@@ -10,7 +10,7 @@
 Report a security issue in this repository through GitHub's private vulnerability reporting —
 **[Security → Report a vulnerability](https://github.com/TheColliery/Kolwen/security/advisories/new)**
 — **never a public issue**. Private reporting is enabled on this repository; the link above
-opens the form directly.
+opens the form directly. Every report stays private until disclosure, whatever its severity: there is no public track for a low-severity report, because severity is often unclear when a report arrives, and a one-person project cannot take back a public mistake.
 
 A public GitHub issue remains the right channel for an ordinary, non-security bug. If you are
 unsure which you have, use private reporting—it is easy to move a report into the open later,
@@ -66,6 +66,20 @@ than dressed up:
 - A confirmed issue is **disclosed once a fix ships, or at 90 days at most**, through a GitHub Security Advisory on
   this repository. If a release fixes a known vulnerability, the release notes name it.
 - Credit is given to the reporter by default. Say so if you would rather not be named.
+
+## How an advisory is written
+
+An advisory opens with who is affected, who is not, and what to do. The description comes after that. curl's advisories use the same order: "Affected versions" and "Not affected versions", then "Recommendations" ([curl.se/docs/CVE-2023-38545.html](https://curl.se/docs/CVE-2023-38545.html), read 2026-11-15).
+
+Kolwen's site is hosted, and no version of it is installed by a user. So "affected" names the time window in UTC and the deployed Worker version, the version id Cloudflare gives each deployment. A released package, such as the `kolwen` package on PyPI or npm, names its version range.
+
+The description is one sentence in the CVE Program's template ([Key Details Phrasing](https://www.cve.org/Resources/General/Key-Details-Phrasing.pdf), read 2026-11-15): "[VULNTYPE] in [COMPONENT] in [VENDOR] [PRODUCT] [VERSION] allows [ATTACKER] to [IMPACT] via [VECTOR]." Where a detail is not known, the template's defaults apply: "attackers", "unspecified impact", "via unspecified vectors". The product name is always given.
+
+One advisory covers one flaw that can be fixed on its own.
+
+An advisory states facts only, with no promotional wording. The reporter is credited in GitHub's advisory credit, as the section above says, and not in the description.
+
+An advisory starts as a draft repository security advisory, visible only to the maintainer and the people added to it, which is where the impact is discussed privately. It is published when the issue is disclosed, once the fix ships or at 90 days at most, as the section above says. GitHub's documentation ([About repository security advisories](https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/about-repository-security-advisories), read 2026-11-15) describes the two steps as "Create a draft security advisory, and use the draft to privately discuss the impact of the vulnerability on your project" and "Publish the security advisory to alert your community".
 
 ## What this repository already does
 
