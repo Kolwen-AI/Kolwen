@@ -10,7 +10,7 @@
 Report a security issue in this repository through GitHub's private vulnerability reporting —
 **[Security → Report a vulnerability](https://github.com/TheColliery/Kolwen/security/advisories/new)**
 — **never a public issue**. Private reporting is enabled on this repository; the link above
-opens the form directly.
+opens the form directly. Every report stays private until disclosure, whatever its severity: there is no public track for a low-severity report, because severity is often unclear when a report arrives, and a one-person project cannot take back a public mistake.
 
 A public GitHub issue remains the right channel for an ordinary, non-security bug. If you are
 unsure which you have, use private reporting—it is easy to move a report into the open later,
@@ -67,6 +67,20 @@ than dressed up:
   this repository. If a release fixes a known vulnerability, the release notes name it.
 - Credit is given to the reporter by default. Say so if you would rather not be named.
 
+## How an advisory is written
+
+An advisory opens with who is affected, who is not, and what to do. The description comes after that. curl's advisories carry the same three parts, under "Affected versions", "Not affected versions" and "Recommendations" ([curl.se/docs/CVE-2023-38545.html](https://curl.se/docs/CVE-2023-38545.html), read 2026-11-15), though curl places them after its description.
+
+Kolwen's site is hosted, and no version of it is installed by a user. So "affected" names the time window in UTC and every Worker version that served traffic in it, by the version ID Cloudflare gives each version (a deployment can serve two versions during a gradual deployment). A published package, such as the `kolwen` name-reservation packages on PyPI and npm, names its version range.
+
+The description is one sentence in the CVE Program's template ([Key Details Phrasing](https://www.cve.org/Resources/General/Key-Details-Phrasing.pdf), read 2026-11-15): "[VULNTYPE] in [COMPONENT] in [VENDOR] [PRODUCT] [VERSION] allows [ATTACKER] to [IMPACT] via [VECTOR]." Where a detail is not known, the template's defaults apply: "attackers", "unspecified impact", "via unspecified vectors". The product name is always given.
+
+One advisory covers one flaw that can be fixed on its own.
+
+An advisory states facts only, with no promotional wording. The reporter is credited in GitHub's advisory credit, as the section above says, and not in the description.
+
+An advisory starts as a draft repository security advisory, visible only to the maintainer and the people added to it, which is where the impact is discussed privately. It is published when the issue is disclosed, once the fix ships or at 90 days at most, as the section above says. GitHub's documentation ([About repository security advisories](https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/about-repository-security-advisories), read 2026-11-15) describes the two steps as "Create a draft security advisory, and use the draft to privately discuss the impact of the vulnerability on your project" and "Publish the security advisory to alert your community of the vulnerability once a patch is released". Kolwen also publishes at 90 days when no patch has shipped, as the section above says.
+
 ## What this repository already does
 
 Stated because a reporter is entitled to know the baseline, and because every line here is
@@ -75,8 +89,8 @@ checkable rather than asserted:
 - **Every GitHub Action is pinned to a 40-character commit SHA**, with its human version beside
   it—not a moving tag.
 - **No repository secrets exist.** Publishing to PyPI uses OIDC Trusted Publishing, so there is
-  no long-lived token to steal. Note that the `kolwen` 0.0.0 currently on PyPI predates that
-  workflow and was uploaded by hand; the workflow has not yet run.
+  no long-lived token to steal. The first upload, `kolwen` 0.0.0, predates that
+  workflow and was made by hand; `kolwen` 0.0.1, the current version, was published by the workflow.
 - **Workflow permissions are least-privilege**: `contents: read` at the top of every workflow,
   with write scopes narrowed to the single job that needs them.
 - **No `pull_request_target`, no `workflow_run`**, and no attacker-controllable context
