@@ -40,7 +40,7 @@ nothing here needs an `npm install` to run.
 node scripts/rendered-check.mjs     # every page in a real headless browser: 320 px reflow, 200% text, CSP, the reading theme (Chrome, Chromium or Edge on Linux and macOS; on Windows the headless shell inside WSL; KOLWEN_BROWSER names a binary, or is `wsl` on Windows)
 node --test scripts/rendered-check.test.mjs   # that check's own tests, each defect planted in a copy of web/
 node scripts/surface-check.mjs      # the room's own laws: claims, leakage, orthography, contrast, the tracker claim, production noindex
-node scripts/secret-gate.mjs        # the house secret scan over the tracked tree (the hooks also scan what a commit or push adds)
+node scripts/secret-gate.mjs        # the house secret scan over the staged tree, what a commit records (the hooks also scan what a commit or push adds)
 node --test scripts/secret-scan.test.mjs scripts/secret-gate.test.mjs scripts/legal-state.test.mjs   # the scanner's, the gate's and the legal-state switch's own tests
 node scripts/legal-state.mjs        # check TERMS.md against legal/legal-state.json; --write renders it, and is the only way to flip the Thai 7-day clause
 node brand/make-brand.mjs           # regenerate every brand asset; must leave git clean
@@ -49,7 +49,7 @@ node scripts/post-deploy-check.mjs  # compare the live site to what is committed
 
 The surface check, the brand byte-identity check and the secret gate (with its test files) run in CI on every push and must pass, and so does the `rendered` job, which runs the rendered check in a headless Chrome on the runner. Locally the rendered check says `NOT RUN HERE` and exits 3 when it finds no browser route, which is not a pass; in CI it fails instead. The post-deploy check runs after a deploy.
 
-The repository also ships a `pre-commit` and a `pre-push` hook in `.githooks/` that run the secret scan, then the surface check. `pre-commit` scans the working-tree copy of each tracked file, not what is staged, so a key that is staged and then removed from the working copy passes it; `pre-push` scans the added lines, commit messages and tags of every pushed commit, and CI scans the tree, so that key is caught there. They run only in a clone that ran `git config core.hooksPath .githooks`, and `git push --no-verify` bypasses them; GitHub's server-side secret scanning and push protection stay this repository's other wall.
+The repository also ships a `pre-commit` and a `pre-push` hook in `.githooks/` that run the secret scan, then the surface check. `pre-commit` scans every staged blob, which is what the commit records, so a key that is staged is caught even if the working copy was changed back; `pre-push` scans the added lines, commit messages and tags of every pushed commit, so a key added and later removed inside the pushed range is still found, and CI scans the tree as checked out. They run only in a clone that ran `git config core.hooksPath .githooks`, and `git push --no-verify` bypasses them; GitHub's server-side secret scanning and push protection stay this repository's other wall.
 
 ### Rules that are not style preferences
 
