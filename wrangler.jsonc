@@ -43,7 +43,8 @@
 		"crons": ["*/15 * * * *"]
 	},
 	// Workers Logs (https://developers.cloudflare.com/workers/observability/logs/workers-logs/): invocation_logs off, so a visitor's request is never logged; only the probe results the script writes with console.log are kept.
-	// Free: 200,000 log events a day, 3 days retention.
+	// Today the Workers Logs page above states the Free plan's daily limit and retention. From 2026-12-01 these logs fall under
+	// Cloudflare Observability pricing (https://developers.cloudflare.com/observability/pricing/): on Free, ingestion stops at the daily limit and resumes at 00:00 UTC.
 	"observability": {
 		"enabled": true,
 		"logs": {
