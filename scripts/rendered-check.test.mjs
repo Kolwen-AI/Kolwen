@@ -70,7 +70,7 @@ test('the built pages pass all three checks, in both languages, under their real
 });
 
 test('a 400 px wide element fails the 320 px reflow check on the page that has it, and only there', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<div style="width:400px;height:20px;background:#f00">planted</div><main>')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<div style="width:400px;height:20px;background:#f00">planted</div><main id="main" tabindex="-1">')));
   const { failures } = await run(web, ['reflow']);
   const hit = where(failures, 'terms.html', 'reflow');
   assert.equal(hit.length, 2, 'both languages: ' + JSON.stringify(failures));
@@ -85,7 +85,7 @@ test('the Thai document is measured too: an element only the Thai side holds fai
 });
 
 test('the 320 px check is not the same as any viewport: the planted element passes at a width that holds it', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<div style="width:300px;height:20px">fits</div><main>')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<div style="width:300px;height:20px">fits</div><main id="main" tabindex="-1">')));
   assert.deepEqual((await run(web, ['reflow'])).failures, []);
 });
 
@@ -109,7 +109,7 @@ test('the plan table scrolls inside its own wrapper: a table wider than 320 px n
 });
 
 test('a box that clips its own text fails the 200% text check', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<div id="planted" style="width:7rem;height:1.4rem;overflow:hidden">A sentence that cannot fit in a box of this size at any text size</div><main>')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<div id="planted" style="width:7rem;height:1.4rem;overflow:hidden">A sentence that cannot fit in a box of this size at any text size</div><main id="main" tabindex="-1">')));
   const { failures } = await run(web, ['zoom']);
   const hit = where(failures, 'terms.html', 'zoom');
   assert.ok(hit.length >= 1, JSON.stringify(failures));
@@ -117,20 +117,20 @@ test('a box that clips its own text fails the 200% text check', { skip: SKIP }, 
 });
 
 test('an element that fits at 100% and not at 200% makes the page scroll sideways, which fails the 200% text check', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<div style="min-width:45rem;height:20px">planted</div><main>')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<div style="min-width:45rem;height:20px">planted</div><main id="main" tabindex="-1">')));
   const hit = where((await run(web, ['zoom'])).failures, 'terms.html', 'zoom');
   assert.ok(hit.some(f => /at 200% text: the page scrolls sideways: scrollWidth \d+ > clientWidth/.test(f.detail)), JSON.stringify(hit));
   assert.deepEqual((await run(web, ['reflow'])).failures.filter(f => f.page === 'terms.html').length, 2, 'and at 320 px it fails the reflow check too');
 });
 
 test('text that sticks out of a clipping parent fails the 200% text check', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<div id="frame" style="width:9rem;overflow:hidden"><p style="white-space:nowrap">A line that does not wrap and runs past the frame</p></div><main>')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<div id="frame" style="width:9rem;overflow:hidden"><p style="white-space:nowrap">A line that does not wrap and runs past the frame</p></div><main id="main" tabindex="-1">')));
   const hit = where((await run(web, ['zoom'])).failures, 'terms.html', 'zoom');
   assert.ok(hit.some(f => /text of p is cut by div#frame/.test(f.detail)), JSON.stringify(hit));
 });
 
 test('a box that grows with its text, and a scrolling box, are not a loss', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<div style="min-height:1.4rem;width:12rem">A box that grows with the text it holds, wrapping onto more lines</div><div style="width:9rem;overflow:auto"><p style="white-space:nowrap">A scrolling box keeps all of its text reachable</p></div><main>')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<div style="min-height:1.4rem;width:12rem">A box that grows with the text it holds, wrapping onto more lines</div><div style="width:9rem;overflow:auto"><p style="white-space:nowrap">A scrolling box keeps all of its text reachable</p></div><main id="main" tabindex="-1">')));
   assert.deepEqual((await run(web, ['zoom'])).failures, []);
 });
 
@@ -224,35 +224,35 @@ test('the reading theme: prose pages are solid and follow the device in both col
 });
 
 test('text that is too faint for ONE colour scheme fails that scheme\'s contrast check and not the other\'s', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<main><p id="faint" style="color:#8d8d8d">Faint grey text</p>')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p id="faint" style="color:#8d8d8d">Faint grey text</p>')));
   const { failures } = await run(web, ['contrast']);
   const hit = failures.filter(f => f.check === 'contrast');
   assert.ok(hit.length >= 1 && hit.every(f => f.scheme === 'light' && f.page === 'terms.html'), JSON.stringify(hit));
   assert.match(hit[0].detail, /under the floor in the light scheme: p#faint \d\.\d\d:1 \(floor 4\.5\)/);
-  const web2 = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<main><p id="dim" style="color:#555555">Dark grey text</p>')));
+  const web2 = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p id="dim" style="color:#555555">Dark grey text</p>')));
   const hit2 = (await run(web2, ['contrast'])).failures.filter(f => f.check === 'contrast');
   assert.ok(hit2.length >= 1 && hit2.every(f => f.scheme === 'dark'), JSON.stringify(hit2));
 });
 
 test('large text has the lower floor of 3:1', { skip: SKIP }, async () => {
   // #8d8d8d on the light ground is about 3.2:1: it fails as body text and passes as large text
-  const small = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<main><p style="color:#8d8d8d;font-size:1rem">Body size</p>')));
+  const small = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p style="color:#8d8d8d;font-size:1rem">Body size</p>')));
   assert.ok((await run(small, ['contrast'])).failures.some(f => f.scheme === 'light'));
-  const large = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<main><p style="color:#8d8d8d;font-size:1.6rem">Large size</p>')));
+  const large = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p style="color:#8d8d8d;font-size:1.6rem">Large size</p>')));
   assert.deepEqual((await run(large, ['contrast'])).failures, []);
 });
 
 test('a translucent text colour is measured over what it really sits on, and a disabled control is exempt', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<main><p style="color:rgba(0,0,0,0.3)">Translucent</p><button disabled style="color:#bbbbbb">Inactive</button>')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p style="color:rgba(0,0,0,0.3)">Translucent</p><button disabled style="color:#bbbbbb">Inactive</button>')));
   const hit = (await run(web, ['contrast'])).failures.filter(f => f.check === 'contrast');
   assert.ok(hit.some(f => f.scheme === 'light') && hit.some(f => f.scheme === 'dark'), 'the translucent black text fails on both grounds: ' + JSON.stringify(hit));
   assert.ok(!hit.some(f => /button/.test(f.detail)), 'the disabled button is not measured');
 });
 
 test('the opacity of an element counts: faded text fails where the same colour at full strength passes', { skip: SKIP }, async () => {
-  const full = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<main><p>Full strength</p>')));
+  const full = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p>Full strength</p>')));
   assert.deepEqual((await run(full, ['contrast'])).failures, []);
-  const faded = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<main><p id="faded" style="opacity:0.35">Faded text</p>')));
+  const faded = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p id="faded" style="opacity:0.35">Faded text</p>')));
   const hit = (await run(faded, ['contrast'])).failures.filter(f => f.check === 'contrast');
   assert.ok(hit.length >= 2 && hit.every(f => /p#faded/.test(f.detail)), JSON.stringify(hit));
 });
@@ -1298,7 +1298,7 @@ test('the marker records intent, not origin (a stated limit): a folder that hold
 });
 
 test('a resource asked for by host name is a finding: the browser resolves no host name, so it fails, and the run says which address', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main>', '<img src="http://cdn.kolwen-no-such-host.example/x.png" alt=""><main>')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<img src="http://cdn.kolwen-no-such-host.example/x.png" alt=""><main id="main" tabindex="-1">')));
   const { failures } = await run(web, ['reflow']);
   const hit = failures.filter(f => f.check === 'resources');
   assert.deepEqual(hit.map(f => [f.page, f.lang]), [['terms.html', 'en'], ['terms.html', 'th']], JSON.stringify(failures));
@@ -1378,4 +1378,61 @@ test('a Thai heading in a KW Mono stack fails the glyphs check on the page that 
   assert.equal(hit[0].lang, 'th');
   assert.match(hit[0].detail, /h2 "ช่องทางทางการ": a face the site does not ship draws it \(/);
   assert.equal(failures.length, 1, 'no other page or language fails: ' + JSON.stringify(failures));
+});
+
+// ── glyphs: one element the browser refuses is that element's failure, and the rest are read ───────────────────────────────────────────────────────
+// A fake page with the two protocol calls the reader makes: the first element's CSS read is refused (a node removed by a page update, say), and the second is read.
+test('a glyph read the browser refuses is that element\'s own record, and the next element is still read', async () => {
+  const page = {
+    evaluate: async expr => (expr.includes('fonts.ready') || expr.includes('removeAttribute') ? true : [{ tag: 'h2', sample: 'ก' }, { tag: 'p', sample: 'ข' }]),
+    send: async (method, params) => {
+      if (method === 'DOM.getDocument') return { root: { nodeId: 1 } };
+      if (method === 'DOM.querySelectorAll') return { nodeIds: [10, 11] };
+      if (method === 'DOM.getAttributes') return { attributes: ['data-glyph-probe', params.nodeId === 10 ? '0' : '1'] };
+      if (method === 'CSS.getPlatformFontsForNode') {
+        if (params.nodeId === 10) throw new Error('No node with given id found');
+        return { fonts: [{ familyName: 'KW Sans Thai SmBld', isCustomFont: true, glyphCount: 3 }] };
+      }
+      return {};
+    },
+  };
+  const out = await checkLib.thaiElementFaces(page);
+  assert.equal(out.length, 2, 'both elements are in the result');
+  assert.equal(out[0].error, 'No node with given id found');
+  assert.equal(out[0].fonts, null);
+  assert.equal(out[1].tag, 'p');
+  assert.equal(checkLib.glyphVerdict(out[1].fonts), null);
+});
+
+// ── skip, header, keys: the header specs (C1 to C4), on the built pages and on a planted defect each ──────────────────────────────────────────────
+test('the built pages pass the skip link, the header and the keyboard checks, in both languages', { skip: SKIP }, async () => {
+  const { failures, measured } = await run(join(ROOT, 'web'), ['skip', 'header', 'keys']);
+  assert.deepEqual(failures, []);
+  for (const c of ['skip', 'header', 'keys']) assert.ok(measured.some(m => m.check === c), `${c} was measured`);
+});
+
+test('a skip link hidden with display:none fails the skip check: it is not in the tab order, so the first Tab focuses the mark', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('.skip{position:absolute;', '.skip{display:none !important;position:absolute;')));
+  const { failures } = await run(web, ['skip']);
+  // A hidden skip link is not in the tab order (the first Tab focuses the mark, one finding per language) and has no accessible name (a second finding per language):
+  // both are the defect, so the test counts the tab-order finding and requires every finding to be on this page.
+  const hit = where(failures, 'terms.html', 'skip');
+  assert.equal(hit.filter(f => /the first Tab from a fresh load focuses mark/.test(f.detail)).length, 2, JSON.stringify(failures));
+  assert.ok(failures.every(f => f.page === 'terms.html'), 'no other page fails: ' + JSON.stringify(failures));
+  assert.ok(hit.some(f => /accessible name/.test(f.detail)), 'the hidden link has no accessible name: ' + JSON.stringify(failures));
+});
+
+test('a header whose English mark has a name without its visible word fails the header check on that page, in English only', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('aria-label="Kolwen home"', 'aria-label="Home"')));
+  const { failures } = await run(web, ['header']);
+  assert.deepEqual(failures.map(f => [f.page, f.lang, f.check]), [['terms.html', 'en', 'header']], JSON.stringify(failures));
+  assert.match(failures[0].detail, /a header link's visible text is not in its accessible name: Kolwen is not in Home/);
+});
+
+test('a header language button taken out of the tab order fails the keys check: the English-language Tab order skips it', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('data-lang-set="th" lang="th" aria-pressed="false">', 'data-lang-set="th" lang="th" aria-pressed="false" tabindex="-1">')));
+  const { failures } = await run(web, ['keys']);
+  const hit = where(failures, 'terms.html', 'keys');
+  assert.ok(hit.some(f => f.lang === 'en' && /Tab does not reach switch:th@en/.test(f.detail)), JSON.stringify(failures));
+  assert.equal(failures.every(f => f.page === 'terms.html'), true, 'no other page fails: ' + JSON.stringify(failures));
 });

@@ -62,6 +62,12 @@
     --kw-size-container-wide:68.75rem;
     --kw-size-container-compact:38rem;
     --kw-size-measure-reading:33em;
+    --kw-font-size-header-link:0.90625rem;
+    --kw-font-size-header-name:1.125rem;
+    --kw-font-size-header-switch:0.78125rem;
+    --kw-size-header-row:2.75rem;
+    --kw-size-header:calc(var(--kw-size-header-row) + 2 * var(--kw-space-header-block) + 1px);
+    --kw-size-header-switch:2.125rem;
     --kw-line-height-body:1.6;
     --kw-line-height-thai:1.65;
     --kw-color-switch-border:rgba(128, 128, 128, 0.7);
@@ -93,19 +99,24 @@ p{margin:0 0 .6rem;color:var(--dim)}
 a{color:var(--amber)}
 /* site-header-css:begin */
   .site-header{border-bottom:1px solid rgba(128,128,128,.35);padding-block:var(--kw-space-header-top) var(--kw-space-header-block);padding-inline:var(--kw-space-gutter-inline)}
-  .site-header nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;font-size:var(--kw-font-size-6)}
+  .site-header nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;font-size:var(--kw-font-size-header-link)}
   .site-header nav[lang="th"]{display:none}
   html[lang="th"] .site-header nav[lang="en"]{display:none}
   html[lang="th"] .site-header nav[lang="th"]{display:flex}
-  .site-header a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;min-height:44px;overflow-wrap:anywhere}
+  .site-header a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);overflow-wrap:anywhere}
   .site-header a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
-  .site-header .hmark{gap:10px;font-weight:700;font-size:var(--kw-font-size-9);letter-spacing:.01em;margin-right:auto}
+  .site-header .hmark{gap:10px;font-weight:700;font-size:var(--kw-font-size-header-name);letter-spacing:.01em;margin-right:auto}
   .site-header .hglyph,.site-footer .fglyph{flex:none;display:block;fill:var(--accent,var(--amber,#e8833a))}
   .lswitch{display:inline-flex;gap:6px}
-  .lswitch button{font:inherit;font-size:var(--kw-font-size-2);color:inherit;background:transparent;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:34px;cursor:pointer}
+  .lswitch button{font:inherit;font-size:var(--kw-font-size-header-switch);color:inherit;background:transparent;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:var(--kw-size-header-switch);cursor:pointer}
   .lswitch button:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
   .lswitch button[aria-pressed="true"]{border-color:currentColor;font-weight:600}
   .site-header :focus-visible,.site-footer :focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.skip{position:absolute;z-index:100;inset-block-start:var(--kw-space-header-top);inset-inline-start:max(var(--kw-space-inset-inline), env(safe-area-inset-left, 0px));display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);padding-inline:var(--kw-space-button);color:var(--txt);background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:var(--kw-font-size-header-link);text-decoration:none;clip-path:inset(50%)}
+.skip:focus-visible{clip-path:none;outline:2px solid currentColor;outline-offset:2px}
+  .skip[lang="th"]{display:none}
+  html[lang="th"] .skip[lang="en"]{display:none}
+  html[lang="th"] .skip[lang="th"]{display:inline-flex}
 /* site-header-css:end */
 /* site-footer-css:begin */
   .site-footer{display:block;margin-top:var(--kw-space-footer-offset);padding-block:var(--kw-space-footer-top) var(--kw-space-footer-end);padding-inline:var(--kw-space-gutter-inline);border-top:1px solid rgba(128,128,128,.35);font-size:var(--kw-font-size-4);line-height:1.7}
@@ -131,11 +142,14 @@ a{color:var(--amber)}
   #doc-th{display:block !important;border-top:1px solid var(--line);padding-top:28px}
   .site-header nav[lang="th"]{display:flex !important}
   .site-footer[lang="th"]{display:block !important}
+  .skip[lang="th"]{display:inline-flex !important}
 /* site-noscript-css:end */
 </style></noscript>
 </head>
 <body>
 <!-- site-header:begin -->
+<a class="skip" href="#main" lang="en">Skip to main content</a>
+<a class="skip" href="#main" lang="th">ข้ามไปยังเนื้อหาหลัก</a>
 <header class="site-header">
 <nav lang="en" aria-label="Main">
 <a class="hmark" href="/" aria-label="Kolwen home"><svg class="hglyph" viewBox="0 0 100 100" width="26" height="26" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg><span>Kolwen</span></a>
@@ -149,7 +163,7 @@ a{color:var(--amber)}
 </nav>
 </header>
 <!-- site-header:end -->
-<main data-status>
+<main id="main" tabindex="-1" data-status>
   <div id="doc-en" lang="en">
   <h1>Status</h1>
   <p>Kolwen checks its public pages every 15 minutes. The last check is shown here.</p>

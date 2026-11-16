@@ -87,6 +87,15 @@ export const TOKENS = {
   // (readingCss), so this em is the body's. 33em is the column the pages had when their body was 14.5 px (480 px = 33.1 em): the same number of characters on a line at any body size, which held at most 80 Latin
   // characters on a rendered line (SC 1.4.8, a TARGET, never claimed as met; the rendered check measures it on every prose page, in both languages, and fails a line over 80).
   'size.measure.reading': '33em',
+  // The header (C5, the design seat's order 2026-11-16b): the height of its tap targets and row, and the derived height of the whole bar, which is for the one place that must know it (a
+  // scroll-padding-top if the header ever becomes sticky; today it is not sticky, so nothing reads it yet). The three type sizes are the sizes the header already rendered (14.5, 18 and
+  // 12.5 px), named so that a role can move without moving every other use of its step. Every number is the number the site already rendered.
+  'font.size.header-link': rem(14.5),
+  'font.size.header-name': rem(18),
+  'font.size.header-switch': rem(12.5),
+  'size.header-row': rem(44),
+  'size.header': 'calc(var(--kw-size-header-row) + 2 * var(--kw-space-header-block) + 1px)',
+  'size.header-switch': rem(34),
   // Line heights: the Latin body text (the house's 1.6, at least the 1.5 of SC 1.4.8) and the Thai text of a reading page (1.65: at 1.5 the tallest marks of the bold face collide).
   'line-height.body': '1.6',
   'line-height.thai': '1.65',

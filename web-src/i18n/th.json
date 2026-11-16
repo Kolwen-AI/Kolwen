@@ -285,6 +285,7 @@
   },
   "shared": {
     "brand": "Kolwen",
+    "skip": "ข้ามไปยังเนื้อหาหลัก",
     "header": {
       "label": "เมนูหลัก",
       "home": "หน้าแรกของ Kolwen",
