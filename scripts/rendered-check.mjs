@@ -44,6 +44,7 @@
 //   keys     Tab from a fresh load visits the skip link, the mark, Pricing, English and ไทย in that order (C4); Space and Enter on the other language move the html lang and the focus to the
 //            same-language header button now shown, and leave the scroll position unchanged; the language already shown changes neither. LIMIT: the scroll is 200 px into the page, so a page shorter
 //            than 300 px fails as "cannot be read" rather than passing.
+//   Not checked here (C1 to C4 list them): the dark and light schemes for the header checks (default scheme only), the Tab after Enter into main, axe and the Nu checker, text spacing at 320 px, visual order after wrapping, the footer's language toggle, a throwing localStorage, and keyboard traps.
 // Usage: node scripts/rendered-check.mjs [--web <dir>] [--only reflow,zoom,csp,theme,contrast,lineheight,measure,glyphs,skip,header,keys] [--no-headers]
 import { isMainModule } from './lib/entry-guard.mjs'; // by real path: a run through a junction or a symlink still runs
 import { fileURLToPath } from 'node:url';
@@ -330,7 +331,14 @@ function skipRest(lang) {
   const shown = document.querySelector('a.skip[lang="' + lang + '"]');
   const other = document.querySelector('a.skip[lang="' + (lang === 'th' ? 'en' : 'th') + '"]');
   const cs = shown ? getComputedStyle(shown) : null;
-  return { shown: !!shown, clip: cs ? cs.clipPath : null, display: cs ? cs.display : null, otherDisplay: other ? getComputedStyle(other).display : null };
+  // The hit test: at rest, the browser must not hit the link at its centre. A clip-path that clips nothing (inset(0px)) passes the clip test and fails this one.
+  let restHit = false;
+  if (shown) {
+    const r = shown.getBoundingClientRect();
+    const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    restHit = !!h && (h === shown || shown.contains(h));
+  }
+  return { shown: !!shown, clip: cs ? cs.clipPath : null, display: cs ? cs.display : null, otherDisplay: other ? getComputedStyle(other).display : null, restHit };
 }
 // The header's visible items at the current width: the rows they sit on, whether any is outside the viewport, each link's visible text against its accessible name, and repeated names.
 function measureHeader() {
@@ -339,10 +347,12 @@ function measureHeader() {
   if (!nav) return { navs: 0 };
   const vw = document.documentElement.clientWidth, vh = window.innerHeight;
   const items = [...nav.querySelectorAll('a, button')].filter(e => e.getClientRects().length > 0);
-  const tops = [], outside = [];
+  // Rows by vertical overlap: an item joins a row when its box overlaps the row's band, so a link (44 px) and a button (34 px) centred on the same row are one row.
+  const rows = [], outside = [];
   for (const e of items) {
     const r = e.getBoundingClientRect();
-    if (!tops.some(t => Math.abs(t - r.top) < 2)) tops.push(r.top);
+    const row = rows.find(w => r.top < w.b && r.bottom > w.t);
+    if (row) { row.t = Math.min(row.t, r.top); row.b = Math.max(row.b, r.bottom); } else rows.push({ t: r.top, b: r.bottom });
     if (r.left < 0 || r.top < 0 || r.right > vw || r.bottom > vh) outside.push(e.tagName.toLowerCase() + (e.getAttribute('data-lang-set') ? '[' + e.getAttribute('data-lang-set') + ']' : '') + (e.classList.contains('hmark') ? '.hmark' : ''));
   }
   const norm = s => s.replace(/\s+/g, ' ').trim();
@@ -350,7 +360,7 @@ function measureHeader() {
   const notContained = links.filter(l => !l.name.includes(l.visible)).map(l => l.visible + ' is not in ' + l.name);
   const names = links.map(l => l.name);
   const dupes = names.filter((n, i) => names.indexOf(n) !== i);
-  return { navs: navs.length, items: items.length, rows: tops.length, outside, notContained, dupes, vw, vh };
+  return { navs: navs.length, items: items.length, rows: rows.length, outside, notContained, dupes, vw, vh };
 }
 // The scroll position a key press must not change: the page is scrolled to 200 px (or to its end, if shorter) and the position read back after the press.
 const SCROLL_TO = `(() => { const max = document.documentElement.scrollHeight - window.innerHeight; const y = Math.min(200, Math.max(0, max)); window.scrollTo(0, y); return { max, y: window.scrollY }; })()`;
@@ -376,7 +386,7 @@ export async function headerChecks(page, origin, path, lang, tag, checks, failur
     const rest = await page.evaluate(`(${skipRest})(${JSON.stringify(lang)})`);
     measured.push({ ...tag, check: 'skip', rest: rest.shown, clip: rest.clip });
     if (!rest.shown) fail('skip', `no skip link in ${lang}`);
-    else if (rest.clip === 'none') fail('skip', 'at rest the skip link is not clipped away, so it is visible before it is focused');
+    else if (rest.clip === 'none' || rest.restHit) fail('skip', 'at rest the skip link is not clipped away, so it is visible before it is focused');
     if (rest.shown && rest.otherDisplay !== 'none') fail('skip', `the ${other} copy of the skip link is not hidden (display ${rest.otherDisplay}), so it would sit in the tab order too`);
     const name = await accessibleName(page, `a.skip[lang="${lang}"]`);
     if (name !== label) fail('skip', `its accessible name is "${reportField(String(name))}", the catalogue string is "${reportField(label)}"`);

@@ -1436,3 +1436,28 @@ test('a header language button taken out of the tab order fails the keys check: 
   assert.ok(hit.some(f => f.lang === 'en' && /Tab does not reach switch:th@en/.test(f.detail)), JSON.stringify(failures));
   assert.equal(failures.every(f => f.page === 'terms.html'), true, 'no other page fails: ' + JSON.stringify(failures));
 });
+
+// ── the reviewer's findings on the skip, header and keys checks (C151b-2, C151b-3) ────────────────────────────────────────────────────────────────
+// m1: a clip-path that clips nothing. The link is visible at rest, so the centre of its box is hit: the rest check fails it in both languages.
+test('a skip link whose clip-path clips nothing is visible at rest, and fails the skip check in both languages', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('clip-path:inset(50%)}', 'clip-path:inset(0px)}')));
+  const { failures } = await run(web, ['skip']);
+  const hit = where(failures, 'terms.html', 'skip').filter(f => /not clipped away/.test(f.detail));
+  assert.deepEqual(hit.map(f => f.lang).sort(), ['en', 'th'], JSON.stringify(failures));
+  assert.ok(failures.every(f => f.page === 'terms.html'), 'no other page fails: ' + JSON.stringify(failures));
+});
+
+// m4: the mark on a row of its own, with the links and buttons below it. Two rows, by overlap, so the header check passes; the old count by distinct tops read three.
+test('a header whose mark takes a row of its own is two rows, and passes the header check', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('.site-header .hmark{gap:10px;', '.site-header .hmark{flex-basis:100%;gap:10px;')));
+  const { failures } = await run(web, ['header']);
+  assert.deepEqual(where(failures, 'terms.html', 'header'), [], JSON.stringify(failures));
+});
+
+// The three-row shape still fails: a column nav stacks every item on its own row.
+test('a header whose nav is a column stacks its items on more than two rows, and fails the header check', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('.site-header nav{display:flex;flex-wrap:wrap;', '.site-header nav{display:flex;flex-direction:column;flex-wrap:wrap;')));
+  const { failures } = await run(web, ['header']);
+  const hit = where(failures, 'terms.html', 'header').filter(f => /sit on \d+ rows/.test(f.detail));
+  assert.ok(hit.length >= 1, JSON.stringify(failures));
+});
