@@ -215,19 +215,27 @@ function refundBody(clauseMd, termsClass, lang, opts) {
 // rule shows the one that matches. With no script the Thai ones are shown too (NOSCRIPT_STYLE), as the Thai document is.
 export const HEADER_CSS = [
   "  .site-header{border-bottom:1px solid rgba(128,128,128,.35);padding-block:var(--kw-space-header-top) var(--kw-space-header-block);padding-inline:var(--kw-space-gutter-inline)}",
-  "  .site-header nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;font-size:var(--kw-font-size-6)}",
+  "  .site-header nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;font-size:var(--kw-font-size-header-link)}",
   '  .site-header nav[lang="th"]{display:none}',
   '  html[lang="th"] .site-header nav[lang="en"]{display:none}',
   '  html[lang="th"] .site-header nav[lang="th"]{display:flex}',
-  "  .site-header a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;min-height:44px;overflow-wrap:anywhere}",
+  "  .site-header a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);overflow-wrap:anywhere}",
   "  .site-header a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}",
-  "  .site-header .hmark{gap:10px;font-weight:700;font-size:var(--kw-font-size-9);letter-spacing:.01em;margin-right:auto}",
+  "  .site-header .hmark{gap:10px;font-weight:700;font-size:var(--kw-font-size-header-name);letter-spacing:.01em;margin-right:auto}",
   "  .site-header .hglyph,.site-footer .fglyph{flex:none;display:block;fill:var(--accent,var(--amber,#e8833a))}",
   "  .lswitch{display:inline-flex;gap:6px}",
-  "  .lswitch button{font:inherit;font-size:var(--kw-font-size-2);color:inherit;background:transparent;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:34px;cursor:pointer}",
+  "  .lswitch button{font:inherit;font-size:var(--kw-font-size-header-switch);color:inherit;background:transparent;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:var(--kw-size-header-switch);cursor:pointer}",
   "  .lswitch button:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}",
   '  .lswitch button[aria-pressed="true"]{border-color:currentColor;font-weight:600}',
-  "  .site-header :focus-visible,.site-footer :focus-visible{outline:2px solid currentColor;outline-offset:2px}"].join('\n');
+  "  .site-header :focus-visible,.site-footer :focus-visible{outline:2px solid currentColor;outline-offset:2px}",
+  // The skip link (C1). It sits before the header in the document and is written inside this block with it. At rest it is clipped to nothing, not hidden: it stays in the tab order and in the
+  // accessibility tree, and a display:none would take it out of both. On :focus-visible it appears at the header's top-left, inside the gutter, over the header, with the page's own tokens.
+  // Each language has its own copy, shown and hidden by the same rule as the header navs, so only one copy is in the tab order.
+  ".skip{position:absolute;z-index:100;inset-block-start:var(--kw-space-header-top);inset-inline-start:max(var(--kw-space-inset-inline), env(safe-area-inset-left, 0px));display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);padding-inline:var(--kw-space-button);color:var(--txt);background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:var(--kw-font-size-header-link);text-decoration:none;clip-path:inset(50%)}",
+  ".skip:focus-visible{clip-path:none;outline:2px solid currentColor;outline-offset:2px}",
+  '  .skip[lang="th"]{display:none}',
+  '  html[lang="th"] .skip[lang="en"]{display:none}',
+  '  html[lang="th"] .skip[lang="th"]{display:inline-flex}'].join('\n');
 
 export const FOOTER_CSS = [
   "  .site-footer{display:block;margin-top:var(--kw-space-footer-offset);padding-block:var(--kw-space-footer-top) var(--kw-space-footer-end);padding-inline:var(--kw-space-gutter-inline);border-top:1px solid rgba(128,128,128,.35);font-size:var(--kw-font-size-4);line-height:1.7}",
@@ -283,7 +291,9 @@ const switchButtons = () => [
 export const SWITCH_BUTTONS = (() => { try { return switchButtons(); } catch { return []; } })();
 const switchHtml = lang => `<div class="lswitch" role="group" aria-label="${escAttr(t(lang, 'shared.header.language'))}">${switchButtons().join('')}</div>`;
 // The header: the Kolwen mark linking to /, Pricing, the switch. No Dashboard and no Sign in until the service exists, and no link to a page that does not.
-export const siteHeaderHtml = () => ['<header class="site-header">', ...['en', 'th'].map(lang => {
+// The skip link (C1): one per language, written immediately before the header, outside its nav. Its target is the page's main (id="main", tabindex="-1"), so activating it moves focus there.
+const skipLinkHtml = lang => `<a class="skip" href="#main" lang="${lang}">${tHtml(lang, 'shared.skip')}</a>`;
+export const siteHeaderHtml = () => [...['en', 'th'].map(skipLinkHtml), '<header class="site-header">', ...['en', 'th'].map(lang => {
   return [`<nav lang="${lang}" aria-label="${escAttr(t(lang, 'shared.header.label'))}">`, `<a class="hmark" href="/" aria-label="${escAttr(t(lang, 'shared.header.home'))}">${markSvg(26, 'hglyph')}<span>${tHtml(lang, 'shared.brand')}</span></a>`,
     `<a href="/pricing">${tHtml(lang, 'shared.header.pricing')}</a>`, switchHtml(lang), '</nav>'].join('\n');
 }), '</header>'].join('\n');
@@ -414,7 +424,8 @@ export const NOSCRIPT_STYLE = [
   "  .lswitch{display:none}",
   "  #doc-th{display:block !important;border-top:1px solid var(--line);padding-top:28px}",
   '  .site-header nav[lang="th"]{display:flex !important}',
-  '  .site-footer[lang="th"]{display:block !important}'].join('\n');
+  '  .site-footer[lang="th"]{display:block !important}',
+  '  .skip[lang="th"]{display:inline-flex !important}'].join('\n');
 
 // The page script: the language choice. It keeps the SAME localStorage key as before, 'kolwen-lang', and the same behaviour (show the saved language, switch on a
 // click, remember it); the only difference is that it finds the switches by data-lang-set instead of by id, so a page can hold more than one (the header's and the
@@ -550,7 +561,7 @@ ${fenced('site-noscript-css')}
 </head>
 <body>
 ${fenced('site-header')}
-<main>
+<main id="main" tabindex="-1">
   <div id="doc-en" lang="en">
 ${en}
   </div>

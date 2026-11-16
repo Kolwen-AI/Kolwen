@@ -1053,12 +1053,14 @@ test('surface-check rule 17 allows a live button only when it is exactly a switc
     const page = join(dir, 'web/pricing.html'), real = readFileSync(page, 'utf8');
     const REAL = '<button type="button" data-lang-set="en" lang="en" aria-pressed="true">English</button>';
     assert.ok(real.includes(REAL), 'the page holds the real switch button');
+    // The page's main element, as the renderer writes it (id and tabindex for the skip link's target, C1): the cases insert their markup right after it.
+    const MAIN_OPEN = '<main id="main" tabindex="-1">';
     const cases = [
-      ['a buy button carrying the attribute, in main', x => x.replace('<main>', () => '<main><button type="button" data-lang-set="en">Buy now</button>')],
+      ['a buy button carrying the attribute, in main', x => x.replace(MAIN_OPEN, () => MAIN_OPEN + '<button type="button" data-lang-set="en">Buy now</button>')],
       ['a buy button carrying the attribute inside the header block', x => x.replace(MARK.header.begin, () => MARK.header.begin + '\n<button type="button" data-lang-set="en">Buy now</button>')],
       ['a footer-block button with the attribute and another text', x => x.replace(MARK.en.begin, () => MARK.en.begin + '\n<button type="button" data-lang-set="th" lang="th" aria-pressed="false">Buy</button>')],
-      ['the real switch button, moved out of the shared blocks into main', x => x.replace('<main>', () => '<main>' + REAL)],
-      ['a switch button for a language the page does not have', x => x.replace('<main>', () => '<main><button type="button" data-lang-set="fr">Français</button>')],
+      ['the real switch button, moved out of the shared blocks into main', x => x.replace(MAIN_OPEN, () => MAIN_OPEN + REAL)],
+      ['a switch button for a language the page does not have', x => x.replace(MAIN_OPEN, () => MAIN_OPEN + '<button type="button" data-lang-set="fr">Français</button>')],
     ];
     for (const [what, fn] of cases) {
       const y = fn(real);
@@ -1159,12 +1161,33 @@ const mix = (fg, a, bg) => fg.map((c, i) => Math.round(c * a + bg[i] * (1 - a)))
 const css = html => (html.match(/<style>[\s\S]*?<\/style>/g) || []).join('\n').replace(/\/\* site-tokens-css:begin \*\/[\s\S]*?\/\* site-tokens-css:end \*\//, '');
 const varIn = (text, name) => { const m = new RegExp('--' + name + ':(#[0-9a-fA-F]{6})').exec(text); assert.ok(m, 'var --' + name); return rgb(m[1]); };
 
+// The one allowed divergence (the head's ruling, 2026-11-16, UNIT 2 of CONTINUE 151): the skip link draws over the page content when it is focused, so it names its own ground and its
+// text colour, the body's own pair (--txt on --bg, C1 spec item 6). Only a rule whose selector is .skip (or .skip:focus-visible) may set those two values. Every other header rule is
+// held to inherit for its colour, and to transparent, inherit or none for its background.
+const SKIP_SELECTOR = /^\.skip(:focus-visible)?$/;
+function headerColourViolations(css) {
+  const out = [];
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = m[1].trim(), body = m[2];
+    for (const d of body.matchAll(/(?:^|;)\s*(color|background(?:-color)?):([^;]*)/g)) {
+      const prop = d[1], value = d[2];
+      const plain = prop === 'color' ? value === 'inherit' : ['transparent', 'inherit', 'none'].includes(value);
+      const skipOwn = SKIP_SELECTOR.test(selector) && (prop === 'color' ? value === 'var(--txt)' : value === 'var(--bg)');
+      if (!plain && !skipOwn) out.push(selector + ' sets ' + prop + ':' + value);
+    }
+  }
+  return out;
+}
 test('the footer and header css have no opacity and no hover colour, so no text is dimmed below its page colour', () => {
   for (const [name, rules] of [['footer', FOOTER_CSS], ['header', HEADER_CSS]]) {
     assert.ok(!/opacity/.test(rules), 'no opacity in the ' + name + ' rules');
-    for (const m of rules.matchAll(/[{;]\s*color:([^;}]*)/g)) assert.equal(m[1], 'inherit', 'the only colour a ' + name + ' rule sets is inherit');
+    assert.deepEqual(headerColourViolations(rules), [], 'the only colour a ' + name + ' rule sets is inherit, except the skip link\'s own pair');
     assert.ok(!/:hover\{[^}]*color/.test(rules), name + ': hover does not change the colour (it underlines)');
   }
+});
+test('the colour check is not vacuous: a header rule that sets a colour, or a skip rule with another colour, is a violation', () => {
+  assert.deepEqual(headerColourViolations(HEADER_CSS + '\n.site-header nav{color:var(--txt)}'), ['.site-header nav sets color:var(--txt)']);
+  assert.deepEqual(headerColourViolations(HEADER_CSS + '\n.skip{color:var(--quiet)}'), ['.skip sets color:var(--quiet)']);
 });
 
 test('every footer text colour measures at least 4.5:1 on every page background (dark pages with the brightest gradient point, the 404 page in both colour schemes)', () => {

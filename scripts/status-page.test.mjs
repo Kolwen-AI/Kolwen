@@ -28,7 +28,8 @@ test('the status page loads nothing from a third-party origin: every script, ima
 
 test('the status page fetches /status.json and nothing else', () => {
   const html = read('web/status.html');
-  assert.match(html, /<main data-status>/, 'the page script finds the status page by this marker');
+  // The page script finds the status page by its data-status attribute (legal-render.mjs: document.querySelector('[data-status]')), so the test pins the attribute, not the tag's other attributes.
+  assert.match(html, /<main\b[^>]*\sdata-status[\s>]/, 'the page script finds the status page by this marker');
   const targets = [...html.matchAll(/fetch\(\s*['"]([^'"]*)['"]/g)].map(m => m[1]);
   assert.deepEqual(targets, ['/status.json']);
 });
