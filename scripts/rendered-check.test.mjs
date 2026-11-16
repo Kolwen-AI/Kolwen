@@ -1345,3 +1345,37 @@ test('K-17: a checked page reaches only its own origin: a request to another loo
     } finally { await page.close(); await server.close(); }
   } finally { await new Promise(r => other.close(r)); }
 });
+
+// ── glyphs: the Thai text is drawn by the site's own Thai face ───────────────────────────────────────────────────────────────────────────────────
+// The verdict on an element's faces, without a browser: the faces are what CSS.getPlatformFontsForNode reports, in the shape a KW Sans Thai weight and a system face take.
+test('glyphVerdict: a Thai element drawn by a site face alone passes; a system face, no Thai face, or no face at all fails', () => {
+  const sans = { familyName: 'KW Sans Thai SmBld', isCustomFont: true, glyphCount: 12 };
+  const mono = { familyName: 'KW Mono', isCustomFont: true, glyphCount: 4 };
+  assert.equal(checkLib.glyphVerdict([sans, mono]), null);
+  assert.equal(checkLib.glyphVerdict([sans]), null);
+  assert.match(checkLib.glyphVerdict([{ familyName: 'DejaVu Sans Mono', isCustomFont: false, glyphCount: 9 }]), /a face the site does not ship draws it \(DejaVu Sans Mono\)/);
+  assert.match(checkLib.glyphVerdict([sans, { familyName: 'DejaVu Sans Mono', isCustomFont: false, glyphCount: 2 }]), /a face the site does not ship draws it \(DejaVu Sans Mono\)/);
+  assert.match(checkLib.glyphVerdict([{ familyName: 'KW Sans Thai', isCustomFont: false, glyphCount: 9 }]), /a face the site does not ship draws it \(KW Sans Thai\)/);
+  assert.match(checkLib.glyphVerdict([mono]), /no KW Sans Thai face draws it \(the faces: KW Mono\)/);
+  assert.match(checkLib.glyphVerdict([{ familyName: 'KW Sans Thai', isCustomFont: true, glyphCount: 0 }]), /no KW Sans Thai face draws it/);
+  assert.match(checkLib.glyphVerdict([]), /no KW Sans Thai face draws it \(the faces: none\)/);
+});
+
+test('the built pages draw their Thai text with the site\'s Thai face, in both languages', { skip: SKIP }, async () => {
+  const { failures, measured } = await run(join(ROOT, 'web'), ['glyphs']);
+  assert.deepEqual(failures, []);
+  const th = measured.filter(m => m.check === 'glyphs' && m.lang === 'th');
+  assert.equal(th.length, PAGE_COUNT, 'every page was measured in Thai');
+  for (const m of th) assert.ok(m.read > 0, `${m.page} [th] read its Thai text elements (${m.read})`);
+});
+
+// The defect this check was written for: a Thai heading in a Latin mono stack with no Thai face in it. It fails in the Thai document only, and on that element.
+test('a Thai heading in a KW Mono stack fails the glyphs check on the page that has it, in the Thai document only', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<div id="doc-th" lang="th" hidden>', '<div id="doc-th" lang="th" hidden><h2 style="font-family:\'KW Mono\',monospace">ช่องทางทางการ</h2>')));
+  const { failures } = await run(web, ['glyphs']);
+  const hit = where(failures, 'terms.html', 'glyphs');
+  assert.equal(hit.length, 1, JSON.stringify(failures));
+  assert.equal(hit[0].lang, 'th');
+  assert.match(hit[0].detail, /h2 "ช่องทางทางการ": a face the site does not ship draws it \(/);
+  assert.equal(failures.length, 1, 'no other page or language fails: ' + JSON.stringify(failures));
+});

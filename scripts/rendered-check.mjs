@@ -28,7 +28,13 @@
 // on this machine the run says so in one line and exits 3, "not run here": never a pass, and the pass is the pull request's CI (the rendered job) or a person's own browser looking at the pages. In
 // CI (CI=true) a missing browser FAILS (exit 1): a silent skip in CI is the one outcome this script refuses.
 // Exit codes: 0 passed, 1 findings (or no browser in CI), 2 a bad argument, 3 not run here.
-// Usage: node scripts/rendered-check.mjs [--web <dir>] [--only reflow,zoom,csp,theme,contrast,lineheight,measure] [--no-headers]
+// And for every page, in both languages, the Thai text is drawn by the site's own Thai face (check name: glyphs):
+//   glyphs   every rendered element whose own text holds a Thai character (U+0E01-U+0E5B) is read for the faces the browser drew it with (the DevTools protocol's
+//            CSS.getPlatformFontsForNode, which names each face's familyName, isCustomFont and glyphCount). It fails when a face that is not one the site ships (KW Sans Thai, KW Mono;
+//            a system or browser default) drew it, or when no shipped KW Sans Thai face with glyphs draws it (the tofu case: a Latin face and no Thai one). A Latin face beside KW Sans Thai is
+//            fine: KW Mono's unicode-range keeps Thai out of it. LIMIT: the protocol reports faces per ELEMENT, not per character, so a Thai character shaped by a face the site ships but that
+//            lacks the glyph, in an element that also holds a face with Thai, is not seen; hidden text (the other language's document) is not read.
+// Usage: node scripts/rendered-check.mjs [--web <dir>] [--only reflow,zoom,csp,theme,contrast,lineheight,measure,glyphs] [--no-headers]
 import { isMainModule } from './lib/entry-guard.mjs'; // by real path: a run through a junction or a symlink still runs
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -38,7 +44,7 @@ import { READING } from './lib/layout-tokens.mjs';
 import { parseColor } from './lib/contrast.mjs';
 import { reportField } from './lib/report-field.mjs';
 
-export const ALL_CHECKS = ['reflow', 'zoom', 'csp', 'theme', 'contrast', 'lineheight', 'measure'];
+export const ALL_CHECKS = ['reflow', 'zoom', 'csp', 'theme', 'contrast', 'lineheight', 'measure', 'glyphs'];
 const READING_CHECKS = ['theme', 'contrast', 'lineheight', 'measure'];
 export const MAX_LATIN_CHARS = 80; // SC 1.4.8 (AAA), the target the reading theme holds itself to
 export const urlPathOf = file => (file === 'index.html' ? '/' : '/' + file.replace(/\.html$/, '').replace(/\/index$/, '/'));
@@ -205,6 +211,57 @@ function measureTheme() {
 // What the browser's own log says about a page's response headers, sorted. A Content-Security-Policy violation is what the csp check is for and fails it. A message about the Permissions-Policy
 // header (the browser does not know a feature name that another engine, or a later version of the same one, does) is not a CSP violation: it is returned as a note and never fails the check, so
 // the run is not red on the version of the browser the runner happens to ship. Any other message the browser files under 'security' (mixed content, say) is a note too: not this check's to fail.
+// ── glyphs: the Thai text of the page, by the face the browser drew each element's text with ──────────────────────────────────────────────────────
+export const SITE_FACES = ['KW Sans Thai', 'KW Mono'];
+export const SITE_THAI_FACE = 'KW Sans Thai';
+// Page side: tags each rendered element whose own text holds a Thai character, once, in document order. A hidden element (the other language's document) has no client rect and is not read.
+function tagThaiElements() {
+  const found = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (!/[ก-๛]/.test(n.nodeValue)) continue;
+    const el = n.parentElement;
+    if (!el || el.hasAttribute('data-glyph-probe') || el.closest('script,style,noscript,template')) continue;
+    if (el.getClientRects().length === 0) continue;
+    el.setAttribute('data-glyph-probe', String(found.length));
+    found.push({ tag: el.tagName.toLowerCase(), sample: n.nodeValue.trim().slice(0, 40) });
+  }
+  return found;
+}
+// The verdict on one element's faces (CSS.getPlatformFontsForNode's fonts): null when the site's own Thai face draws it and no other face but the site's own does, else the reason.
+// A face is the site's own when the browser loaded it from a @font-face (isCustomFont) under one of the site's family names. The protocol reports a weight of a family under
+// the name that the font file carries (KW Sans Thai SmBld, KW Sans Thai Medm), so the name matches as the family or the family followed by a space.
+const isSiteFace = f => f.isCustomFont && SITE_FACES.some(s => f.familyName === s || (f.familyName || '').startsWith(s + ' '));
+export function glyphVerdict(fonts) {
+  const shipped = fonts.filter(isSiteFace);
+  const other = fonts.filter(f => !shipped.includes(f));
+  if (other.length) return `a face the site does not ship draws it (${other.map(f => reportField(f.familyName || 'unnamed')).join(', ')})`;
+  const thai = shipped.find(f => f.familyName === SITE_THAI_FACE || (f.familyName || '').startsWith(SITE_THAI_FACE + ' '));
+  if (!thai || !(thai.glyphCount > 0)) return `no ${SITE_THAI_FACE} face draws it (the faces: ${fonts.length ? fonts.map(f => reportField(f.familyName || 'unnamed')).join(', ') : 'none'})`;
+  return null;
+}
+// Node side: each tagged element with the faces the protocol reports for it; the tags are removed again, so the page is left as it was.
+async function thaiElementFaces(page) {
+  const tags = await page.evaluate(`(${tagThaiElements})()`);
+  try {
+    await page.send('DOM.enable');
+    await page.send('CSS.enable');
+    const { root } = await page.send('DOM.getDocument', { depth: 0 });
+    const { nodeIds } = await page.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: '[data-glyph-probe]' });
+    const out = [];
+    for (const nodeId of nodeIds) {
+      const { attributes } = await page.send('DOM.getAttributes', { nodeId });
+      const at = attributes.indexOf('data-glyph-probe');
+      const tag = tags[Number(attributes[at + 1])];
+      const { fonts } = await page.send('CSS.getPlatformFontsForNode', { nodeId });
+      out.push({ ...tag, fonts });
+    }
+    return out;
+  } finally {
+    await page.evaluate(`(() => { document.querySelectorAll('[data-glyph-probe]').forEach(e => e.removeAttribute('data-glyph-probe')); return true; })()`);
+  }
+}
+
 export function classifyLogs(logs) {
   const violations = [], notes = [];
   for (const l of logs) {
@@ -343,6 +400,16 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
             measured.push({ ...tag, check: 'zoom', rootPx, textElementsRead: m.read, issues: m.issues.length });
             for (const issue of m.issues) failures.push({ ...tag, check: 'zoom', detail: `at 200% text: ${reportField(issue)}` });
             if (m.read === 0) failures.push({ ...tag, check: 'zoom', detail: 'no text element was read, so the zoom check measured nothing' });
+          }
+        }
+        if (checks.includes('glyphs')) {
+          await open(1280);
+          const els = await thaiElementFaces(page);
+          measured.push({ ...tag, check: 'glyphs', read: els.length });
+          if (lang === 'th' && els.length === 0) failures.push({ ...tag, check: 'glyphs', detail: 'no Thai text element was read, so the glyphs check measured nothing' });
+          for (const el of els) {
+            const why = glyphVerdict(el.fonts);
+            if (why) failures.push({ ...tag, check: 'glyphs', detail: `${reportField(el.tag)} "${reportField(el.sample)}": ${why}` });
           }
         }
       }

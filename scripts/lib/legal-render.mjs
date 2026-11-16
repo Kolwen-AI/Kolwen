@@ -348,18 +348,18 @@ ${fenced('site-tokens-css')}
   h1{font-size:var(--kw-font-size-title);font-weight:600;line-height:1.5}
   .sub{color:var(--txt2);font-size:var(--kw-font-size-6);margin-top:8px}
   .card{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:18px 20px;display:flex;flex-direction:column;gap:10px}
-  .card h2,.card h3{font-size:var(--kw-font-size-3);font-weight:600;color:var(--quiet);letter-spacing:.04em;text-transform:uppercase;font-family:'KW Mono',monospace}
+  .card h2,.card h3{font-size:var(--kw-font-size-3);font-weight:600;color:var(--quiet);letter-spacing:.04em;text-transform:uppercase;font-family:'KW Mono','KW Sans Thai',monospace}
   .card p,.card li{font-size:var(--kw-font-size-6);color:var(--txt2)}
   .card strong{color:var(--txt);font-weight:600}
   .card ul{padding-left:20px;display:flex;flex-direction:column;gap:6px}
-  .card code{font-family:'KW Mono',monospace;font-size:var(--kw-font-size-4);color:var(--txt)}
+  .card code{font-family:'KW Mono','KW Sans Thai',monospace;font-size:var(--kw-font-size-4);color:var(--txt)}
   .plans-wrap{overflow-x:auto;color-scheme:dark;max-height:calc(100vh - var(--kw-space-inset-block-start));max-height:calc(100svh - var(--kw-space-inset-block-start))}
   @supports (scrollbar-color:auto){.plans-wrap{scrollbar-color:var(--quiet) var(--bg2)}}
   @media (min-width:1024px){.plans-wrap{overflow-x:visible;max-height:none}}
   .plans{width:100%;border-collapse:collapse;font-size:var(--kw-font-size-5)}
-  .plans caption{text-align:left;padding:0 0 8px;font-size:var(--kw-font-size-2);color:var(--quiet);font-family:'KW Mono',monospace}
+  .plans caption{text-align:left;padding:0 0 8px;font-size:var(--kw-font-size-2);color:var(--quiet);font-family:'KW Mono','KW Sans Thai',monospace}
   .plans th,.plans td{text-align:left;padding:8px var(--kw-space-cell) 8px 0;font-size:var(--kw-font-size-cell);border-bottom:1px solid var(--line);color:var(--txt2);font-weight:400;vertical-align:middle}
-  .plans thead th{font-size:var(--kw-font-size-2);color:var(--quiet);font-family:'KW Mono',monospace}
+  .plans thead th{font-size:var(--kw-font-size-2);color:var(--quiet);font-family:'KW Mono','KW Sans Thai',monospace}
   .plans tbody th{color:var(--txt);font-weight:600}
   .plans tbody th small{display:block;font-size:var(--kw-font-size-2);color:var(--quiet);font-weight:400}
   .plans thead th{position:sticky;top:0;background:var(--card);z-index:1;box-shadow:inset 0 -1px 0 var(--line)}
@@ -380,7 +380,7 @@ ${fenced('site-tokens-css')}
   .legal p,.legal li{font-size:var(--kw-font-size-body);color:var(--txt2);overflow-wrap:anywhere}
   .legal strong{color:var(--txt);font-weight:600}
   .legal ul,.legal ol{padding-left:22px;display:flex;flex-direction:column;gap:8px}
-  .legal code{font-family:'KW Mono',monospace;font-size:var(--kw-font-size-3);color:var(--txt);overflow-wrap:anywhere}
+  .legal code{font-family:'KW Mono','KW Sans Thai',monospace;font-size:var(--kw-font-size-3);color:var(--txt);overflow-wrap:anywhere}
   .pending{color:var(--quiet) !important;font-style:italic}
   .bill{display:flex;flex-wrap:wrap;gap:8px;align-items:center;position:relative}
   .bill > input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
@@ -398,7 +398,7 @@ ${fenced('site-tokens-css')}
   .pcard h3{font-size:var(--kw-font-size-9);font-weight:600;color:var(--txt);font-family:inherit;text-transform:none;letter-spacing:0}
   .faq h3{font-size:var(--kw-font-size-7);font-weight:600;color:var(--txt);font-family:inherit;text-transform:none;letter-spacing:0}
   .card a,.legal a{color:var(--accent2)}
-  .pcard .badge{font-size:var(--kw-font-size-2);color:var(--quiet);font-family:'KW Mono',monospace}
+  .pcard .badge{font-size:var(--kw-font-size-2);color:var(--quiet);font-family:'KW Mono','KW Sans Thai',monospace}
   .pcard .price{font-size:var(--kw-font-size-11);font-weight:700;color:var(--txt)}
   .pcard ul{padding-left:18px;display:flex;flex-direction:column;gap:5px}
   .pcard li{font-size:var(--kw-font-size-5);color:var(--txt2)}
