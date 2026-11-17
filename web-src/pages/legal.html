@@ -4,12 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{legal.meta.title}}</title>
-{{lang th}}
-<meta name="kolwen-title-th" content="{{=legal.meta.title}}">
-{{/lang}}
 <meta name="description" content="{{=legal.meta.description}}">
 <meta name="robots" content="noindex">
 {{raw:reading}}
+{{block:site-links}}
 {{block:site-fonts}}
 <style>
 {{block:site-tokens-css}}
@@ -36,7 +34,6 @@ a{color:var(--amber)}
 <body>
 {{block:site-header}}
 <main id="main" tabindex="-1">
-  <div id="doc-en" lang="en">
 {{lang en}}
   <h1>{{legal.title}}</h1>
   <p>{{legal.intro}}</p>
@@ -45,8 +42,6 @@ a{color:var(--amber)}
     <p><a href="/refund">{{legal.item.refund.name}}</a>{{legal.item.refund.text}}</p>
     <p><a href="/accessibility">{{legal.item.accessibility.name}}</a>{{legal.item.accessibility.text}}</p>
 {{/lang}}
-  </div>
-  <div class="th" id="doc-th" lang="th" hidden>
 {{lang th}}
   <h1>{{legal.title}}</h1>
   <p>{{legal.intro}}</p>
@@ -55,10 +50,8 @@ a{color:var(--amber)}
     <p><a href="/refund">{{legal.item.refund.name}}</a>{{legal.item.refund.text}}</p>
     <p><a href="/accessibility">{{legal.item.accessibility.name}}</a>{{legal.item.accessibility.text}}</p>
 {{/lang}}
-  </div>
 </main>
-{{block:site-footer:en}}
-{{block:site-footer:th}}
+{{block:site-footer}}
 {{raw:script}}
 </body>
 </html>

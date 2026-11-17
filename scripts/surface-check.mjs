@@ -236,8 +236,9 @@ if (existsSync('web/index.html')) {
     for (const b of ldBlocks) { try { JSON.parse(b.body); } catch (e) { note('web/index.html', 'ld+json does not parse: ' + e.message); } }
   }
   if (!/<html lang="en"(?: data-job="[a-z]+")?>/.test(s)) note('web/index.html', 'default document language is not English');
-  if (!/id="doc-th"[^>]*\shidden/.test(s)) note('web/index.html', 'Thai block is not hidden by default');
-  if (/id="doc-en"[^>]*\shidden/.test(s)) note('web/index.html', 'English block is hidden by default');
+  // One language per file (ORDER 1017j): the English page holds no Thai block, and the Thai page (web/th/index.html) is English-free in its language attribute.
+  if (/id="doc-(en|th)"/.test(s)) note('web/index.html', 'carries a language block (doc-en or doc-th); each language is its own file now, so the English page holds English only');
+  if (existsSync('web/th/index.html') && !/<html lang="th"/.test(read('web/th/index.html'))) note('web/th/index.html', 'default document language is not Thai (<html lang="th">)');
   if (!/mailto:info@kolwen\.com/.test(s)) note('web/index.html', 'the published contact channel is missing');
 }
 
@@ -303,6 +304,9 @@ const SHIPPED = new Set([
   'web/terms.html', 'web/privacy.html', 'web/refund.html',
   // The changelog page (rendered from CHANGELOG.md by the same script): a PRODUCTION page.
   'web/changelog.html',
+  // The Thai pages (ORDER 1017j, one language per file): each page above has its Thai twin under web/th/, the same rules, the same exemptions by name.
+  'web/th/index.html', 'web/th/pricing.html', 'web/th/404.html', 'web/th/status.html', 'web/th/subprocessors.html', 'web/th/legal.html',
+  'web/th/accessibility.html', 'web/th/terms.html', 'web/th/privacy.html', 'web/th/refund.html', 'web/th/changelog.html',
   // The plain-text guide for language models (llmstxt.org shape); it states only what the pages state and is not in the sitemap.
   'web/llms.txt',
   'web/favicon.svg', 'web/favicon-32.png', 'web/apple-touch-icon.png', 'web/og.png',
@@ -907,15 +911,17 @@ const WEB_PAGES = tracked.filter(f => f.startsWith('web/') && f.endsWith('.html'
 // a Free plan). Rules 15 and 17(a) read that page like every other. The hits that exist on it today are exactly the passages pinned below, each by a
 // fingerprint of its normalized text (tags removed, whitespace collapsed, sha256, the first 16 hex characters) with its reason. A hit in any other
 // passage fires, and a pin that matches no passage of the page is STALE and fires, so the list cannot go on excusing text that is gone. A pin also
-// carries `count`, the number of times its passage appears on the page (2: the English and the Thai document); while the page holds any other number
+// carries `count`, the number of times its passage appears on the page (1: each page holds one language, the English document is its own file, web/th/ holds the Thai one); while the page holds any other number
 // of copies (a pinned passage pasted into a new entry) the pin exempts none of them and a finding names the count, so a copy cannot ride on a pin.
 // STATED LIMITS: a pin compares text, not meaning. Editing a pinned passage changes its fingerprint and fires both a new hit and a stale pin, so a person
 // re-confirms the pin; and it holds only the rendered page, not CHANGELOG.md itself (where the same words are history).
 const HISTORY_PINS = [
-  { file: 'web/changelog.html', fp: '518613b551644633', start: "The home page footer no longer says \"no trackers ...\"", count: 2, reason: 'a record of a withdrawn claim' },
-  { file: 'web/changelog.html', fp: '510c767ab5d9bc0c', start: "Rule 17 of scripts/surface-check.mjs, on the web pages", count: 2, reason: 'a record of a withdrawn claim' },
-  { file: 'web/changelog.html', fp: '5a476948bbcbd9d8', start: "Two more rules in scripts/surface-check.mjs, both about the web pages", count: 2, reason: 'a record of a withdrawn claim' },
+  { file: 'web/changelog.html', fp: '518613b551644633', start: "The home page footer no longer says \"no trackers ...\"", count: 1, reason: 'a record of a withdrawn claim' },
+  { file: 'web/changelog.html', fp: '510c767ab5d9bc0c', start: "Rule 17 of scripts/surface-check.mjs, on the web pages", count: 1, reason: 'a record of a withdrawn claim' },
+  { file: 'web/changelog.html', fp: '5a476948bbcbd9d8', start: "Two more rules in scripts/surface-check.mjs, both about the web pages", count: 1, reason: 'a record of a withdrawn claim' },
 ];
+// The Thai changelog renders the same CHANGELOG.md passages (one language per file), so each pin also holds for web/th/changelog.html.
+HISTORY_PINS.push(...HISTORY_PINS.filter(p => p.file === 'web/changelog.html').map(p => ({ ...p, file: 'web/th/changelog.html' })));
 // The readers of rules 15 and 16 (metaTagsOf, isRobotsNoindex, passagesOf, pinnedHitter) live in scripts/lib/page-claims.mjs, one linear pass each, and that library is loaded
 // above section 5 with the balance count. A gate imports only Node builtins at the top level; a library that will not load is a finding.
 const PRODUCTION_PAGES = WEB_PAGES.filter(f => !PREVIEW_EXEMPT.has(f));
@@ -971,7 +977,7 @@ const lineOf = (s, i) => s.slice(0, i).split('\n').length;
   // The unread-tag finding below is safe only while rule 13's file set stays a superset of this rule's pages: rule 13 reads the markup of every page
   // this rule reads, so a page whose tags rule 13 cannot read is named there. Keep that superset when either list changes.
   // subprocessors: unannounced until its first row takes effect; the switch that removes the noindex, adds the link and the sitemap entry is a later change
-const NOINDEX_META_OK = new Set(['web/404.html', 'web/subprocessors.html', 'web/legal.html']);
+const NOINDEX_META_OK = new Set(['web/404.html', 'web/subprocessors.html', 'web/legal.html', 'web/th/404.html', 'web/th/subprocessors.html', 'web/th/legal.html']);
   if (WEB_PAGES.length > 0 && PRODUCTION_PAGES.length === 0) note('web/', 'has tracked HTML pages but every one is in PREVIEW_EXEMPT, so rule 16 checked nothing — this CHECK is now empty, not the noindex meta proven absent');
   for (const f of PRODUCTION_PAGES.filter(f => !NOINDEX_META_OK.has(f))) {
     if (!pageClaims) break;

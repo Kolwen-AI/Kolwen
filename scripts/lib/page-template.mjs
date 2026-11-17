@@ -253,7 +253,7 @@ export function usageProblems({ templates, messages, codeKeys = new Set() }) {
 }
 
 // The page: the template with its directive lines removed and every slot filled. blocks: { name: () => string }, raw: { name: string }.
-export function renderTemplate(src, { messages, blocks, raw }) {
+export function renderTemplate(src, { messages, blocks, raw, lang: pageLang = DEFAULT_LANG }) {
   const lines = [];
   let region = null;
   const msg = (key, lang) => {
@@ -265,16 +265,17 @@ export function renderTemplate(src, { messages, blocks, raw }) {
     const open = LANG_OPEN.exec(line);
     if (open) { region = open[1]; continue; }
     if (LANG_CLOSE.test(line)) { region = null; continue; }
-    const lang = region ?? DEFAULT_LANG;
+    if (region !== null && region !== pageLang) continue; // another language's region: not in this file
+    const cur = region ?? pageLang;
     const text = line.replace(SLOT, (...a) => {
       const m = [a[0], ...a.slice(1, 6)];
       const kind = kindOf(m);
       if (kind === 'block') { if (!blocks[m[4]]) throw new Error(`line ${i + 1}: no block named ${m[4]}`); return blocks[m[4]](); }
       if (kind === 'raw') { if (!(m[4] in raw)) throw new Error(`line ${i + 1}: no raw piece named ${m[4]}`); return raw[m[4]]; }
       const key = m[2] ?? m[5];
-      if (kind === 'text') return valueHtml(msg(key, lang));
-      if (kind === 'attr') return escAttr(valuePlain(msg(key, lang)));
-      return valueJson(msg(key, lang));
+      if (kind === 'text') return valueHtml(msg(key, cur));
+      if (kind === 'attr') return escAttr(valuePlain(msg(key, cur)));
+      return valueJson(msg(key, cur));
     });
     if (/\{\{/.test(text)) throw new Error(`line ${i + 1}: a slot that is not valid is left in the page`);
     lines.push(text);

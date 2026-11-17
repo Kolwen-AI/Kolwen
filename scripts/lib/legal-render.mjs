@@ -211,37 +211,28 @@ function refundBody(clauseMd, termsClass, lang, opts) {
 // width, the same on every page: 2 columns below 640px, 3 from 640px, 5 in one row from 1024px (the most common points in a read of 12 sites; market
 // practice, not a standard). WCAG 2.2 SC 1.4.10 (reflow at 320px) is the one standard width: every track is minmax(0,1fr), every link may break
 // anywhere, and the header's row wraps, so nothing in either has a width of its own.
-// THE LANGUAGE follows <html lang>, which the page script sets: the header holds one <nav> per language and the footer one <footer> per language, and a
-// rule shows the one that matches. With no script the Thai ones are shown too (NOSCRIPT_STYLE), as the Thai document is.
+// THE LANGUAGE is the page's own: each file is one language (its <html lang> and its own copies of the header, the footer and the text). A page has one <nav> and one footer,
+// and the switch to the other language is a plain link to that language's copy of the page: no script, no stored choice (W-I18N-07, W-I18N-03).
 export const HEADER_CSS = [
   "  .site-header{border-bottom:1px solid rgba(128,128,128,.35);padding-block:var(--kw-space-header-top) var(--kw-space-header-block);padding-inline:var(--kw-space-gutter-inline)}",
   "  .site-header nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;font-size:var(--kw-font-size-header-link)}",
-  '  .site-header nav[lang="th"]{display:none}',
-  '  html[lang="th"] .site-header nav[lang="en"]{display:none}',
-  '  html[lang="th"] .site-header nav[lang="th"]{display:flex}',
   "  .site-header a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);overflow-wrap:anywhere}",
   "  .site-header a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}",
   "  .site-header .hmark{gap:10px;font-weight:700;font-size:var(--kw-font-size-header-name);letter-spacing:.01em;margin-right:auto}",
   "  .site-header .hglyph,.site-footer .fglyph{flex:none;display:block;fill:var(--accent,var(--amber,#e8833a))}",
-  "  .lswitch{display:inline-flex;gap:6px}",
-  "  .lswitch button{font:inherit;font-size:var(--kw-font-size-header-switch);color:inherit;background:transparent;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:var(--kw-size-header-switch);cursor:pointer}",
-  "  .lswitch button:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}",
-  '  .lswitch button[aria-pressed="true"]{border-color:currentColor;font-weight:600}',
+  "  .lswitch{display:inline-flex;align-items:center;gap:6px}",
+  "  .lswitch a,.lswitch [aria-current=\"page\"]{font-size:var(--kw-font-size-header-switch);color:inherit;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:var(--kw-size-header-switch);display:inline-flex;align-items:center;text-decoration:none}",
+  "  .lswitch a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}",
+  "  .lswitch [aria-current=\"page\"]{border-color:currentColor;font-weight:600}",
   "  .site-header :focus-visible,.site-footer :focus-visible{outline:2px solid currentColor;outline-offset:2px}",
-  // The skip link (C1). It sits before the header in the document and is written inside this block with it. At rest it is clipped to nothing, not hidden: it stays in the tab order and in the
+  // The skip link (C1): one per page, in the page's own language, written before the header. At rest it is clipped to nothing, not hidden: it stays in the tab order and in the
   // accessibility tree, and a display:none would take it out of both. On :focus-visible it appears at the header's top-left, inside the gutter, over the header, with the page's own tokens.
-  // Each language has its own copy, shown and hidden by the same rule as the header navs, so only one copy is in the tab order.
   ".skip{position:absolute;z-index:100;inset-block-start:var(--kw-space-header-top);inset-inline-start:max(var(--kw-space-inset-inline), env(safe-area-inset-left, 0px));display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);padding-inline:var(--kw-space-button);color:var(--txt);background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:var(--kw-font-size-header-link);text-decoration:none;clip-path:inset(50%)}",
   ".skip:focus-visible{clip-path:none;outline:2px solid currentColor;outline-offset:2px}",
-  '  .skip[lang="th"]{display:none}',
-  '  html[lang="th"] .skip[lang="en"]{display:none}',
-  '  html[lang="th"] .skip[lang="th"]{display:inline-flex}'].join('\n');
+].join('\n');
 
 export const FOOTER_CSS = [
   "  .site-footer{display:block;margin-top:var(--kw-space-footer-offset);padding-block:var(--kw-space-footer-top) var(--kw-space-footer-end);padding-inline:var(--kw-space-gutter-inline);border-top:1px solid rgba(128,128,128,.35);font-size:var(--kw-font-size-4);line-height:1.7}",
-  '  .site-footer[lang="th"]{display:none}',
-  '  html[lang="th"] .site-footer[lang="en"]{display:none}',
-  '  html[lang="th"] .site-footer[lang="th"]{display:block}',
   "  .site-footer .fwrap{width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;display:flex;flex-direction:column;gap:28px}",
   "  .site-footer .fbrand{display:flex;align-items:center;gap:10px;margin:0;font-size:var(--kw-font-size-10);font-weight:700;letter-spacing:.01em}",
   "  .site-footer .fgroups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 18px}",
@@ -269,34 +260,61 @@ const NAMES = new Set(['github', 'huggingface', 'npm', 'llms']); // product name
 // A render parameter for the commercial registration number and the DBD mark: { en: 'text', th: 'text' }, or null. It prints NOTHING until it is set (no
 // placeholder text, no empty element), and is set only after the registration and the lawyer's issue are in.
 export const REGISTRATION = null;
-export const siteFooterHtml = (lang, registration = REGISTRATION) => {
+// A page's own address: the English page keeps its path (/, /terms); the Thai page of the same page is under /th/ (/th/, /th/terms). The English address is the default
+// and the x-default, so nothing assumes a Thai reader (ORDER 1017j CONTINUE 152).
+export const LANGS = ['en', 'th'];
+// The switch is a plain link now: no live button is written, so rule 17 allows none.
+export const SWITCH_BUTTONS = [];
+export const urlOf = (path, lang) => (lang === 'th' ? (path === '/' ? '/th/' : '/th' + path) : path);
+// The site's own page addresses. A Thai page writes these under /th/ (its links to each other and to the header and footer); no other address is rewritten.
+export const PAGE_PATHS = ['/', '/pricing', '/changelog', '/terms', '/privacy', '/refund', '/accessibility', '/legal', '/subprocessors', '/status'];
+const localHref = (u, lang) => (PAGE_PATHS.includes(u) ? urlOf(u, lang) : u);
+// The file of a page in one language: web/terms.html is English, web/th/terms.html is Thai.
+export const fileOf = (file, lang) => (lang === 'th' ? file.replace(/^web\//, 'web/th/') : file);
+// A whole page's links to its own site pages, in the Thai file. Only an exact href to one of PAGE_PATHS moves.
+// The language switch's own link is left alone: it names the OTHER language's address, which the shared block already holds (its render is the page's context).
+export const localizeLinks = (html, lang) => (lang === 'en' ? html : html.replace(/<a\b[^>]*>/g, tag => (tag.includes('class="lang-link"') ? tag : tag.replace(/href="(\/[^"]*)"/g, (m, p) => (PAGE_PATHS.includes(p) ? `href="${urlOf(p, 'th')}"` : m)))));
+
+export const siteFooterHtml = (ctx, registration = REGISTRATION) => {
+  const { lang } = ctx;
   const reg = registration && registration[lang] ? `<p class="fine freg">${escText(registration[lang])}</p>` : '';
   const label = key => tHtml(lang, NAMES.has(key) ? 'shared.names.' + key : 'shared.footer.' + key);
   return [`<footer class="site-footer" lang="${lang}">`, '<div class="fwrap">', `<p class="fbrand">${markSvg(24, 'fglyph')}${tHtml(lang, 'shared.brand')}</p>`,
     `<nav class="fgroups" aria-label="${escAttr(t(lang, 'shared.footer.label'))}">`,
-    ...FOOTER_GROUPS.map(([head, links]) => `<div class="fgroup"><p class="fh">${head ? label(head) : tHtml(lang, 'shared.brand')}</p>${links.map(([u, key]) => `<a href="${escAttr(u)}">${label(key)}</a>`).join('')}</div>`),
-    '</nav>', '<div class="fbar">', `<p class="fine">${tHtml(lang, 'shared.footer.note')}</p>`, reg, switchHtml(lang), '</div>', '</div>', '</footer>'].filter(Boolean).join('\n');
+    ...FOOTER_GROUPS.map(([head, links]) => `<div class="fgroup"><p class="fh">${head ? label(head) : tHtml(lang, 'shared.brand')}</p>${links.map(([u, key]) => `<a href="${escAttr(localHref(u, lang))}">${label(key)}</a>`).join('')}</div>`),
+    '</nav>', '<div class="fbar">', `<p class="fine">${tHtml(lang, 'shared.footer.note')}</p>`, reg, switchHtml(ctx), '</div>', '</div>', '</footer>'].filter(Boolean).join('\n');
 };
 
-// The TH/EN switch. Both buttons carry data-lang-set, which the page script reads; the script keeps aria-pressed on every switch of the page.
-// Each language is named in its own language. The two buttons are the ONLY live buttons the site's pages may carry (surface-check rule 17 compares a button with SWITCH_BUTTONS byte for byte
-// and requires it to sit inside the shared header or footer block), so the strings are written once, here.
-// The two names are the shared.switch keys, the same in every language (the catalogue check holds them equal), so a button reads the same in both documents.
-const switchButtons = () => [
-  `<button type="button" data-lang-set="en" lang="en" aria-pressed="true">${tHtml('en', 'shared.switch.en')}</button>`,
-  `<button type="button" data-lang-set="th" lang="th" aria-pressed="false">${tHtml('en', 'shared.switch.th')}</button>`,
-];
-// Read once for surface-check rule 17. An unreadable catalogue must not stop this module from loading, or the build would blame this file ("could not be loaded") and never reach the catalogue check that
-// names the real problem: the list is then empty (rule 17 refuses every live button) and the same error is thrown again, where it is reported, when a page asks for the buttons.
-export const SWITCH_BUTTONS = (() => { try { return switchButtons(); } catch { return []; } })();
-const switchHtml = lang => `<div class="lswitch" role="group" aria-label="${escAttr(t(lang, 'shared.header.language'))}">${switchButtons().join('')}</div>`;
-// The header: the Kolwen mark linking to /, Pricing, the switch. No Dashboard and no Sign in until the service exists, and no link to a page that does not.
-// The skip link (C1): one per language, written immediately before the header, outside its nav. Its target is the page's main (id="main", tabindex="-1"), so activating it moves focus there.
+// The language switch: the current language as text (aria-current), the other as a plain link to the same page in that language.
+// The link carries the class the page script reads (the section it keeps), its lang and hreflang.
+const switchHtml = ctx => {
+  const { lang } = ctx;
+  const other = lang === 'th' ? 'en' : 'th';
+  const to = urlOf(ctx.path ?? '/', other);
+  return `<div class="lswitch" role="group" aria-label="${escAttr(t(lang, 'shared.header.language'))}"><span lang="${lang}" aria-current="page">${tHtml('en', 'shared.switch.' + lang)}</span><a class="lang-link" href="${escAttr(to)}" lang="${other}" hreflang="${other}">${tHtml('en', 'shared.switch.' + other)}</a></div>`;
+};
+
+// The skip link (C1): one per page, in the page's language, immediately before the header. Its target is the page's main (id="main", tabindex="-1").
 const skipLinkHtml = lang => `<a class="skip" href="#main" lang="${lang}">${tHtml(lang, 'shared.skip')}</a>`;
-export const siteHeaderHtml = () => [...['en', 'th'].map(skipLinkHtml), '<header class="site-header">', ...['en', 'th'].map(lang => {
-  return [`<nav lang="${lang}" aria-label="${escAttr(t(lang, 'shared.header.label'))}">`, `<a class="hmark" href="/" aria-label="${escAttr(t(lang, 'shared.header.home'))}">${markSvg(26, 'hglyph')}<span>${tHtml(lang, 'shared.brand')}</span></a>`,
-    `<a href="/pricing">${tHtml(lang, 'shared.header.pricing')}</a>`, switchHtml(lang), '</nav>'].join('\n');
-}), '</header>'].join('\n');
+// The header: the skip link, then the Kolwen mark linking to the home page, Pricing, and the switch. No Dashboard and no Sign in until the service exists.
+export const siteHeaderHtml = ctx => {
+  const { lang } = ctx;
+  return [skipLinkHtml(lang), '<header class="site-header">',
+    `<nav lang="${lang}" aria-label="${escAttr(t(lang, 'shared.header.label'))}">`,
+    `<a class="hmark" href="${urlOf('/', lang)}" aria-label="${escAttr(t(lang, 'shared.header.home'))}">${markSvg(26, 'hglyph')}<span>${tHtml(lang, 'shared.brand')}</span></a>`,
+    `<a href="${urlOf('/pricing', lang)}">${tHtml(lang, 'shared.header.pricing')}</a>`, switchHtml(ctx), '</nav>', '</header>'].join('\n');
+};
+
+// The head links of a page: the canonical (its own address), the three alternates (en, th and x-default, which is the English address), and the Open Graph URL and locales.
+// The 404 pages have no address of their own, so they carry no canonical and no alternates (only the locale).
+export const siteLinksHtml = ctx => {
+  const { lang, path } = ctx;
+  const locale = [`<meta property="og:locale" content="${lang === 'th' ? 'th_TH' : 'en_US'}">`, `<meta property="og:locale:alternate" content="${lang === 'th' ? 'en_US' : 'th_TH'}">`];
+  if (path === null || path === undefined) return locale.join('\n');
+  const self = 'https://kolwen.com' + urlOf(path, lang), en = 'https://kolwen.com' + urlOf(path, 'en'), th = 'https://kolwen.com' + urlOf(path, 'th');
+  return [`<link rel="canonical" href="${escAttr(self)}">`, `<link rel="alternate" hreflang="en" href="${escAttr(en)}">`, `<link rel="alternate" hreflang="th" href="${escAttr(th)}">`,
+    `<link rel="alternate" hreflang="x-default" href="${escAttr(en)}">`, `<meta property="og:url" content="${escAttr(self)}">`, ...locale].join('\n');
+};
 
 // What is true only of pages that store the language choice (not of the 404 page), so it is not in the shared block. The fonts are the site's own files and need no mention here.
 export const pageNoteHtml = lang => `<p class="fine">${tHtml(lang, 'shared.page.note')}</p>`;
@@ -311,25 +329,29 @@ export const footersOf = html => html.match(/<footer class="site-footer"[^>]*>[\
 export const FONT_LINK = '<link rel="stylesheet" href="/fonts/fonts.css">';
 const htmlPair = name => ({ name, begin: `<!-- ${name}:begin -->`, end: `<!-- ${name}:end -->` });
 const cssPair = name => ({ name, begin: `/* ${name}:begin */`, end: `/* ${name}:end */` });
-// THE ORDER OF THIS ARRAY IS THE ONE EXPECTED DOCUMENT ORDER of the pairs in every one of the seven pages, declared here once: the layout tokens, then the header rules and the footer
-// rules in the style block (the head), the rules for a reader without script, then the header slot, the English footer, the Thai footer, and the page script at
-// the end of the body. scripts/lib/page-sync.mjs reads the pairs in this order and refuses (--check and --write) a page whose pairs overlap, nest across each
-// other or stand in another order, so swapping the two footers cannot pass.
+// THE ORDER OF THIS ARRAY IS THE ONE EXPECTED DOCUMENT ORDER of the pairs in every page (each file is one language, so each carries every block once): the head links and the font
+// manifest first, the layout tokens, the header, footer and reader-without-script rules in the style block, then the header, the footer and the page script at the end of the body.
+// Each render takes the page's context ({ lang, path }): the head links, the header and the footer are the page's own. scripts/lib/page-sync.mjs reads the pairs in this order and
+// refuses (--check and --write) a page whose pairs overlap, nest or stand in another order.
 export const SYNC_BLOCKS = [
+  { ...htmlPair('site-links'), label: 'head links', shared: 'head links', render: ctx => siteLinksHtml(ctx) },
   { ...htmlPair('site-fonts'), label: 'font manifest link', shared: 'font manifest link', render: () => FONT_LINK },
-  { ...cssPair('site-tokens-css'), label: 'layout tokens', shared: 'layout tokens', render: tokensCss },
+  { ...cssPair('site-tokens-css'), label: 'layout tokens', shared: 'layout tokens', render: () => tokensCss() },
   { ...cssPair('site-header-css'), label: 'header css', shared: 'header rules', render: () => HEADER_CSS },
   { ...cssPair('site-footer-css'), label: 'footer css', shared: 'footer rules', render: () => FOOTER_CSS },
   { ...cssPair('site-noscript-css'), label: 'noscript css', shared: 'rules for a reader without script', render: () => NOSCRIPT_STYLE },
-  { ...htmlPair('site-header'), label: 'header', shared: 'header', render: siteHeaderHtml },
-  { ...htmlPair('site-footer:en'), label: 'en footer', shared: 'footer', render: () => siteFooterHtml('en') },
-  { ...htmlPair('site-footer:th'), label: 'th footer', shared: 'footer', render: () => siteFooterHtml('th') },
+  { ...htmlPair('site-header'), label: 'header', shared: 'header', render: ctx => siteHeaderHtml(ctx) },
+  { ...htmlPair('site-footer'), label: 'footer', shared: 'footer', render: ctx => siteFooterHtml(ctx) },
   { ...cssPair('site-script'), label: 'page script', shared: 'page script', render: () => SCRIPT },
 ];
 const BLOCK = Object.fromEntries(SYNC_BLOCKS.map(b => [b.name, b]));
-// A block as a page carries it: begin marker, the render, end marker, with the end marker at the start of its line.
-export const fenced = name => `${BLOCK[name].begin}\n${BLOCK[name].render() ? BLOCK[name].render() + '\n' : ''}${BLOCK[name].end}`;
-// The page script as the page carries it: the one inline <script> element, holding the fenced block. The legal pages' shell and the three templates ({{raw:script}}) take it from here.
+// A block as a page carries it: begin marker, the render for the page's context, end marker, with the end marker at the start of its line.
+export const fenced = (name, ctx = {}) => `${BLOCK[name].begin}\n${BLOCK[name].render(ctx) ? BLOCK[name].render(ctx) + '\n' : ''}${BLOCK[name].end}`;
+// The blocks of one page, as a list whose render is bound to that page's context (page-sync reads them with render()).
+export const syncBlocksAt = ctx => SYNC_BLOCKS.map(b => ({ ...b, render: () => b.render(ctx) }));
+// The renders of one page for a template's {{block:name}} slots.
+export const blocksAt = ctx => Object.fromEntries(SYNC_BLOCKS.map(b => [b.name, () => fenced(b.name, ctx)]));
+
 export const pageScriptHtml = () => `<script>\n${fenced('site-script')}\n</script>`;
 
 // THE PLAN TABLE SCROLLS, THE PAGE DOES NOT (WCAG 2.2 SC 1.4.10). The comparison table of the pricing page is a data table, and the criterion exempts "parts of the content which require two-dimensional layout
@@ -381,7 +403,7 @@ ${fenced('site-tokens-css')}
   .ch a{color:var(--txt);text-decoration:none;font-size:var(--kw-font-size-4);border:1px solid var(--line);border-radius:9px;padding:7px 12px;background:var(--bg2);display:inline-flex;align-items:center;gap:7px;min-height:44px}
   .ch a:hover{border-color:rgba(232,131,58,.4);color:var(--accent2)}
   footer{margin-top:6px;font-size:var(--kw-font-size-1);color:var(--quiet);display:flex;flex-direction:column;gap:4px}
-  #doc-en > * + *,#doc-th > * + *{margin-top:var(--kw-space-section)}
+  main > * + *{margin-top:var(--kw-space-section)}
   .banner{border:1px solid rgba(232,131,58,.45);background:rgba(232,131,58,.08);border-radius:10px;padding:12px 14px;font-size:var(--kw-font-size-body);color:var(--txt);margin-top:14px}
   .legal{display:flex;flex-direction:column;gap:14px}
   .legal > * + *{margin-top:0}
@@ -420,63 +442,28 @@ ${fenced('site-footer-css')}
 `;
 
 // What a reader without script gets: no switch (it would do nothing), the Thai document shown under the English one, and the Thai header and footer shown too.
-export const NOSCRIPT_STYLE = [
-  "  .lswitch{display:none}",
-  "  #doc-th{display:block !important;border-top:1px solid var(--line);padding-top:28px}",
-  '  .site-header nav[lang="th"]{display:flex !important}',
-  '  .site-footer[lang="th"]{display:block !important}',
-  '  .skip[lang="th"]{display:inline-flex !important}'].join('\n');
+// What a reader without script gets. Each file is one language, the switch is a plain link and the page script only adds the section fragment, so no rule is needed.
+export const NOSCRIPT_STYLE = '';
 
-// The page script: the language choice. It keeps the SAME localStorage key as before, 'kolwen-lang', and the same behaviour (show the saved language, switch on a
-// click, remember it); the only difference is that it finds the switches by data-lang-set instead of by id, so a page can hold more than one (the header's and the
-// footer's), and it keeps aria-pressed right on all of them. PRIVACY.md's sentence that the page stores one key stays true: one setItem, one getItem, one key.
+// The page script. A page's language is its own address (no choice is stored), so the script does two small things and nothing else:
+//   1. it removes the one key a version before this one kept in the browser, so nothing is stored any more;
+//   2. following the other-language link keeps the reader's place (M5): the link goes to the same section of the other page. The section is the last h2 whose top is above the top of
+//      the viewport; each language's h2 carries the same id (the renderer writes them in order), so the other page's section has the same id. With no such h2, the link goes to the top.
+// With the script blocked, the link still works and lands at the top of the other page.
 export const SCRIPT = `(function () {
-  var KEY = 'kolwen-lang';
-  var en = document.getElementById('doc-en');
-  var th = document.getElementById('doc-th');
-  var buttons = document.querySelectorAll('[data-lang-set]');
-  // The title follows the language: a page with a Thai title carries it in a meta tag written on its Thai line only, and a page without one keeps its English title.
-  // The meta description is not switched: crawlers read it from the served page, and a reader never sees a change made here, so it would reach no one.
-  var titleEn = document.title;
-  var titleTh = document.querySelector('meta[name="kolwen-title-th"]');
-
-  function apply(lang, persist) {
-    var thai = lang === 'th';
-    th.hidden = !thai;
-    en.hidden = thai;
-    document.documentElement.lang = thai ? 'th' : 'en';
-    document.title = thai && titleTh ? titleTh.getAttribute('content') : titleEn;
-    for (var i = 0; i < buttons.length; i++) {
-      buttons[i].setAttribute('aria-pressed', String(buttons[i].getAttribute('data-lang-set') === lang));
-    }
-    if (persist) {
-      // Language preference only. localStorage, never a cookie: it is a
-      // client-only concern that never needs to ride on an HTTP request.
-      try { localStorage.setItem(KEY, lang); } catch (e) {}
-    }
+  try { localStorage.removeItem('kolwen-lang'); } catch (e) {}
+  function sectionAbove() {
+    var found = null, hs = document.querySelectorAll('main h2[id]');
+    for (var i = 0; i < hs.length; i++) { if (hs[i].getBoundingClientRect().top < 1) found = hs[i].id; else break; }
+    return found;
   }
-
-  var saved = null;
-  try { saved = localStorage.getItem(KEY); } catch (e) {}
-  if (saved === 'th' || saved === 'en') apply(saved, false);
-
-  // Pressing a switch changes the page language on the root element, which hides the header nav or the footer holding the pressed button. So focus goes to the same switch in the block that is now shown,
-  // in the same place (header to header, footer to footer), and without a scroll jump (WCAG 2.2 SC 2.4.3 and 2.4.7). Pressing the language already shown hides nothing and moves nothing.
-  function bind(button) {
-    button.addEventListener('click', function () {
-      var lang = button.getAttribute('data-lang-set');
-      var changed = document.documentElement.lang !== lang;
-      var place = button.closest('.site-header') ? '.site-header' : (button.closest('.site-footer') ? '.site-footer' : '');
-      apply(lang, true);
-      if (!changed || !place) return;
-      var same = document.querySelectorAll(place + ' [data-lang-set]');
-      for (var j = 0; j < same.length; j++) {
-        if (same[j].getAttribute('data-lang-set') === lang && same[j].parentNode.closest('[lang]').getAttribute('lang') === lang) { same[j].focus({ preventScroll: true }); return; }
-      }
+  var links = document.querySelectorAll('a.lang-link');
+  for (var i = 0; i < links.length; i++) {
+    links[i].addEventListener('click', function () {
+      var id = sectionAbove();
+      if (id) this.href = this.href.split('#')[0] + '#' + id;
     });
   }
-  for (var i = 0; i < buttons.length; i++) bind(buttons[i]);
-
   // The status page is the one page with a [data-status] element. It reads /status.json, the last health check the Worker stored, and writes the state, the time and one row per
   // probed page as text: the numbers, paths and times come from the data, and every word on the page comes from the catalogue. Without the fetch the page keeps its unavailable line.
   if (document.querySelector('[data-status]')) {
@@ -527,56 +514,63 @@ export const SCRIPT = `(function () {
   }
 })();`;
 
+
 // `job` is the page's declaration of what it is for (layout-tokens.mjs, THE READING THEME): a prose page is read top to bottom and takes the reading theme, and says so on <html> and in its theme-color.
-export function shell({ title, description, path, en, th, job }) {
+// `lang` is the language of this file (one language per file): <html lang>, the header, the footer, the head links and every text of the page are that language's.
+export function shell({ lang, title, description, path, body, job }) {
   if (!JOBS.includes(job)) throw new Error(`the page ${path} declares no job (one of ${JOBS.join(', ')})`);
-  return `<!DOCTYPE html>
-<html lang="en" data-job="${job}">
+  const ctx = { lang, path };
+  const html = `<!DOCTYPE html>
+<html lang="${lang}" data-job="${job}">
 <head>
 <meta charset="utf-8">
 ${VIEWPORT_META}
 <title>${escText(title)}</title>
-<meta name="description" content="${escAttr(description)}">
-<link rel="canonical" href="https://kolwen.com${escAttr(path)}">
+${description ? `<meta name="description" content="${escAttr(description)}">` : ''}
+${fenced('site-links', ctx)}
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://kolwen.com${escAttr(path)}">
 <meta property="og:title" content="${escAttr(title)}">
-<meta property="og:description" content="${escAttr(description)}">
+${description ? `<meta property="og:description" content="${escAttr(description)}">` : ''}
 <meta property="og:image" content="https://kolwen.com/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escAttr(title)}">
-<meta name="twitter:description" content="${escAttr(description)}">
+${description ? `<meta name="twitter:description" content="${escAttr(description)}">` : ''}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 ${job === 'prose' ? readingMeta() : '<meta name="theme-color" content="#15130f">'}
-${fenced('site-fonts')}
+${fenced('site-fonts', ctx)}
 <style>${STYLE}</style>
 <noscript><style>
-${fenced('site-noscript-css')}
+${fenced('site-noscript-css', ctx)}
 </style></noscript>
 </head>
 <body>
-${fenced('site-header')}
+${fenced('site-header', ctx)}
 <main id="main" tabindex="-1">
-  <div id="doc-en" lang="en">
-${en}
-  </div>
-
-  <div id="doc-th" lang="th" hidden>
-${th}
-  </div>
+${body}
 </main>
-${fenced('site-footer:en')}
-${fenced('site-footer:th')}
+${fenced('site-footer', ctx)}
 ${pageScriptHtml()}
 </body>
 </html>
 `;
+  return localizeLinks(sectionIds(html), lang);
 }
+
+// Each h2 of a page carries an id, s-1, s-2 ... in its order on the page. The two languages of a page have the same sections in the same order, so the same id names the same section
+// in both files (the switch's fragment, M5). An h2 that already has an id keeps it.
+export function sectionIds(html) {
+  let n = 0;
+  return html.replace(/<h2(\s[^>]*)?>/g, (m, attrs) => {
+    n++;
+    if (attrs && /\sid=/.test(attrs)) return m;
+    return `<h2 id="s-${n}"${attrs || ''}>`;
+  });
+}
+
 
 function docHtml(lang, title, body, draft = true, note = '') {
   return `    <div>
@@ -596,28 +590,37 @@ ${pageNoteHtml(lang)}`;
 // Home, pricing, the 404 page and the status page are templates (web-src/pages/<group>.html) whose slots are filled from web-src/i18n/<tag>.json, and the shared blocks come in whole as
 // {{block:name}}, so these pages are all generated and none has a part that is kept by hand (build-qc.md C-FMT-02). The group is the top-level key of the catalogue that the page reads (with `shared`): a page that
 // moves to another domain keeps its strings. The status page is unannounced (no link, not in the sitemap; it carries no noindex, which surface-check rule 16 refuses on a production page). The subprocessor page is unannounced the same way; it carries the one noindex that rule 16 exempts by name; its reading of /status.json is part of the shared inline page script, which runs it only on a page with [data-status].
+// `path` is the English address of the page (the Thai file's address is /th/ followed by it); null for the 404 page, which has no address of its own.
 export const SITE_PAGES = [
-  { group: 'home', template: 'web-src/pages/home.html', file: 'web/index.html' },
-  { group: 'pricing', template: 'web-src/pages/pricing.html', file: 'web/pricing.html' },
-  { group: 'notfound', template: 'web-src/pages/notfound.html', file: 'web/404.html' },
-  { group: 'status', template: 'web-src/pages/status.html', file: 'web/status.html' },
+  { group: 'home', template: 'web-src/pages/home.html', file: 'web/index.html', path: '/' },
+  { group: 'pricing', template: 'web-src/pages/pricing.html', file: 'web/pricing.html', path: '/pricing' },
+  { group: 'notfound', template: 'web-src/pages/notfound.html', file: 'web/404.html', path: null },
+  { group: 'status', template: 'web-src/pages/status.html', file: 'web/status.html', path: '/status' },
   // The subprocessor page: prose, unannounced; its noindex is exempted by name in surface-check rule 16.
-  { group: 'subprocessors', template: 'web-src/pages/subprocessors.html', file: 'web/subprocessors.html' },
-  { group: 'legal', template: 'web-src/pages/legal.html', file: 'web/legal.html' },
-  { group: 'accessibility', template: 'web-src/pages/accessibility.html', file: 'web/accessibility.html' },
+  { group: 'subprocessors', template: 'web-src/pages/subprocessors.html', file: 'web/subprocessors.html', path: '/subprocessors' },
+  { group: 'legal', template: 'web-src/pages/legal.html', file: 'web/legal.html', path: '/legal' },
+  { group: 'accessibility', template: 'web-src/pages/accessibility.html', file: 'web/accessibility.html', path: '/accessibility' },
 ];
-// templates: { group: source }, messages: { lang: { key: value } }. Returns { pages: { 'web/index.html': html, ... }, problems: [line] }.
-// The shared blocks (the header, the footers, the page script's strings) read their strings through t(), which reads the module's loaded catalogue; withCatalogue puts the caller's `messages` in place
-// for the whole render, so a slot of a template and a string of a shared block never come from two catalogues.
+// templates: { group: source }, messages: { lang: { key: value } }. Each page is written twice, once per language, in its own file (fileOf). Returns
+// { pages: { 'web/index.html': html, 'web/th/index.html': html, ... }, contexts: { file: { lang, path } }, problems: [line] }.
+// The shared blocks and the template's slots read the page's language and address; withCatalogue puts the caller's `messages` in place for the whole render.
+// The template's own <html lang="en"> line (outside every language region) takes the page's language.
+const setHtmlLang = (html, lang) => html.replace('<html lang="en"', '<html lang="' + lang + '"');
 export function renderSitePages({ templates, messages }) {
   return withCatalogue(messages, () => {
-    const pages = {}, problems = [];
-    const blocks = Object.fromEntries(SYNC_BLOCKS.map(b => [b.name, () => fenced(b.name)]));
+    const pages = {}, contexts = {}, problems = [];
     for (const p of SITE_PAGES) {
       if (typeof templates[p.group] !== 'string') { problems.push(`${p.template} is missing`); continue; }
-      try { pages[p.file] = renderTemplate(templates[p.group], { messages, blocks, raw: { style: STYLE, script: pageScriptHtml(), reading: readingMeta() } }); } catch (e) { problems.push(`${p.template}: ${e.message}`); }
+      for (const lang of LANGS) {
+        const ctx = { lang, path: p.path };
+        const file = fileOf(p.file, lang);
+        try {
+          pages[file] = localizeLinks(sectionIds(setHtmlLang(renderTemplate(templates[p.group], { lang, messages, blocks: blocksAt(ctx), raw: { style: STYLE, script: pageScriptHtml(), reading: readingMeta() } }), lang)), lang);
+          contexts[file] = ctx;
+        } catch (e) { problems.push(`${p.template} (${lang}): ${e.message}`); }
+      }
     }
-    return { pages, problems };
+    return { pages, contexts, problems };
   });
 }
 
@@ -643,7 +646,7 @@ export function renderPages(inputs) {
   const clauseText = active ? clause.split('{{since}}').join(since) : clause;
   const opts = { holds: holds.holds, active };
   const report = [];
-  const pages = {};
+  const pages = {}, contexts = {};
 
   const perFile = {
     [SOURCES.terms]: classify(SOURCES.terms, terms, opts),
@@ -653,14 +656,19 @@ export function renderPages(inputs) {
   problems.push(...holdProblems(holds.holds, perFile));
   for (const p of PENDING_LINES) if (!(perFile[p.file] && perFile[p.file].items.some(i => i.kind === 'passage' && i.held && i.anchor === p.anchor))) problems.push(`the specific pending line for "${p.anchor}" matches no held passage of ${p.file}`);
 
+  // Each legal page is two files: the English one and the Thai one. Each carries only its language's document, its header, its footer and its address.
   const done = (key, lines, draft = true) => {
     const P = PAGES[key];
-    const html = shell({
-      title: P.metaTitleEn, description: P.descEn, path: P.path, job: P.job,
-      en: docHtml('en', P.titleEn, lines.en.html, draft, ''), th: docHtml('th', P.titleTh, lines.th.html, draft, P.noteTh || ''),
-    });
-    pages[P.file] = html;
-    for (const l of ['en', 'th']) problems.push(...lines[l].errors.map(e => `${P.file} (${l}): ${e}`));
+    for (const lang of LANGS) {
+      const file = fileOf(P.file, lang);
+      pages[file] = shell({
+        // The English file has the English description; the Thai file has the Thai one when the page has one, and none otherwise (no Thai description exists for the legal pages).
+        lang, title: lang === 'en' ? P.metaTitleEn : P.metaTitleTh, description: lang === 'en' ? P.descEn : (P.descTh || ''), path: P.path, job: P.job,
+        body: docHtml(lang, lang === 'en' ? P.titleEn : P.titleTh, lines[lang].html, draft, lang === 'en' ? '' : (P.noteTh || '')),
+      });
+      contexts[file] = { lang, path: P.path };
+      problems.push(...lines[lang].errors.map(e => `${file} (${lang}): ${e}`));
+    }
     return lines.en.stats;
   };
 
@@ -681,5 +689,5 @@ export function renderPages(inputs) {
     const en = renderSource(SOURCES.changelog, changelog, 'en', o), th = renderSource(SOURCES.changelog, changelog, 'th', o);
     say(PAGES.changelog.file, SOURCES.changelog, done('changelog', { en, th }, false));
   }
-  return { pages, report, problems };
+  return { pages, contexts, report, problems };
 }

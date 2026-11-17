@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="th" data-job="prose">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>นโยบายความเป็นส่วนตัวของ Kolwen: เว็บไซต์ทำอะไรในวันนี้ (ฉบับร่าง)</title>
+
+<!-- site-links:begin -->
+<link rel="canonical" href="https://kolwen.com/th/privacy">
+<link rel="alternate" hreflang="en" href="https://kolwen.com/privacy">
+<link rel="alternate" hreflang="th" href="https://kolwen.com/th/privacy">
+<link rel="alternate" hreflang="x-default" href="https://kolwen.com/privacy">
+<meta property="og:url" content="https://kolwen.com/th/privacy">
+<meta property="og:locale" content="th_TH">
+<meta property="og:locale:alternate" content="en_US">
+<!-- site-links:end -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="นโยบายความเป็นส่วนตัวของ Kolwen: เว็บไซต์ทำอะไรในวันนี้ (ฉบับร่าง)">
+
+<meta property="og:image" content="https://kolwen.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="นโยบายความเป็นส่วนตัวของ Kolwen: เว็บไซต์ทำอะไรในวันนี้ (ฉบับร่าง)">
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0d0b" media="(prefers-color-scheme: dark)">
+<!-- site-fonts:begin -->
+<link rel="stylesheet" href="/fonts/fonts.css">
+<!-- site-fonts:end -->
+<style>
+/* site-tokens-css:begin */
+  :root{
+    --kw-font-size-1:0.75rem;
+    --kw-font-size-2:0.78125rem;
+    --kw-font-size-3:0.8125rem;
+    --kw-font-size-4:0.84375rem;
+    --kw-font-size-5:0.875rem;
+    --kw-font-size-6:0.90625rem;
+    --kw-font-size-7:0.9375rem;
+    --kw-font-size-8:0.96875rem;
+    --kw-font-size-9:1.125rem;
+    --kw-font-size-10:1.25rem;
+    --kw-font-size-11:1.625rem;
+    --kw-font-size-body:1.125rem;
+    --kw-font-size-reading-h3:1.3125rem;
+    --kw-font-size-reading-h2:1.5rem;
+    --kw-font-size-reading-title:1.875rem;
+    --kw-font-size-display:clamp(1.75rem, -6.125rem + 30vw, 2.125rem);
+    --kw-font-size-title:clamp(1.25rem, -4rem + 20vw, 1.5rem);
+    --kw-font-size-title-home:clamp(1.125rem, -2.8125rem + 15vw, 1.3125rem);
+    --kw-font-size-cell:clamp(0.8125rem, -0.5rem + 5vw, 0.875rem);
+    --kw-space-inset-inline:1.25rem;
+    --kw-space-inset-roomy:2rem;
+    --kw-space-inset-block-start:2.25rem;
+    --kw-space-section:1.75rem;
+    --kw-space-header-block:0.375rem;
+    --kw-space-footer-top:2.75rem;
+    --kw-space-footer-bottom:2rem;
+    --kw-space-footer-offset:4.5rem;
+    --kw-space-gutter-inline:max(var(--kw-space-inset-inline), env(safe-area-inset-left, 0px)) max(var(--kw-space-inset-inline), env(safe-area-inset-right, 0px));
+    --kw-space-gutter-inline-roomy:max(var(--kw-space-inset-roomy), env(safe-area-inset-left, 0px)) max(var(--kw-space-inset-roomy), env(safe-area-inset-right, 0px));
+    --kw-space-header-top:max(var(--kw-space-header-block), env(safe-area-inset-top, 0px));
+    --kw-space-footer-end:max(var(--kw-space-footer-bottom), env(safe-area-inset-bottom, 0px));
+    --kw-space-cell:clamp(0.375rem, -4.875rem + 20vw, 0.625rem);
+    --kw-space-button:clamp(0.5rem, -4.75rem + 20vw, 0.75rem);
+    --kw-size-container-narrow:37.5rem;
+    --kw-size-container-reading:47.5rem;
+    --kw-size-container-wide:68.75rem;
+    --kw-size-container-compact:38rem;
+    --kw-size-measure-reading:33em;
+    --kw-font-size-header-link:0.90625rem;
+    --kw-font-size-header-name:1.125rem;
+    --kw-font-size-header-switch:0.78125rem;
+    --kw-size-header-row:2.75rem;
+    --kw-size-header:calc(var(--kw-size-header-row) + 2 * var(--kw-space-header-block) + 1px);
+    --kw-size-header-switch:2.125rem;
+    --kw-line-height-body:1.6;
+    --kw-line-height-thai:1.65;
+    --kw-color-switch-border:rgba(128, 128, 128, 0.7);
+  }
+  html[data-job="prose"]{color-scheme:light dark;--bg:#fbfaf8;--bg2:#f1eee9;--card:#f5f2ed;--line:rgba(0, 0, 0, 0.12);--txt:#1a1a1a;--txt2:#464646;--quiet:#585858;--accent:#a65a19;--accent2:#8a4510;--kw-color-switch-border:#767676}
+  @media (prefers-color-scheme:dark){html[data-job="prose"]{--bg:#0f0d0b;--bg2:#15130f;--card:#1a1714;--line:rgba(255, 255, 255, 0.08);--txt:#ece4d9;--txt2:#a89a8c;--quiet:#a2968a;--accent:#e8833a;--accent2:#ffbb7a;--kw-color-switch-border:#8c8c8c}}
+  html[data-job="prose"] body{background:var(--bg)}
+  html[data-job="prose"] main{font-size:var(--kw-font-size-body);max-width:calc(var(--kw-size-measure-reading) + 2 * var(--kw-space-inset-inline))}
+  html[data-job="prose"] h1{font-size:var(--kw-font-size-reading-title)}
+  html[data-job="prose"] .legal h2{font-size:var(--kw-font-size-reading-h2)}
+  html[data-job="prose"] .legal h3{font-size:var(--kw-font-size-reading-h3)}
+  html[data-job="prose"][lang="th"] main,html[data-job="prose"][lang="th"] main *{line-height:var(--kw-line-height-thai)}
+/* site-tokens-css:end */
+  :root{--bg:#0f0d0b;--bg2:#15130f;--card:#1a1714;--line:rgba(255,255,255,.08);--txt:#ece4d9;--txt2:#a89a8c;--quiet:#a2968a;--accent:#e8833a;--accent2:#ffbb7a}
+  *{box-sizing:border-box;margin:0}
+  body{background:radial-gradient(circle at 20% 0%,rgba(232,131,58,.07),transparent 55%),var(--bg);color:var(--txt);font-family:'KW Sans Thai',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:stretch;padding:0;line-height:var(--kw-line-height-body)}
+  body{container-type:inline-size}
+  html[data-job="default"]{color-scheme:dark}
+  main{flex:1 0 auto;width:100%;max-width:var(--kw-size-container-reading);margin:0 auto;padding-block:var(--kw-space-inset-block-start) 0;padding-inline:var(--kw-space-gutter-inline);display:flex;flex-direction:column;gap:var(--kw-space-section)}
+  a:focus-visible,button:focus-visible,.plans-wrap:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+  .mark{display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none}
+  .glyph{flex:none;display:block}
+  .name{font-size:var(--kw-font-size-display);font-weight:700;letter-spacing:.01em}
+  .thai{font-size:var(--kw-font-size-7);color:var(--quiet);font-weight:500}
+  h1{font-size:var(--kw-font-size-title);font-weight:600;line-height:1.5}
+  .sub{color:var(--txt2);font-size:var(--kw-font-size-6);margin-top:8px}
+  .card{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+  .card h2,.card h3{font-size:var(--kw-font-size-3);font-weight:600;color:var(--quiet);letter-spacing:.04em;text-transform:uppercase;font-family:'KW Mono','KW Sans Thai',monospace}
+  .card p,.card li{font-size:var(--kw-font-size-6);color:var(--txt2)}
+  .card strong{color:var(--txt);font-weight:600}
+  .card ul{padding-left:20px;display:flex;flex-direction:column;gap:6px}
+  .card code{font-family:'KW Mono','KW Sans Thai',monospace;font-size:var(--kw-font-size-4);color:var(--txt)}
+  .plans-wrap{overflow-x:auto;color-scheme:dark;max-height:calc(100vh - var(--kw-space-inset-block-start));max-height:calc(100svh - var(--kw-space-inset-block-start))}
+  @supports (scrollbar-color:auto){.plans-wrap{scrollbar-color:var(--quiet) var(--bg2)}}
+  @media (min-width:1024px){.plans-wrap{overflow-x:visible;max-height:none}}
+  .plans{width:100%;border-collapse:collapse;font-size:var(--kw-font-size-5)}
+  .plans caption{text-align:left;padding:0 0 8px;font-size:var(--kw-font-size-2);color:var(--quiet);font-family:'KW Mono','KW Sans Thai',monospace}
+  .plans th,.plans td{text-align:left;padding:8px var(--kw-space-cell) 8px 0;font-size:var(--kw-font-size-cell);border-bottom:1px solid var(--line);color:var(--txt2);font-weight:400;vertical-align:middle}
+  .plans thead th{font-size:var(--kw-font-size-2);color:var(--quiet);font-family:'KW Mono','KW Sans Thai',monospace}
+  .plans tbody th{color:var(--txt);font-weight:600}
+  .plans tbody th small{display:block;font-size:var(--kw-font-size-2);color:var(--quiet);font-weight:400}
+  .plans thead th{position:sticky;top:0;background:var(--card);z-index:1;box-shadow:inset 0 -1px 0 var(--line)}
+  .plans tbody th,.plans thead th:first-child{position:sticky;left:0;background:var(--card)}
+  .plans thead th:first-child{z-index:2}
+  .plans button,.pcard button{font:inherit;font-size:var(--kw-font-size-2);color:var(--quiet);background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;min-height:34px;cursor:not-allowed}
+  .plans button{padding-inline:var(--kw-space-button)}
+  .ch{display:flex;flex-wrap:wrap;gap:8px}
+  .ch a{color:var(--txt);text-decoration:none;font-size:var(--kw-font-size-4);border:1px solid var(--line);border-radius:9px;padding:7px 12px;background:var(--bg2);display:inline-flex;align-items:center;gap:7px;min-height:44px}
+  .ch a:hover{border-color:rgba(232,131,58,.4);color:var(--accent2)}
+  footer{margin-top:6px;font-size:var(--kw-font-size-1);color:var(--quiet);display:flex;flex-direction:column;gap:4px}
+  main > * + *{margin-top:var(--kw-space-section)}
+  .banner{border:1px solid rgba(232,131,58,.45);background:rgba(232,131,58,.08);border-radius:10px;padding:12px 14px;font-size:var(--kw-font-size-body);color:var(--txt);margin-top:14px}
+  .legal{display:flex;flex-direction:column;gap:14px}
+  .legal > * + *{margin-top:0}
+  .legal h2{font-size:var(--kw-font-size-9);font-weight:600;line-height:1.5;margin-top:14px}
+  .legal h3{font-size:var(--kw-font-size-8);font-weight:600;line-height:1.5;margin-top:6px}
+  .legal p,.legal li{font-size:var(--kw-font-size-body);color:var(--txt2);overflow-wrap:anywhere}
+  .legal strong{color:var(--txt);font-weight:600}
+  .legal ul,.legal ol{padding-left:22px;display:flex;flex-direction:column;gap:8px}
+  .legal code{font-family:'KW Mono','KW Sans Thai',monospace;font-size:var(--kw-font-size-3);color:var(--txt);overflow-wrap:anywhere}
+  .pending{color:var(--quiet) !important;font-style:italic}
+  .bill{display:flex;flex-wrap:wrap;gap:8px;align-items:center;position:relative}
+  .bill > input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+  .bill > label{font-size:var(--kw-font-size-4);color:var(--quiet);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:8px 14px;min-height:40px;display:inline-flex;align-items:center;cursor:pointer}
+  .bill > input:checked + label{color:var(--accent2);border-color:rgba(232,131,58,.55);background:rgba(232,131,58,.10)}
+  .bill > input:focus-visible + label{outline:2px solid var(--accent2);outline-offset:2px}
+  .bill .pcards{flex-basis:100%;display:grid;gap:14px;grid-template-columns:minmax(0,1fr);margin-top:6px}
+  @media (min-width:640px){.bill .pcards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (min-width:1024px){.bill .pcards{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  @media (min-width:640px){.wide-card{--pw:min(var(--kw-size-container-wide),100cqw - 2 * var(--kw-space-inset-inline));width:var(--pw);margin-inline:calc((100% - var(--pw)) / 2)}}
+  @media (min-width:640px){.wide-card > :not(.bill):not(.plans-wrap){max-width:calc(var(--kw-size-container-reading) - 2 * var(--kw-space-inset-inline));margin-inline:auto}}
+  .bill > input[value="y"]:checked ~ .pcards .mo{display:none}
+  .bill > input[value="m"]:checked ~ .pcards .yr{display:none}
+  .pcard{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+  .pcard h3{font-size:var(--kw-font-size-9);font-weight:600;color:var(--txt);font-family:inherit;text-transform:none;letter-spacing:0}
+  .faq h3{font-size:var(--kw-font-size-7);font-weight:600;color:var(--txt);font-family:inherit;text-transform:none;letter-spacing:0}
+  .card a,.legal a{color:var(--accent2)}
+  .pcard .badge{font-size:var(--kw-font-size-2);color:var(--quiet);font-family:'KW Mono','KW Sans Thai',monospace}
+  .pcard .price{font-size:var(--kw-font-size-11);font-weight:700;color:var(--txt)}
+  .pcard ul{padding-left:18px;display:flex;flex-direction:column;gap:5px}
+  .pcard li{font-size:var(--kw-font-size-5);color:var(--txt2)}
+  .note{font-size:var(--kw-font-size-3);color:var(--quiet)}
+/* site-header-css:begin */
+  .site-header{border-bottom:1px solid rgba(128,128,128,.35);padding-block:var(--kw-space-header-top) var(--kw-space-header-block);padding-inline:var(--kw-space-gutter-inline)}
+  .site-header nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;font-size:var(--kw-font-size-header-link)}
+  .site-header a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);overflow-wrap:anywhere}
+  .site-header a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+  .site-header .hmark{gap:10px;font-weight:700;font-size:var(--kw-font-size-header-name);letter-spacing:.01em;margin-right:auto}
+  .site-header .hglyph,.site-footer .fglyph{flex:none;display:block;fill:var(--accent,var(--amber,#e8833a))}
+  .lswitch{display:inline-flex;align-items:center;gap:6px}
+  .lswitch a,.lswitch [aria-current="page"]{font-size:var(--kw-font-size-header-switch);color:inherit;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:var(--kw-size-header-switch);display:inline-flex;align-items:center;text-decoration:none}
+  .lswitch a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+  .lswitch [aria-current="page"]{border-color:currentColor;font-weight:600}
+  .site-header :focus-visible,.site-footer :focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.skip{position:absolute;z-index:100;inset-block-start:var(--kw-space-header-top);inset-inline-start:max(var(--kw-space-inset-inline), env(safe-area-inset-left, 0px));display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);padding-inline:var(--kw-space-button);color:var(--txt);background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:var(--kw-font-size-header-link);text-decoration:none;clip-path:inset(50%)}
+.skip:focus-visible{clip-path:none;outline:2px solid currentColor;outline-offset:2px}
+/* site-header-css:end */
+/* site-footer-css:begin */
+  .site-footer{display:block;margin-top:var(--kw-space-footer-offset);padding-block:var(--kw-space-footer-top) var(--kw-space-footer-end);padding-inline:var(--kw-space-gutter-inline);border-top:1px solid rgba(128,128,128,.35);font-size:var(--kw-font-size-4);line-height:1.7}
+  .site-footer .fwrap{width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;display:flex;flex-direction:column;gap:28px}
+  .site-footer .fbrand{display:flex;align-items:center;gap:10px;margin:0;font-size:var(--kw-font-size-10);font-weight:700;letter-spacing:.01em}
+  .site-footer .fgroups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 18px}
+  @media (min-width:640px){.site-footer .fgroups{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media (min-width:1024px){.site-footer .fgroups{grid-template-columns:repeat(5,minmax(0,1fr))}}
+  .site-footer .fgroup{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+  .site-footer .fh{font-size:var(--kw-font-size-1);letter-spacing:.04em;text-transform:uppercase;margin:0}
+  .site-footer a{color:inherit;text-decoration:underline;text-underline-offset:3px;display:inline-block;padding:5px 0;min-height:32px;overflow-wrap:anywhere}
+  .site-footer a:hover{text-decoration-thickness:2px}
+  .site-footer .fbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid rgba(128,128,128,.25);padding-top:16px}
+  .fine{font-size:var(--kw-font-size-1);margin:0}
+/* site-footer-css:end */
+  [hidden]{display:none !important}
+  @media (max-width:359px){.plans th,.plans td{padding-right:2px}}
+</style>
+<noscript><style>
+/* site-noscript-css:begin */
+/* site-noscript-css:end */
+</style></noscript>
+</head>
+<body>
+<!-- site-header:begin -->
+<a class="skip" href="#main" lang="th">ข้ามไปยังเนื้อหาหลัก</a>
+<header class="site-header">
+<nav lang="th" aria-label="เมนูหลัก">
+<a class="hmark" href="/th/" aria-label="หน้าแรกของ Kolwen"><svg class="hglyph" viewBox="0 0 100 100" width="26" height="26" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg><span>Kolwen</span></a>
+<a href="/th/pricing">ราคา</a>
+<div class="lswitch" role="group" aria-label="ภาษา"><span lang="th" aria-current="page">ไทย</span><a class="lang-link" href="/privacy" lang="en" hreflang="en">English</a></div>
+</nav>
+</header>
+<!-- site-header:end -->
+<main id="main" tabindex="-1">
+    <div>
+      <h1>ความเป็นส่วนตัว</h1>
+      <p class="banner" role="note">หน้านี้เป็นฉบับร่าง ยังไม่มีผลใช้บังคับ ยังไม่มีสินค้าให้ซื้อ และบางส่วนรอที่ปรึกษากฎหมายตรวจสอบ</p>
+    </div>
+    <div class="legal">
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="t" lang="en">Kolwen has not launched. This page describes what <strong>kolwen.com</strong> does today, and says plainly which parts change on the day the assistant itself ships.</p>
+      <h2 id="s-1" lang="en">What this site is</h2>
+      <p class="t" lang="en">Static pages, served by a Cloudflare Worker. <strong>The Worker runs one small script of ours</strong> (<code>worker/index.mjs</code>). It hands every request for a path with no static file to the pages, so a missing page gets the 404 page, except that it answers <code>/status.json</code> and <code>/subscribe</code> itself, and every 15 minutes it requests six of our own pages to check that they answer. It does not log, keep or store a visitor&#39;s request, and there is no database and no storage of visitor data on our side. The status record holds only the time, each page check&#39;s result, and which result the owner was last told of. A subscriber store is built and switched off: while it is switched off, no address can be stored, and no mail goes to a subscriber in this build. Once an alert address is set, the Worker tries to mail the owner when the result of its checks changes: from all passing to a failure, with each failed check&#39;s path, HTTP status or error (a timeout or a network error), timing and content-type result, the number of failed checks and the UTC time; and from failing back to all passing, with a recovery note. Once the status record is bound and can be read, a failure that goes on is not mailed again once the owner has been told, and a send that fails is tried again by the next run that still finds the failure (until then, and whenever the record cannot be read, every failing check run is mailed), and no visitor data is in either mail (a send that fails is logged by its error class only). Until an address is set, nothing is sent.</p>
+      <p class="t" lang="en"><em>Measured: <code>grep -nE &#39;^[[:space:]]*&quot;main&quot;&#39; wrangler.jsonc</code> returns one line, <code>&quot;main&quot;: &quot;worker/index.mjs&quot;,</code>; the config declares a name, a compatibility date, the <code>assets</code> block, a cron trigger (<code>*/15 * * * *</code>), the <code>observability</code> block with invocation logs off, the <code>send_email</code> binding, one variable (<code>ALERT_FROM</code>) and an empty <code>previews</code> block. The alert recipient is a secret set outside the file, so the file holds no recipient address; its one address is the sender, the published <code>info@kolwen.com</code> in <code>ALERT_FROM</code>.</em></p>
+      <h2 id="s-2" lang="en">Cookies</h2>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="t" lang="en"><em>Measured: <code>curl -sI https://kolwen.com/</code> and the same on an asset—no <code>Set-Cookie</code> header on either (re-measured 2026-10-08, after the zone&#39;s JavaScript Detections were switched off).</em></p>
+      <p class="t" lang="en"><strong>A note on what could change that:</strong> per Cloudflare&#39;s own cookie and clearance pages (read 2026-10-08), Bot Fight Mode sets the <code>__cf_bm</code> cookie, and Turnstile sets <code>cf_clearance</code> only when its pre-clearance option is enabled. If either is ever switched on for this site, the sentence above, &quot;no cookies at all&quot;, would be reworded the same day. Both are off today.</p>
+      <p class="t" lang="en">Your language choice (English or Thai) is stored in your browser&#39;s <code>localStorage</code>, which is not a cookie, is never sent to a server, and never leaves your device. Clearing your browser data removes it.</p>
+      <p class="t" lang="en"><em>Measured: <code>web/index.html</code> uses <code>localStorage.setItem</code> / <code>getItem</code> for one key, and nothing else.</em></p>
+      <h3 lang="en">When the assistant ships, this changes, and here is exactly how</h3>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="t" lang="en"><strong>Worker logs.</strong> Today the Worker logs the result of each of its own page checks (the path, status, timing and error class) and, when the result of the checks changes, one line saying whether an alert was sent, not sent because no alert address is set, or failed (with the error&#39;s class only), and one line when the status record cannot be saved (again the error&#39;s class only); never a visitor&#39;s request (see &quot;What this site is&quot;). Invocation logs are switched off in <code>wrangler.jsonc</code>. When the Worker first answers visitors&#39; requests with code of ours (an API, a payment-provider webhook or a chat endpoint) with invocation logs switched on, Cloudflare Workers Logs will record each such request. Switching it on is Cloudflare&#39;s setting, and the page says &quot;All newly created Workers will come with the observability setting enabled by default&quot;. Cloudflare&#39;s documentation (https://developers.cloudflare.com/workers/observability/logs/workers-logs/, page last updated Oct 12, 2026, read 2026-10-17) says an invocation log contains details such as the request, the response and related metadata, that a fetch request&#39;s message shows the request method and the request URL, and that anything the Worker prints with console.log is stored too. The same page gives a retention of 3 days on the Workers plan without a monthly charge and 7 days on the paid Workers plan, in its table &quot;until then&quot; (until 30 November 2026), and says &quot;Beginning December 1, 2026, Workers Logs will use Cloudflare Observability pricing&quot;. For the period after that date it names no retention for either plan; its limits table gives only a &quot;Maximum log retention period&quot; of 7 days.</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <h2 id="s-3" lang="en">Who else sees your request</h2>
+      <p class="t" lang="en"><strong>Cloudflare</strong> serves this site, so it necessarily handles your request: your IP address, the URL you asked for, and your browser&#39;s user-agent reach their edge before any bytes reach you. That is how any hosted site works, and it is not something we can turn off while remaining online. Cloudflare no longer injects its bot-detection script into the served HTML: the zone&#39;s JavaScript Detections setting was switched off on 2026-10-07, and Bot Fight Mode is off.</p>
+      <p class="t" lang="en"><em>Measured 2026-10-08: <code>curl -s https://kolwen.com/ | grep -c challenge-platform</code> prints 0.</em></p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <h2 id="s-4" lang="en">Age</h2>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <h2 id="s-5" lang="en">Contact</h2>
+      <p class="t" lang="en"><code>privacy@kolwen.com</code> reaches the maintainer. Anything you send there is read by a person.</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <h2 id="s-6" lang="en">What we do not do</h2>
+      <ul><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="t" lang="en">No account, no sign-up, and nothing to log in to.</li><li class="t" lang="en">Kolwen&#39;s own systems—the site and its Worker—collect and store nothing about a visitor, so there is nothing there to sell or share. <strong>Two parties outside those systems do handle data, as this notice already says:</strong> Cloudflare handles every request; and the mailbox behind the contact address holds what you send to it. What each retains cannot be measured from this repository.</li></ul>
+      <h2 id="s-7" lang="en">When the assistant ships</h2>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <ul><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li></ul>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <ul><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li></ul>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <ul><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li></ul>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <ul><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li></ul>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
+      <h2 id="s-8" lang="en">Changes</h2>
+      <p class="t" lang="en">This notice is versioned with the site in git; its history is the change log. There is no separate &quot;last updated&quot; line to fall out of date.</p>
+      <p class="pending">[รอที่ปรึกษากฎหมาย] ฉบับภาษาไทยเต็มของข้อกำหนด การคืนเงิน และความเป็นส่วนตัว ที่เนื้อหาเท่ากับฉบับภาษาอังกฤษ ยังจะตามมา</p>
+    </div>
+
+<p class="fine">หน้านี้: ภาษาที่เลือกถูกเก็บไว้ในเบราว์เซอร์ของคุณ</p>
+</main>
+<!-- site-footer:begin -->
+<footer class="site-footer" lang="th">
+<div class="fwrap">
+<p class="fbrand"><svg class="fglyph" viewBox="0 0 100 100" width="24" height="24" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg>Kolwen</p>
+<nav class="fgroups" aria-label="ส่วนท้ายเว็บ">
+<div class="fgroup"><p class="fh">Kolwen</p><a href="/th/">หน้าแรก</a></div>
+<div class="fgroup"><p class="fh">สินค้า</p><a href="/th/pricing">ราคา</a><a href="/th/changelog">บันทึกการเปลี่ยนแปลง</a></div>
+<div class="fgroup"><p class="fh">กฎหมาย</p><a href="/th/terms">ข้อกำหนด</a><a href="/th/privacy">ความเป็นส่วนตัว</a><a href="/th/refund">การคืนเงิน</a></div>
+<div class="fgroup"><p class="fh">โค้ด</p><a href="https://github.com/TheColliery/Kolwen">GitHub</a><a href="https://huggingface.co/kolwen">Hugging Face</a><a href="https://www.npmjs.com/package/kolwen">npm</a><a href="/llms.txt">llms.txt</a></div>
+<div class="fgroup"><p class="fh">ติดต่อ</p><a href="mailto:info@kolwen.com">อีเมล</a><a href="mailto:support@kolwen.com">ขอความช่วยเหลือ</a><a href="mailto:abuse@kolwen.com">แจ้งการละเมิด</a><a href="mailto:appeals@kolwen.com">ยื่นอุทธรณ์</a><a href="https://kolwen.com/.well-known/security.txt">ความปลอดภัย</a></div>
+</nav>
+<div class="fbar">
+<p class="fine">© 2026 Kolwen · เครื่องหมายการค้าอยู่ระหว่างการจดทะเบียน</p>
+<div class="lswitch" role="group" aria-label="ภาษา"><span lang="th" aria-current="page">ไทย</span><a class="lang-link" href="/privacy" lang="en" hreflang="en">English</a></div>
+</div>
+</div>
+</footer>
+<!-- site-footer:end -->
+<script>
+/* site-script:begin */
+(function () {
+  try { localStorage.removeItem('kolwen-lang'); } catch (e) {}
+  function sectionAbove() {
+    var found = null, hs = document.querySelectorAll('main h2[id]');
+    for (var i = 0; i < hs.length; i++) { if (hs[i].getBoundingClientRect().top < 1) found = hs[i].id; else break; }
+    return found;
+  }
+  var links = document.querySelectorAll('a.lang-link');
+  for (var i = 0; i < links.length; i++) {
+    links[i].addEventListener('click', function () {
+      var id = sectionAbove();
+      if (id) this.href = this.href.split('#')[0] + '#' + id;
+    });
+  }
+  // The status page is the one page with a [data-status] element. It reads /status.json, the last health check the Worker stored, and writes the state, the time and one row per
+  // probed page as text: the numbers, paths and times come from the data, and every word on the page comes from the catalogue. Without the fetch the page keeps its unavailable line.
+  if (document.querySelector('[data-status]')) {
+    fetch('/status.json', { cache: 'no-store' })
+      .then(function (res) { if (!res.ok) throw new Error('status ' + res.status); return res.json(); })
+      .then(showStatus)
+      .catch(function () { /* the page keeps its unavailable line */ });
+  }
+
+  function showStatus(data) {
+    var state = 'none';
+    if (data.checked) state = data.probes.every(function (p) { return p.ok; }) ? 'ok' : 'failing';
+    var lines = document.querySelectorAll('[data-state]');
+    for (var i = 0; i < lines.length; i++) lines[i].hidden = lines[i].getAttribute('data-state') !== state;
+    if (!data.checked) return;
+    var times = document.querySelectorAll('[data-fill="checked"]');
+    for (var j = 0; j < times.length; j++) { times[j].textContent = data.checked; times[j].setAttribute('datetime', data.checked); }
+    var lists = document.querySelectorAll('[data-fill="probes"]');
+    for (var k = 0; k < lists.length; k++) {
+      lists[k].textContent = '';
+      var labels = marks(lists[k]);
+      for (var m = 0; m < data.probes.length; m++) lists[k].appendChild(probeRow(data.probes[m], labels));
+    }
+  }
+
+  // A row's OK and FAIL labels come from the language section that holds its list, so a Thai row says ผ่าน or ไม่ผ่าน.
+  function marks(list) {
+    var lang = list.closest('[lang]');
+    return { ok: lang.querySelector('[data-mark="ok"]').textContent, fail: lang.querySelector('[data-mark="fail"]').textContent };
+  }
+
+  function probeRow(p, labels) {
+    var li = document.createElement('li');
+    var path = document.createElement('span');
+    path.className = 'path';
+    path.textContent = p.path;
+    var code = document.createElement('span');
+    code.textContent = p.status ? String(p.status) : '-';
+    var ms = document.createElement('span');
+    ms.textContent = p.ms + ' ms';
+    var mark = document.createElement('span');
+    mark.textContent = p.ok ? labels.ok : labels.fail;
+    li.appendChild(path);
+    li.appendChild(code);
+    li.appendChild(ms);
+    li.appendChild(mark);
+    return li;
+  }
+})();
+/* site-script:end */
+</script>
+</body>
+</html>

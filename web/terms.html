@@ -5,15 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kolwen terms of use: a draft that is not yet in force</title>
 <meta name="description" content="Kolwen terms: a draft, not in force. Nothing is for sale, and parts of it wait for review by counsel.">
+<!-- site-links:begin -->
 <link rel="canonical" href="https://kolwen.com/terms">
-<meta property="og:type" content="website">
+<link rel="alternate" hreflang="en" href="https://kolwen.com/terms">
+<link rel="alternate" hreflang="th" href="https://kolwen.com/th/terms">
+<link rel="alternate" hreflang="x-default" href="https://kolwen.com/terms">
 <meta property="og:url" content="https://kolwen.com/terms">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="th_TH">
+<!-- site-links:end -->
+<meta property="og:type" content="website">
 <meta property="og:title" content="Kolwen terms of use: a draft that is not yet in force">
 <meta property="og:description" content="Kolwen terms: a draft, not in force. Nothing is for sale, and parts of it wait for review by counsel.">
 <meta property="og:image" content="https://kolwen.com/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Kolwen terms of use: a draft that is not yet in force">
 <meta name="twitter:description" content="Kolwen terms: a draft, not in force. Nothing is for sale, and parts of it wait for review by counsel.">
@@ -84,7 +90,7 @@
   html[data-job="prose"] h1{font-size:var(--kw-font-size-reading-title)}
   html[data-job="prose"] .legal h2{font-size:var(--kw-font-size-reading-h2)}
   html[data-job="prose"] .legal h3{font-size:var(--kw-font-size-reading-h3)}
-  html[data-job="prose"] #doc-th,html[data-job="prose"] #doc-th *{line-height:var(--kw-line-height-thai)}
+  html[data-job="prose"][lang="th"] main,html[data-job="prose"][lang="th"] main *{line-height:var(--kw-line-height-thai)}
 /* site-tokens-css:end */
   :root{--bg:#0f0d0b;--bg2:#15130f;--card:#1a1714;--line:rgba(255,255,255,.08);--txt:#ece4d9;--txt2:#a89a8c;--quiet:#a2968a;--accent:#e8833a;--accent2:#ffbb7a}
   *{box-sizing:border-box;margin:0}
@@ -123,7 +129,7 @@
   .ch a{color:var(--txt);text-decoration:none;font-size:var(--kw-font-size-4);border:1px solid var(--line);border-radius:9px;padding:7px 12px;background:var(--bg2);display:inline-flex;align-items:center;gap:7px;min-height:44px}
   .ch a:hover{border-color:rgba(232,131,58,.4);color:var(--accent2)}
   footer{margin-top:6px;font-size:var(--kw-font-size-1);color:var(--quiet);display:flex;flex-direction:column;gap:4px}
-  #doc-en > * + *,#doc-th > * + *{margin-top:var(--kw-space-section)}
+  main > * + *{margin-top:var(--kw-space-section)}
   .banner{border:1px solid rgba(232,131,58,.45);background:rgba(232,131,58,.08);border-radius:10px;padding:12px 14px;font-size:var(--kw-font-size-body);color:var(--txt);margin-top:14px}
   .legal{display:flex;flex-direction:column;gap:14px}
   .legal > * + *{margin-top:0}
@@ -158,29 +164,20 @@
 /* site-header-css:begin */
   .site-header{border-bottom:1px solid rgba(128,128,128,.35);padding-block:var(--kw-space-header-top) var(--kw-space-header-block);padding-inline:var(--kw-space-gutter-inline)}
   .site-header nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;font-size:var(--kw-font-size-header-link)}
-  .site-header nav[lang="th"]{display:none}
-  html[lang="th"] .site-header nav[lang="en"]{display:none}
-  html[lang="th"] .site-header nav[lang="th"]{display:flex}
   .site-header a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);overflow-wrap:anywhere}
   .site-header a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
   .site-header .hmark{gap:10px;font-weight:700;font-size:var(--kw-font-size-header-name);letter-spacing:.01em;margin-right:auto}
   .site-header .hglyph,.site-footer .fglyph{flex:none;display:block;fill:var(--accent,var(--amber,#e8833a))}
-  .lswitch{display:inline-flex;gap:6px}
-  .lswitch button{font:inherit;font-size:var(--kw-font-size-header-switch);color:inherit;background:transparent;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:var(--kw-size-header-switch);cursor:pointer}
-  .lswitch button:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
-  .lswitch button[aria-pressed="true"]{border-color:currentColor;font-weight:600}
+  .lswitch{display:inline-flex;align-items:center;gap:6px}
+  .lswitch a,.lswitch [aria-current="page"]{font-size:var(--kw-font-size-header-switch);color:inherit;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:var(--kw-size-header-switch);display:inline-flex;align-items:center;text-decoration:none}
+  .lswitch a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+  .lswitch [aria-current="page"]{border-color:currentColor;font-weight:600}
   .site-header :focus-visible,.site-footer :focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .skip{position:absolute;z-index:100;inset-block-start:var(--kw-space-header-top);inset-inline-start:max(var(--kw-space-inset-inline), env(safe-area-inset-left, 0px));display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);padding-inline:var(--kw-space-button);color:var(--txt);background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:var(--kw-font-size-header-link);text-decoration:none;clip-path:inset(50%)}
 .skip:focus-visible{clip-path:none;outline:2px solid currentColor;outline-offset:2px}
-  .skip[lang="th"]{display:none}
-  html[lang="th"] .skip[lang="en"]{display:none}
-  html[lang="th"] .skip[lang="th"]{display:inline-flex}
 /* site-header-css:end */
 /* site-footer-css:begin */
   .site-footer{display:block;margin-top:var(--kw-space-footer-offset);padding-block:var(--kw-space-footer-top) var(--kw-space-footer-end);padding-inline:var(--kw-space-gutter-inline);border-top:1px solid rgba(128,128,128,.35);font-size:var(--kw-font-size-4);line-height:1.7}
-  .site-footer[lang="th"]{display:none}
-  html[lang="th"] .site-footer[lang="en"]{display:none}
-  html[lang="th"] .site-footer[lang="th"]{display:block}
   .site-footer .fwrap{width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;display:flex;flex-direction:column;gap:28px}
   .site-footer .fbrand{display:flex;align-items:center;gap:10px;margin:0;font-size:var(--kw-font-size-10);font-weight:700;letter-spacing:.01em}
   .site-footer .fgroups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 18px}
@@ -198,33 +195,21 @@
 </style>
 <noscript><style>
 /* site-noscript-css:begin */
-  .lswitch{display:none}
-  #doc-th{display:block !important;border-top:1px solid var(--line);padding-top:28px}
-  .site-header nav[lang="th"]{display:flex !important}
-  .site-footer[lang="th"]{display:block !important}
-  .skip[lang="th"]{display:inline-flex !important}
 /* site-noscript-css:end */
 </style></noscript>
 </head>
 <body>
 <!-- site-header:begin -->
 <a class="skip" href="#main" lang="en">Skip to main content</a>
-<a class="skip" href="#main" lang="th">ข้ามไปยังเนื้อหาหลัก</a>
 <header class="site-header">
 <nav lang="en" aria-label="Main">
 <a class="hmark" href="/" aria-label="Kolwen home"><svg class="hglyph" viewBox="0 0 100 100" width="26" height="26" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg><span>Kolwen</span></a>
 <a href="/pricing">Pricing</a>
-<div class="lswitch" role="group" aria-label="Language"><button type="button" data-lang-set="en" lang="en" aria-pressed="true">English</button><button type="button" data-lang-set="th" lang="th" aria-pressed="false">ไทย</button></div>
-</nav>
-<nav lang="th" aria-label="เมนูหลัก">
-<a class="hmark" href="/" aria-label="หน้าแรกของ Kolwen"><svg class="hglyph" viewBox="0 0 100 100" width="26" height="26" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg><span>Kolwen</span></a>
-<a href="/pricing">ราคา</a>
-<div class="lswitch" role="group" aria-label="ภาษา"><button type="button" data-lang-set="en" lang="en" aria-pressed="true">English</button><button type="button" data-lang-set="th" lang="th" aria-pressed="false">ไทย</button></div>
+<div class="lswitch" role="group" aria-label="Language"><span lang="en" aria-current="page">English</span><a class="lang-link" href="/th/terms" lang="th" hreflang="th">ไทย</a></div>
 </nav>
 </header>
 <!-- site-header:end -->
 <main id="main" tabindex="-1">
-  <div id="doc-en" lang="en">
     <div>
       <h1>Terms</h1>
       <p class="banner" role="note">This page is a draft. It is not in force, nothing is for sale, and parts of it wait for review by counsel.</p>
@@ -232,51 +217,51 @@
     <div class="legal">
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Customer Content and training</h2>
+      <h2 id="s-1">Customer Content and training</h2>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Rights in Inputs and Outputs</h2>
+      <h2 id="s-2">Rights in Inputs and Outputs</h2>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Who you are contracting with</h2>
+      <h2 id="s-3">Who you are contracting with</h2>
       <p class="t">Payment for a key, a subscription or credits is taken by Paddle as the merchant of record, under Paddle&#39;s own buyer terms. These Terms cover the licence to use Kolwen and Kolwen&#39;s own policies; the purchase contract itself sits with Paddle.</p>
-      <h2>Age</h2>
+      <h2 id="s-4">Age</h2>
       <p class="t">You must be at least 18, or the age at which the law of the place where you are lets you consent, whichever is higher. At sign-up you confirm this. Kolwen does not ask for, or keep, an image of any identity document. If the way an account is used shows that its holder is under that age, the account is disabled and the unused part is refunded.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Outputs and training</h2>
+      <h2 id="s-5">Outputs and training</h2>
       <p class="t">You own the Outputs you generate. Kolwen assigns to you any right, title and interest it has in them, if any, and claims no licence back. Outputs may not be unique: Kolwen may generate similar outputs for other users, and the assignment gives you no right against that.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Keys, subscriptions and credits</h2>
+      <h2 id="s-6">Keys, subscriptions and credits</h2>
       <p class="t">A <strong>key</strong> is a time-boxed licence to use Kolwen, sold once through Paddle. It gives you exactly what a subscriber has for the same number of days: key and subscription differ in how they are paid for, not in what they unlock. A <strong>subscription</strong> renews until you cancel it. <strong>Credits</strong> are prepaid units of Kolwen&#39;s own metered service: they are used only at Kolwen, cannot be moved to anyone else, and cannot be cashed out.</p>
       <p class="t">A key is a licence to consume, not a thing you own. It is <strong>non-transferable and binds to your account when you activate it.</strong> Before activation a key can be given as a gift; after activation it is yours alone.</p>
-      <h2>Limits on keys</h2>
+      <h2 id="s-7">Limits on keys</h2>
       <p class="t">These limits exist to stop bulk buying for resale, and are set at what one household should need.</p>
       <ul><li class="t"><strong>2 keys per order.</strong></li><li class="t"><strong>4 keys per account per sale window, or per rolling 30 days</strong> (all key lengths counted together).</li><li class="t"><strong>A key adds time to your account</strong> (keys stack), up to a <strong>36-month ceiling</strong>.</li><li class="t"><strong>An unredeemed key expires 12 months after purchase.</strong></li></ul>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Refunds</h2>
+      <h2 id="s-8">Refunds</h2>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <ul><li class="t"><strong>An unredeemed key is refunded in full within 14 days of purchase.</strong> Nothing was used, so the key is simply voided.</li><li class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</li><li class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</li><li class="t">When Kolwen ends the contract without cause, it refunds the unused part (see &quot;Ending the contract&quot;).</li></ul>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Ending the contract</h2>
+      <h2 id="s-9">Ending the contract</h2>
       <p class="t"><strong>By Kolwen without cause.</strong> Kolwen refunds the unused part: a key&#39;s remaining days, a subscription&#39;s remaining current period, and unused credits at the price paid.</p>
       <p class="t"><strong>By Kolwen for your fault</strong> (a breach of the acceptable-use process below, or a chargeback). This runs as a process, not a summary punishment: see &quot;Acceptable use and how it is enforced&quot;.</p>
       <p class="t"><strong>By you.</strong> You may stop using Kolwen at any time. A refund follows the Refunds section.</p>
-      <h2>Changes to these Terms</h2>
+      <h2 id="s-10">Changes to these Terms</h2>
       <p class="t">Kolwen gives <strong>30 days&#39; notice</strong> of a material change, by email to the address on your account <strong>and</strong> by a banner on the site and in the app. A change forced by law, security or abuse prevention takes effect at once. If you reject a changed term, you may end the contract and you are refunded the unused part, as in &quot;Ending the contract&quot;. At your first sign-in after a change takes effect, you see a one-time screen to review and accept it. A public dated record of each change to these Terms is kept. If an email bounces, that is logged and the in-app screen carries the notice.</p>
-      <h2>Price changes</h2>
+      <h2 id="s-11">Price changes</h2>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <ul><li class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</li><li class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</li><li class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</li><li class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</li><li class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</li><li class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</li><li class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</li><li class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</li></ul>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Limit of liability</h2>
+      <h2 id="s-12">Limit of liability</h2>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Governing law and courts</h2>
+      <h2 id="s-13">Governing law and courts</h2>
       <p class="t">Thai law governs these Terms, and the Thai courts have jurisdiction. Your rights as a consumer under the law of the place where you live are not taken away by this clause. There is no arbitration clause.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Acceptable use and how it is enforced</h2>
+      <h2 id="s-14">Acceptable use and how it is enforced</h2>
       <p class="t"><strong>The list of prohibited conduct is not written yet.</strong> It is an open decision for the owner and counsel, and this section does not guess at it. What is written is how Kolwen acts when it believes a customer has broken a rule, which is a process, in this order:</p>
       <ol><li class="t"><strong>Notice.</strong> Kolwen tells you which clause it believes you broke and gives a summary of the evidence.</li><li class="t"><strong>Suspension, not termination,</strong> while the case is open. If the product is a key, its clock of days stops for the whole case.</li><li class="t"><strong>A window to answer.</strong> You have <strong>14 business days</strong> to answer the notice. If the window closes with no answer, the case is still decided, as step 4 says.</li><li class="t"><strong>A written decision,</strong> within <strong>7 business days</strong> after your answer or, if you give no answer, within <strong>7 business days</strong> after the 14 business days close, on the evidence Kolwen holds. Either the case is dismissed and the account and its key are restored in full, or it is upheld. An upheld decision does not end the contract at once: the account stays suspended, and the key&#39;s clock stays stopped, through the appeal window of step 5 and through any appeal.</li><li class="t"><strong>One appeal to a human</strong> against an upheld decision. You have <strong>30 business days</strong> after the written decision to file it, through <strong>appeals@kolwen.com</strong>, and Kolwen answers within <strong>14 business days</strong>. If the appeal succeeds, the account and its key are restored in full. The contract is terminated, with no refund, only when the appeal is dismissed or the 30 business days pass with no appeal filed.</li><li class="t"><strong>A register of cases</strong> is kept, so that the same conduct draws the same answer.</li></ol>
       <p class="pending">[pending legal review] In this section only legal working days in Thailand count as business days. The exact definition is waiting for review.</p>
@@ -288,95 +273,18 @@
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Retention</h2>
+      <h2 id="s-15">Retention</h2>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
-      <h2>Status of this document</h2>
+      <h2 id="s-16">Status of this document</h2>
       <p class="t">Nothing here is in force. There is no service to buy, no account to open, and no contract formed by this file. It exists so the shape can be read and corrected before it matters.</p>
       <p class="pending">[pending legal review] Full Thai versions of the Terms, the Refunds and the Privacy pages, equal in substance to the English, are still to come.</p>
     </div>
 
 <p class="fine">This page: your language choice is stored locally in your browser</p>
-  </div>
-
-  <div id="doc-th" lang="th" hidden>
-    <div>
-      <h1>ข้อกำหนด</h1>
-      <p class="banner" role="note">หน้านี้เป็นฉบับร่าง ยังไม่มีผลใช้บังคับ ยังไม่มีสินค้าให้ซื้อ และบางส่วนรอที่ปรึกษากฎหมายตรวจสอบ</p>
-    </div>
-    <div class="legal">
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Customer Content and training</h2>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Rights in Inputs and Outputs</h2>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Who you are contracting with</h2>
-      <p class="t">Paddle เป็นผู้รับชำระเงินสำหรับคีย์ การสมัครสมาชิก หรือเครดิต ในฐานะผู้ขายตามกฎหมาย (merchant of record) ตามข้อกำหนดผู้ซื้อของ Paddle เอง ข้อกำหนดนี้ครอบคลุมสิทธิใช้ Kolwen และนโยบายของ Kolwen เอง ส่วนสัญญาซื้อขายอยู่กับ Paddle</p>
-      <h2 lang="en">Age</h2>
-      <p class="t" lang="en">You must be at least 18, or the age at which the law of the place where you are lets you consent, whichever is higher. At sign-up you confirm this. Kolwen does not ask for, or keep, an image of any identity document. If the way an account is used shows that its holder is under that age, the account is disabled and the unused part is refunded.</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Outputs and training</h2>
-      <p class="t" lang="en">You own the Outputs you generate. Kolwen assigns to you any right, title and interest it has in them, if any, and claims no licence back. Outputs may not be unique: Kolwen may generate similar outputs for other users, and the assignment gives you no right against that.</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Keys, subscriptions and credits</h2>
-      <p class="t" lang="en">A <strong>key</strong> is a time-boxed licence to use Kolwen, sold once through Paddle. It gives you exactly what a subscriber has for the same number of days: key and subscription differ in how they are paid for, not in what they unlock. A <strong>subscription</strong> renews until you cancel it. <strong>Credits</strong> are prepaid units of Kolwen&#39;s own metered service: they are used only at Kolwen, cannot be moved to anyone else, and cannot be cashed out.</p>
-      <p class="t" lang="en">A key is a licence to consume, not a thing you own. It is <strong>non-transferable and binds to your account when you activate it.</strong> Before activation a key can be given as a gift; after activation it is yours alone.</p>
-      <h2 lang="en">Limits on keys</h2>
-      <p class="t" lang="en">These limits exist to stop bulk buying for resale, and are set at what one household should need.</p>
-      <ul><li class="t" lang="en"><strong>2 keys per order.</strong></li><li class="t" lang="en"><strong>4 keys per account per sale window, or per rolling 30 days</strong> (all key lengths counted together).</li><li class="t" lang="en"><strong>A key adds time to your account</strong> (keys stack), up to a <strong>36-month ceiling</strong>.</li><li class="t" lang="en"><strong>An unredeemed key expires 12 months after purchase.</strong></li></ul>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Refunds</h2>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <ul><li class="t" lang="en"><strong>An unredeemed key is refunded in full within 14 days of purchase.</strong> Nothing was used, so the key is simply voided.</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="t" lang="en">When Kolwen ends the contract without cause, it refunds the unused part (see &quot;Ending the contract&quot;).</li></ul>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Ending the contract</h2>
-      <p class="t" lang="en"><strong>By Kolwen without cause.</strong> Kolwen refunds the unused part: a key&#39;s remaining days, a subscription&#39;s remaining current period, and unused credits at the price paid.</p>
-      <p class="t" lang="en"><strong>By Kolwen for your fault</strong> (a breach of the acceptable-use process below, or a chargeback). This runs as a process, not a summary punishment: see &quot;Acceptable use and how it is enforced&quot;.</p>
-      <p class="t" lang="en"><strong>By you.</strong> You may stop using Kolwen at any time. A refund follows the Refunds section.</p>
-      <h2 lang="en">Changes to these Terms</h2>
-      <p class="t" lang="en">Kolwen gives <strong>30 days&#39; notice</strong> of a material change, by email to the address on your account <strong>and</strong> by a banner on the site and in the app. A change forced by law, security or abuse prevention takes effect at once. If you reject a changed term, you may end the contract and you are refunded the unused part, as in &quot;Ending the contract&quot;. At your first sign-in after a change takes effect, you see a one-time screen to review and accept it. A public dated record of each change to these Terms is kept. If an email bounces, that is logged and the in-app screen carries the notice.</p>
-      <h2 lang="en">Price changes</h2>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <ul><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li></ul>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Limit of liability</h2>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Governing law and courts</h2>
-      <p class="t" lang="en">Thai law governs these Terms, and the Thai courts have jurisdiction. Your rights as a consumer under the law of the place where you live are not taken away by this clause. There is no arbitration clause.</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Acceptable use and how it is enforced</h2>
-      <p class="t" lang="en"><strong>The list of prohibited conduct is not written yet.</strong> It is an open decision for the owner and counsel, and this section does not guess at it. What is written is how Kolwen acts when it believes a customer has broken a rule, which is a process, in this order:</p>
-      <ol><li class="t" lang="en"><strong>Notice.</strong> Kolwen tells you which clause it believes you broke and gives a summary of the evidence.</li><li class="t" lang="en"><strong>Suspension, not termination,</strong> while the case is open. If the product is a key, its clock of days stops for the whole case.</li><li class="t" lang="en"><strong>A window to answer.</strong> You have <strong>14 business days</strong> to answer the notice. If the window closes with no answer, the case is still decided, as step 4 says.</li><li class="t" lang="en"><strong>A written decision,</strong> within <strong>7 business days</strong> after your answer or, if you give no answer, within <strong>7 business days</strong> after the 14 business days close, on the evidence Kolwen holds. Either the case is dismissed and the account and its key are restored in full, or it is upheld. An upheld decision does not end the contract at once: the account stays suspended, and the key&#39;s clock stays stopped, through the appeal window of step 5 and through any appeal.</li><li class="t" lang="en"><strong>One appeal to a human</strong> against an upheld decision. You have <strong>30 business days</strong> after the written decision to file it, through <strong>appeals@kolwen.com</strong>, and Kolwen answers within <strong>14 business days</strong>. If the appeal succeeds, the account and its key are restored in full. The contract is terminated, with no refund, only when the appeal is dismissed or the 30 business days pass with no appeal filed.</li><li class="t" lang="en"><strong>A register of cases</strong> is kept, so that the same conduct draws the same answer.</li></ol>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ในหัวข้อนี้นับเฉพาะวันทำการตามกฎหมายของประเทศไทยเป็นวันทำการ คำจำกัดความที่แน่นอนรอการตรวจสอบ</p>
-      <p class="t" lang="en"><strong>A ceiling and what a missed deadline does.</strong> The case ceiling is <strong>90 calendar days</strong> of Kolwen&#39;s own time, counted from the date of the notice. The count pauses while your 14-business-day window to answer is open, from the notice until you answer or the 14 business days close, whichever comes first, and while your 30-business-day window to file an appeal is open, from the written decision until you file the appeal or the 30 business days close, whichever comes first. Only the days outside those windows count toward the 90. If Kolwen misses a deadline of its own (the 7 business days for the decision, the 14 business days for the appeal answer, or the 90-day ceiling), the suspension, including one that follows an upheld decision, is lifted and the key comes back into use. If a deadline of yours lapses (the 14 business days to answer, or the 30 business days to appeal), the case proceeds to its next step.</p>
-      <p class="t" lang="en"><strong>Chargebacks run on Paddle&#39;s track.</strong> A bank dispute is handled through Paddle as merchant of record, and Paddle asks Kolwen for evidence. The account is <strong>suspended</strong> when a chargeback is filed, because the money is gone. It is <strong>restored</strong> if the dispute resolves in Kolwen&#39;s favour or you pay again, and <strong>terminated only when the dispute closes against Kolwen.</strong> Kolwen does not argue a chargeback with you directly.</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <ol><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li><li class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</li></ol>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Retention</h2>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
-      <h2 lang="en">Status of this document</h2>
-      <p class="t" lang="en">Nothing here is in force. There is no service to buy, no account to open, and no contract formed by this file. It exists so the shape can be read and corrected before it matters.</p>
-      <p class="pending">[รอที่ปรึกษากฎหมาย] ฉบับภาษาไทยเต็มของข้อกำหนด การคืนเงิน และความเป็นส่วนตัว ที่เนื้อหาเท่ากับฉบับภาษาอังกฤษ ยังจะตามมา</p>
-    </div>
-
-<p class="fine">หน้านี้: ภาษาที่เลือกถูกเก็บไว้ในเบราว์เซอร์ของคุณ</p>
-  </div>
 </main>
-<!-- site-footer:en:begin -->
+<!-- site-footer:begin -->
 <footer class="site-footer" lang="en">
 <div class="fwrap">
 <p class="fbrand"><svg class="fglyph" viewBox="0 0 100 100" width="24" height="24" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg>Kolwen</p>
@@ -389,78 +297,27 @@
 </nav>
 <div class="fbar">
 <p class="fine">© 2026 Kolwen · trademark application pending</p>
-<div class="lswitch" role="group" aria-label="Language"><button type="button" data-lang-set="en" lang="en" aria-pressed="true">English</button><button type="button" data-lang-set="th" lang="th" aria-pressed="false">ไทย</button></div>
+<div class="lswitch" role="group" aria-label="Language"><span lang="en" aria-current="page">English</span><a class="lang-link" href="/th/terms" lang="th" hreflang="th">ไทย</a></div>
 </div>
 </div>
 </footer>
-<!-- site-footer:en:end -->
-<!-- site-footer:th:begin -->
-<footer class="site-footer" lang="th">
-<div class="fwrap">
-<p class="fbrand"><svg class="fglyph" viewBox="0 0 100 100" width="24" height="24" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg>Kolwen</p>
-<nav class="fgroups" aria-label="ส่วนท้ายเว็บ">
-<div class="fgroup"><p class="fh">Kolwen</p><a href="/">หน้าแรก</a></div>
-<div class="fgroup"><p class="fh">สินค้า</p><a href="/pricing">ราคา</a><a href="/changelog">บันทึกการเปลี่ยนแปลง</a></div>
-<div class="fgroup"><p class="fh">กฎหมาย</p><a href="/terms">ข้อกำหนด</a><a href="/privacy">ความเป็นส่วนตัว</a><a href="/refund">การคืนเงิน</a></div>
-<div class="fgroup"><p class="fh">โค้ด</p><a href="https://github.com/TheColliery/Kolwen">GitHub</a><a href="https://huggingface.co/kolwen">Hugging Face</a><a href="https://www.npmjs.com/package/kolwen">npm</a><a href="/llms.txt">llms.txt</a></div>
-<div class="fgroup"><p class="fh">ติดต่อ</p><a href="mailto:info@kolwen.com">อีเมล</a><a href="mailto:support@kolwen.com">ขอความช่วยเหลือ</a><a href="mailto:abuse@kolwen.com">แจ้งการละเมิด</a><a href="mailto:appeals@kolwen.com">ยื่นอุทธรณ์</a><a href="https://kolwen.com/.well-known/security.txt">ความปลอดภัย</a></div>
-</nav>
-<div class="fbar">
-<p class="fine">© 2026 Kolwen · เครื่องหมายการค้าอยู่ระหว่างการจดทะเบียน</p>
-<div class="lswitch" role="group" aria-label="ภาษา"><button type="button" data-lang-set="en" lang="en" aria-pressed="true">English</button><button type="button" data-lang-set="th" lang="th" aria-pressed="false">ไทย</button></div>
-</div>
-</div>
-</footer>
-<!-- site-footer:th:end -->
+<!-- site-footer:end -->
 <script>
 /* site-script:begin */
 (function () {
-  var KEY = 'kolwen-lang';
-  var en = document.getElementById('doc-en');
-  var th = document.getElementById('doc-th');
-  var buttons = document.querySelectorAll('[data-lang-set]');
-  // The title follows the language: a page with a Thai title carries it in a meta tag written on its Thai line only, and a page without one keeps its English title.
-  // The meta description is not switched: crawlers read it from the served page, and a reader never sees a change made here, so it would reach no one.
-  var titleEn = document.title;
-  var titleTh = document.querySelector('meta[name="kolwen-title-th"]');
-
-  function apply(lang, persist) {
-    var thai = lang === 'th';
-    th.hidden = !thai;
-    en.hidden = thai;
-    document.documentElement.lang = thai ? 'th' : 'en';
-    document.title = thai && titleTh ? titleTh.getAttribute('content') : titleEn;
-    for (var i = 0; i < buttons.length; i++) {
-      buttons[i].setAttribute('aria-pressed', String(buttons[i].getAttribute('data-lang-set') === lang));
-    }
-    if (persist) {
-      // Language preference only. localStorage, never a cookie: it is a
-      // client-only concern that never needs to ride on an HTTP request.
-      try { localStorage.setItem(KEY, lang); } catch (e) {}
-    }
+  try { localStorage.removeItem('kolwen-lang'); } catch (e) {}
+  function sectionAbove() {
+    var found = null, hs = document.querySelectorAll('main h2[id]');
+    for (var i = 0; i < hs.length; i++) { if (hs[i].getBoundingClientRect().top < 1) found = hs[i].id; else break; }
+    return found;
   }
-
-  var saved = null;
-  try { saved = localStorage.getItem(KEY); } catch (e) {}
-  if (saved === 'th' || saved === 'en') apply(saved, false);
-
-  // Pressing a switch changes the page language on the root element, which hides the header nav or the footer holding the pressed button. So focus goes to the same switch in the block that is now shown,
-  // in the same place (header to header, footer to footer), and without a scroll jump (WCAG 2.2 SC 2.4.3 and 2.4.7). Pressing the language already shown hides nothing and moves nothing.
-  function bind(button) {
-    button.addEventListener('click', function () {
-      var lang = button.getAttribute('data-lang-set');
-      var changed = document.documentElement.lang !== lang;
-      var place = button.closest('.site-header') ? '.site-header' : (button.closest('.site-footer') ? '.site-footer' : '');
-      apply(lang, true);
-      if (!changed || !place) return;
-      var same = document.querySelectorAll(place + ' [data-lang-set]');
-      for (var j = 0; j < same.length; j++) {
-        if (same[j].getAttribute('data-lang-set') === lang && same[j].parentNode.closest('[lang]').getAttribute('lang') === lang) { same[j].focus({ preventScroll: true }); return; }
-      }
+  var links = document.querySelectorAll('a.lang-link');
+  for (var i = 0; i < links.length; i++) {
+    links[i].addEventListener('click', function () {
+      var id = sectionAbove();
+      if (id) this.href = this.href.split('#')[0] + '#' + id;
     });
   }
-  for (var i = 0; i < buttons.length; i++) bind(buttons[i]);
-
   // The status page is the one page with a [data-status] element. It reads /status.json, the last health check the Worker stored, and writes the state, the time and one row per
   // probed page as text: the numbers, paths and times come from the data, and every word on the page comes from the catalogue. Without the fetch the page keeps its unavailable line.
   if (document.querySelector('[data-status]')) {

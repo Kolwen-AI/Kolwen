@@ -25,9 +25,10 @@ const holds = JSON.parse(read('scripts/lib/legal-holds.json'));
 const state = JSON.parse(read('legal/legal-state.json'));
 const inputs = () => ({ terms: read('TERMS.md'), privacy: read('PRIVACY.md'), clause: read('legal/thai-7day-clause.md'), changelog: read('CHANGELOG.md'), state, holds });
 const count = (s, needle) => s.split(needle).length - 1;
-// The English document of a page: the text between the two document containers.
-const docEn = html => html.slice(html.indexOf('id="doc-en"'), html.indexOf('id="doc-th"'));
-const docTh = html => html.slice(html.indexOf('id="doc-th"'), html.indexOf('</main>'));
+// The document of a page: the text inside its <main>. One language per file (ORDER 1017j), so a page's <main> holds its one language's document.
+const docEn = html => html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+// The Thai twin of an English page address: web/terms.html -> web/th/terms.html.
+const thFile = file => file.replace('web/', 'web/th/');
 const ACTIVE = { ...state, sellerType: 'company', incorporated: { on: '2026-12-01' } };
 
 test('a passage carrying a marker is held, one without is shown as written', () => {
@@ -87,9 +88,11 @@ test('no passage is dropped: for each source, passages = shown as written + held
   for (const [file, src] of [['web/terms.html', SOURCES.terms], ['web/privacy.html', SOURCES.privacy]]) {
     const c = classify(src, src === SOURCES.terms ? inputs().terms : inputs().privacy, { holds: holds.holds });
     assert.equal(c.stats.passages, c.stats.text + c.stats.held);
-    for (const doc of [docEn(pages[file]), docTh(pages[file])]) {
-      assert.equal(count(doc, 'class="t"'), c.stats.text, file + ' shown as written');
-      assert.equal(count(doc, 'class="pending"'), c.stats.held + 1, file + ' pending lines (the held passages and the one Thai-versions line)');
+    // each language has its own file, and each file shows the same passages
+    for (const f of [file, thFile(file)]) {
+      const doc = mainOf(pages[f]);
+      assert.equal(count(doc, 'class="t"'), c.stats.text, f + ' shown as written');
+      assert.equal(count(doc, 'class="pending"'), c.stats.held + 1, f + ' pending lines (the held passages and the one Thai-versions line)');
     }
   }
 });
@@ -123,7 +126,7 @@ test('a held passage never shows its own text', () => {
 
 test('escaping covers & < > " and \' for text and for attribute values, and a description cannot leave its attribute', () => {
   for (const fn of [escText, escAttr]) assert.equal(fn('a&b<c>d"e\'f'), 'a&amp;b&lt;c&gt;d&quot;e&#39;f');
-  const page = shell({ title: 'T <b>', description: 'x" onmouseover="alert(1)" <script>', path: '/p"q', en: '', th: '', job: 'default' });
+  const page = shell({ lang: 'en', title: 'T <b>', description: 'x" onmouseover="alert(1)" <script>', path: '/p"q', body: '', job: 'default' });
   assert.match(page, /<meta name="description" content="x&quot; onmouseover=&quot;alert\(1\)&quot; &lt;script&gt;">/);
   assert.ok(page.includes('<title>T &lt;b&gt;</title>'), 'the title is escaped and written as given: the page titles are complete sentences, so no suffix is added');
   assert.ok(page.includes('href="https://kolwen.com/p&quot;q"'));
@@ -153,17 +156,21 @@ test('refund rows R1 and R2 are the TERMS.md passages: a changed passage is repo
 
 test('the pages carry no raw {{token}}, no marker-less pending line, and nothing a production page must not have', () => {
   const { pages } = renderPages(inputs());
-  assert.equal(Object.keys(pages).length, 4);
-  for (const [file, html] of Object.entries(pages).filter(([name]) => name !== 'web/changelog.html')) {
+  // four legal documents, each in two files: the English and the Thai one
+  assert.equal(Object.keys(pages).length, 8);
+  for (const [file, html] of Object.entries(pages).filter(([name]) => name !== 'web/changelog.html' && name !== 'web/th/changelog.html')) {
     assert.ok(!html.includes('{{'), file + ' has a raw token');
     assert.ok(!/noindex/i.test(html), file + ' asks search engines to skip it');
     assert.ok(!/PREVIEW/.test(html), file + ' is marked as a preview');
     assert.ok(!/<form\b|<input\b[^>]*type=["']?(?:submit|button)/i.test(html), file + ' has a form or a submit control');
-    assert.equal(count(html, '<button'), 8, file + ' has more than the four language switches (one in each header nav, one in each footer)');
-    assert.equal(count(html, '<button'), count(html, 'data-lang-set='), file + ' has a button that is not a language switch');
+    // the language is a plain link now: a legal page holds no button at all
+    assert.equal(count(html, '<button'), 0, file + ' has a button: the switch is a link');
     for (const m of html.matchAll(/class="pending"[^>]*>([^<]*)</g)) assert.ok(/^\[(?:pending legal review|รอที่ปรึกษากฎหมาย)\]/.test(m[1]), file + ': ' + m[1].slice(0, 50));
-    assert.equal(count(docEn(html), 'class="pending"'), count(docTh(html), 'class="pending"'), file + ': both languages show the same number of pending lines');
-    assert.equal(count(docEn(html), 'class="t"'), count(docTh(html), 'class="t"'), file + ': both languages show the same number of statements');
+    if (file.startsWith('web/th/')) {
+      const en = pages[file.replace('web/th/', 'web/')];
+      assert.equal(count(mainOf(html), 'class="pending"'), count(mainOf(en), 'class="pending"'), file + ': the Thai and English files show the same number of pending lines');
+      assert.equal(count(mainOf(html), 'class="t"'), count(mainOf(en), 'class="t"'), file + ': the Thai and English files show the same number of statements');
+    }
   }
 });
 
@@ -221,7 +228,9 @@ test('the same inputs give the same pages', () => {
 
 // ── the CLI, against a throwaway copy of the tree ──────────────────────────────────────────────
 const FILES = ['web/band-404.svg', 'web/band-home.svg', 'web/accessibility.html', 'web/legal.html', 'scripts/legal-pages.mjs','scripts/lib/legal-render.mjs', 'scripts/lib/layout-tokens.mjs', 'scripts/lib/legal-page-text.mjs', 'scripts/lib/legal-state.mjs', 'scripts/lib/legal-holds.json', 'TERMS.md', 'PRIVACY.md', 'legal/thai-7day-clause.md', 'legal/legal-state.json', 'web/terms.html', 'web/privacy.html', 'web/refund.html', 'web/pricing.html', 'CHANGELOG.md', 'web/changelog.html', 'web/index.html', 'web/404.html', 'web/status.html', 'web/subprocessors.html', 'web/_headers', 'scripts/lib/headers-file.mjs', 'scripts/lib/page-sync.mjs', 'scripts/lib/csp-hashes.mjs', 'scripts/lib/page-claims.mjs',
-  'scripts/lib/i18n-catalogue.mjs', 'scripts/lib/page-template.mjs', 'scripts/lib/html-tokens.mjs', 'scripts/lib/rendered-text.mjs', 'scripts/lib/contained-read.mjs', 'scripts/lib/web-files.mjs', 'scripts/lib/html-entities.json', 'web-src/i18n/en.json', 'web-src/i18n/th.json', 'web-src/pages/home.html', 'web-src/pages/accessibility.html', 'web-src/pages/legal.html', 'web-src/pages/pricing.html', 'web-src/pages/notfound.html', 'web-src/pages/status.html', 'web-src/pages/subprocessors.html', 'scripts/lib/controller-slot.mjs', 'legal/controller.json'];
+  'scripts/lib/i18n-catalogue.mjs', 'scripts/lib/page-template.mjs', 'scripts/lib/html-tokens.mjs', 'scripts/lib/rendered-text.mjs', 'scripts/lib/contained-read.mjs', 'scripts/lib/web-files.mjs', 'scripts/lib/html-entities.json', 'web-src/i18n/en.json', 'web-src/i18n/th.json', 'web-src/pages/home.html', 'web-src/pages/accessibility.html', 'web-src/pages/legal.html', 'web-src/pages/pricing.html', 'web-src/pages/notfound.html', 'web-src/pages/status.html', 'web-src/pages/subprocessors.html', 'scripts/lib/controller-slot.mjs', 'legal/controller.json',
+  // the Thai pages: each in its own file, the same sources and the same shared blocks (ORDER 1017j)
+  'web/th/index.html', 'web/th/pricing.html', 'web/th/404.html', 'web/th/status.html', 'web/th/subprocessors.html', 'web/th/legal.html', 'web/th/accessibility.html', 'web/th/terms.html', 'web/th/privacy.html', 'web/th/refund.html', 'web/th/changelog.html'];
 function copyTree() {
   const dir = mkdtempSync(join(tmpdir(), 'legal-pages-'));
   for (const f of FILES) { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), readFileSync(join(ROOT, f))); }
@@ -235,7 +244,7 @@ const edit = (dir, f, fn) => writeFileSync(join(dir, f), fn(readFileSync(join(di
 
 test('--check passes on the committed pages', () => {
   const dir = copyTree();
-  try { const r = check(dir); assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout, /11 pages match/); } finally { rmSync(dir, { recursive: true, force: true }); }
+  try { const r = check(dir); assert.equal(r.status, 0, r.stdout + r.stderr); assert.match(r.stdout, /22 pages \(each in English and Thai/); } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('--check fails, naming the page, when one word of a statement in a source changes; --write puts it right', () => {
@@ -289,27 +298,33 @@ test('the CLI refuses an unknown flag with exit 2 and prints usage on --help', (
 const LINKS = ['/', '/pricing', '/changelog', '/terms', '/privacy', '/refund', 'https://github.com/TheColliery/Kolwen', 'https://huggingface.co/kolwen', 'https://www.npmjs.com/package/kolwen', '/llms.txt', 'mailto:info@kolwen.com', 'mailto:support@kolwen.com', 'mailto:abuse@kolwen.com', 'mailto:appeals@kolwen.com', 'https://kolwen.com/.well-known/security.txt'];
 const hrefs = block => [...block.matchAll(/<a href="([^"]*)"/g)].map(m => m[1]);
 
+// The Thai footer links to the Thai address of each page of the site (one language per file: /th/ for the home page, /th/<page> for the rest). The plain-link switch is a <a class="lang-link">, which hrefs() does not read.
+const THAI_LINKS = LINKS.map(h => (['/', '/pricing', '/changelog', '/terms', '/privacy', '/refund'].includes(h) ? (h === '/' ? '/th/' : '/th' + h) : h));
 test('the shared footer links the same fifteen places in both languages, in one order, with no buy word and no payment address', () => {
-  for (const lang of ['en', 'th']) {
-    const b = siteFooterHtml(lang);
-    assert.deepEqual(hrefs(b), LINKS, lang);
+  for (const [lang, want] of [['en', LINKS], ['th', THAI_LINKS]]) {
+    const b = siteFooterHtml({ lang, path: '/' });
+    assert.deepEqual(hrefs(b), want, lang);
     assert.ok(!/^\s/m.test(b), 'no line of the block is indented, so it is byte-identical wherever it sits');
     assert.ok(!/paddle|checkout|_ptxn/i.test(b));
   }
-  assert.deepEqual(hrefs(siteFooterHtml('en')), hrefs(siteFooterHtml('th')));
 });
 
-test('every generated page holds the shared footer, English then Thai, byte for byte', () => {
+test('every generated page holds one shared footer, in the language of its own file', () => {
   const { pages } = renderPages(inputs());
-  for (const [file, html] of Object.entries(pages)) assert.deepEqual(footersOf(html), [siteFooterHtml('en'), siteFooterHtml('th')], file);
+  for (const [file, html] of Object.entries(pages)) {
+    const lang = file.startsWith('web/th/') ? 'th' : 'en';
+    const f = footersOf(html);
+    assert.equal(f.length, 1, file + ' holds one footer');
+    assert.ok(f[0].startsWith(`<footer class="site-footer" lang="${lang}"`), file + ' footer is in its own language');
+  }
 });
 
 test('the four template pages hold the same two footer blocks and carry the footer rules in a style block', () => {
   for (const file of TEMPLATE_PAGES) {
     const html = read(file);
-    assert.deepEqual(footersOf(html), [siteFooterHtml('en'), siteFooterHtml('th')], file);
-    assert.ok((html.match(/<style>[\s\S]*?<\/style>/g) || []).some(b => b.includes(FOOTER_CSS)), file + ' has the footer rules');
-    assert.equal(hrefs(footersOf(html)[0]).length, LINKS.length, file + ' footer link count');
+    // a template holds its footer as one shared block (the renderer writes each language's footer into its own file); the footer rules come in with the style block
+    assert.equal(count(read(lib.SITE_PAGES.find(p => p.file === file).template), '{{block:site-footer}}'), 1, file + ' is generated from a template that holds the shared footer block once');
+    assert.match(read(lib.SITE_PAGES.find(p => p.file === file).template), /\{\{raw:style\}\}|\{\{block:site-footer-css\}\}/, file + ' template carries the style block, which holds the footer rules');
   }
   assert.ok(STYLE.includes(FOOTER_CSS));
 });
@@ -321,8 +336,9 @@ test('the changelog page shows every passage of CHANGELOG.md as written, with no
   const c = classify(SOURCES.changelog, i.changelog, { holds: [], noHold: true });
   assert.equal(c.stats.held, 0);
   assert.equal(c.stats.text, c.stats.passages);
-  for (const doc of [docEn(html), docTh(html)]) {
-    assert.equal(count(doc, 'class="t"'), c.stats.passages, 'passages on the page = passages in CHANGELOG.md');
+  for (const f of ['web/changelog.html', 'web/th/changelog.html']) {
+    const doc = docEn(pages[f]);
+    assert.equal(count(doc, 'class="t"'), c.stats.passages, f + ': passages on the page = passages in CHANGELOG.md');
     assert.equal(count(doc, 'class="pending"'), 0);
   }
   assert.match(report.join('\n'), new RegExp('web/changelog\\.html: CHANGELOG\\.md ' + c.stats.passages + ' passages = ' + c.stats.passages + ' shown as written \\+ 0 pending lines'));
@@ -334,10 +350,10 @@ test('the changelog page shows every passage of CHANGELOG.md as written, with no
 test('the Thai view of the changelog says the log is kept in English; the English view and the legal pages carry no such line', () => {
   const { pages } = renderPages(inputs());
   const line = 'บันทึกการเปลี่ยนแปลงนี้เขียนเป็นภาษาอังกฤษ';
-  assert.equal(count(docTh(pages['web/changelog.html']), line), 1);
+  assert.equal(count(docEn(pages['web/th/changelog.html']), line), 1);
   assert.equal(count(docEn(pages['web/changelog.html']), line), 0);
   for (const f of ['web/terms.html', 'web/privacy.html', 'web/refund.html']) assert.equal(count(pages[f], line), 0, f);
-  assert.equal(count(docTh(pages['web/changelog.html']), 'class="pending"'), 0, 'a status line, not a pending line');
+  assert.equal(count(docEn(pages['web/th/changelog.html']), 'class="pending"'), 0, 'a status line, not a pending line');
 });
 
 test('a [text](https://...) link is a link and anything else stays text', () => {
@@ -348,9 +364,9 @@ test('a [text](https://...) link is a link and anything else stays text', () => 
 
 test('--check fails, naming the page and the language, when the footer of a template page drifts', () => {
   for (const [file, from, to, re] of [
-    ['web/index.html', '<a href="/terms">Terms</a>', '<a href="/terms">Terms </a>', /FAIL web\/index\.html en footer differs from the shared footer, line \d+/],
-    ['web/pricing.html', '<a href="/privacy">ความเป็นส่วนตัว</a>', '<a href="/privacy">ความเป็นส่วนตัว </a>', /FAIL web\/pricing\.html th footer differs from the shared footer/],
-    ['web/404.html', '<a href="/changelog">Changelog</a>', '<a href="/changelogs">Changelog</a>', /FAIL web\/404\.html en footer differs from the shared footer/],
+    ['web/index.html', '<a href="/terms">Terms</a>', '<a href="/terms">Terms </a>', /FAIL web\/index\.html footer differs from the shared footer, line \d+/],
+    ['web/th/pricing.html', '<a href="/th/privacy">ความเป็นส่วนตัว</a>', '<a href="/th/privacy">ความเป็นส่วนตัว </a>', /FAIL web\/th\/pricing\.html footer differs from the shared footer/],
+    ['web/404.html', '<a href="/changelog">Changelog</a>', '<a href="/changelogs">Changelog</a>', /FAIL web\/404\.html footer differs from the shared footer/],
   ]) {
     const dir = copyTree();
     try {
@@ -364,7 +380,7 @@ test('--check fails, naming the page and the language, when the footer of a temp
 
 test('--check fails when a template page loses its footer or its footer rules', () => {
   for (const [file, fn, re] of [
-    ['web/index.html', x => x.replace(/<footer class="site-footer"[^>]*>[\s\S]*?<\/footer>/, ''), /FAIL web\/index\.html en footer differs from the shared footer, line \d+/],
+    ['web/index.html', x => x.replace(/<footer class="site-footer"[^>]*>[\s\S]*?<\/footer>/, ''), /FAIL web\/index\.html footer differs from the shared footer, line \d+/],
     ['web/404.html', x => x.replace(FOOTER_CSS, ''), /FAIL web\/404\.html footer css differs from the shared footer rules, line \d+/],
   ]) {
     const dir = copyTree();
@@ -399,15 +415,16 @@ test('the CLI child runs with HOME, USERPROFILE and the temp variables inside th
 const TEMPLATE_PAGES = ['web/index.html', 'web/pricing.html', 'web/404.html', 'web/status.html', 'web/subprocessors.html', 'web/accessibility.html', 'web/legal.html'];
 const WATCHED = [...TEMPLATE_PAGES, 'web/_headers', 'web/terms.html', 'web/privacy.html', 'web/refund.html', 'web/changelog.html'];
 const mk = (name, css) => (css ? { name, begin: `/* ${name}:begin */`, end: `/* ${name}:end */` } : { name, begin: `<!-- ${name}:begin -->`, end: `<!-- ${name}:end -->` });
-const MARK = { fonts: mk('site-fonts'), tokens: mk('site-tokens-css', true), hcss: mk('site-header-css', true), css: mk('site-footer-css', true), ncss: mk('site-noscript-css', true), header: mk('site-header'), en: mk('site-footer:en'), th: mk('site-footer:th'), script: mk('site-script', true) };
-const LABEL = { fonts: 'font manifest link', tokens: 'layout tokens', hcss: 'header css', css: 'footer css', ncss: 'noscript css', header: 'header', en: 'en footer', th: 'th footer', script: 'page script' };
+// One footer per file (ORDER 1017j): each page carries one footer pair, in its own language. The nine blocks are SYNC_BLOCKS.
+const MARK = { links: mk('site-links'), fonts: mk('site-fonts'), tokens: mk('site-tokens-css', true), hcss: mk('site-header-css', true), css: mk('site-footer-css', true), ncss: mk('site-noscript-css', true), header: mk('site-header'), footer: mk('site-footer'), script: mk('site-script', true) };
+const LABEL = { links: 'head links', fonts: 'font manifest link', tokens: 'layout tokens', hcss: 'header css', css: 'footer css', ncss: 'noscript css', header: 'header', footer: 'footer', script: 'page script' };
 const lf = s => s.replace(/\r\n/g, '\n');
 const snap = (dir, files) => Object.fromEntries(files.map(f => [f, readFileSync(join(dir, f))]));
 const sameBytes = (a, b) => Object.keys(a).every(f => Buffer.compare(a[f], b[f]) === 0);
 // The comments of _headers talk about style-src too, so the directive is read from the one indented policy line.
 const styleSrcLine = text => /^[ \t]+Content-Security-Policy:[^\r\n]*/m.exec(text)[0].split(';').map(d => d.trim()).find(d => d.split(/\s+/)[0] === 'style-src');
 const sortedStyleSrc = text => styleSrcLine(text).split(/\s+/).filter(t => t.startsWith("'sha256-")).sort();
-const FOOTER_ANCHOR = { 'web/index.html': ['<a href="/terms">Terms</a>', '<a href="/terms">Terms </a>'], 'web/pricing.html': ['<a href="/privacy">ความเป็นส่วนตัว</a>', '<a href="/privacy">ความเป็นส่วนตัว </a>'], 'web/404.html': ['<a href="/changelog">Changelog</a>', '<a href="/changelogs">Changelog</a>'], 'web/status.html': ['<a href="/terms">Terms</a>', '<a href="/terms">Terms </a>'], 'web/legal.html': ['<a href="/changelog">Changelog</a>', '<a href="/changelogs">Changelog</a>'], 'web/accessibility.html': ['<a href="/terms">Terms</a>', '<a href="/terms">Terms </a>'], 'web/subprocessors.html': ['<a href="/terms">Terms</a>', '<a href="/terms">Terms </a>'] };
+const FOOTER_ANCHOR = { 'web/index.html': ['<a href="/terms">Terms</a>', '<a href="/terms">Terms </a>'], 'web/pricing.html': ['<a href="/privacy">Privacy</a>', '<a href="/privacy">Privacy </a>'], 'web/404.html': ['<a href="/changelog">Changelog</a>', '<a href="/changelogs">Changelog</a>'], 'web/status.html': ['<a href="/terms">Terms</a>', '<a href="/terms">Terms </a>'], 'web/legal.html': ['<a href="/changelog">Changelog</a>', '<a href="/changelogs">Changelog</a>'], 'web/accessibility.html': ['<a href="/terms">Terms</a>', '<a href="/terms">Terms </a>'], 'web/subprocessors.html': ['<a href="/terms">Terms</a>', '<a href="/terms">Terms </a>'] };
 
 test('reEscape turns any text into a regex that matches exactly that text, backslash included', () => {
   const every = '\\^$.*+?()[]{}|/-';
@@ -429,18 +446,18 @@ test('reEscape output is a valid pattern under the u and v flags too, for every 
 });
 
 test('the sync markers are named once, in the lib, and are the ones the pages carry', () => {
-  assert.deepEqual(lib.SYNC_BLOCKS.map(b => [b.name, b.begin, b.end]), [MARK.fonts, MARK.tokens, MARK.hcss, MARK.css, MARK.ncss, MARK.header, MARK.en, MARK.th, MARK.script].map(m => [m.name, m.begin, m.end]), 'the array order is the one expected document order');
+  assert.deepEqual(lib.SYNC_BLOCKS.map(b => [b.name, b.begin, b.end]), [MARK.links, MARK.fonts, MARK.tokens, MARK.hcss, MARK.css, MARK.ncss, MARK.header, MARK.footer, MARK.script].map(m => [m.name, m.begin, m.end]), 'the array order is the one expected document order');
   const cli = read('scripts/legal-pages.mjs');
   for (const m of Object.values(MARK)) assert.ok(!cli.includes(m.name), 'the CLI does not retype ' + m.name);
 });
 
-test('every one of the eleven pages carries every marker pair exactly once, and the header pair holds the header', () => {
+test('every one of the 22 pages carries every marker pair exactly once, and the header pair holds the header', () => {
   const pages = { ...renderPages(inputs()).pages };
-  for (const f of TEMPLATE_PAGES) pages[f] = read(f);
-  assert.equal(Object.keys(pages).length, 11);
+  for (const f of TEMPLATE_PAGES) { pages[f] = read(f); pages[thFile(f)] = read(thFile(f)); }
+  assert.equal(Object.keys(pages).length, 22);
   for (const [f, html] of Object.entries(pages)) {
     for (const k of Object.keys(MARK)) assert.equal(count(html, MARK[k].begin) + count(html, MARK[k].end), 2, f + ' ' + k);
-    assert.ok(html.includes(MARK.header.begin + '\n' + lib.siteHeaderHtml() + '\n' + MARK.header.end), f + ' the header pair holds the header');
+    assert.ok(pairText(html, MARK.header).includes('<header class="site-header">'), f + ' the header pair holds the header');
   }
 });
 
@@ -453,7 +470,7 @@ test('an edited footer on a template page fails --check, naming page and block, 
       edit(dir, f, x => { assert.ok(x.includes(from), f + ' holds the anchor'); return x.replace(from, to); });
       const r = check(dir);
       assert.equal(r.status, 1, f + '\n' + r.stdout + r.stderr);
-      assert.match(r.stdout, new RegExp('FAIL ' + reEscape(f) + ' (en|th) footer differs from the shared footer, line \\d+'));
+      assert.match(r.stdout, new RegExp('FAIL ' + reEscape(f) + ' footer differs from the shared footer, line \\d+'));
       const w = check(dir, '--write');
       assert.equal(w.status, 0, w.stdout + w.stderr);
       for (const g of WATCHED) { const now = readFileSync(join(dir, g)); if (TEMPLATE_PAGES.includes(g) || g === 'web/_headers') assert.equal(Buffer.compare(before[g], now), 0, g + ' is byte for byte what it was'); else assert.equal(lf(now.toString('utf8')), lf(before[g].toString('utf8')), g + ' is the same text'); }
@@ -464,7 +481,7 @@ test('an edited footer on a template page fails --check, naming page and block, 
 // The three site pages are generated whole (web-src/pages + the language catalogue), so a damaged marker is not a thing --write must refuse to guess about: --check names the block, and --write generates the page again,
 // marker included, and changes nothing else.
 test('a marker that is missing from a site page fails --check naming the block, and --write generates the page again with the marker back', () => {
-  for (const [f, k, edge] of [['web/index.html', 'header', 'begin'], ['web/404.html', 'en', 'end'], ['web/pricing.html', 'th', 'begin'], ['web/index.html', 'css', 'end'], ['web/404.html', 'css', 'begin']]) {
+  for (const [f, k, edge] of [['web/index.html', 'header', 'begin'], ['web/404.html', 'footer', 'end'], ['web/th/pricing.html', 'footer', 'begin'], ['web/index.html', 'css', 'end'], ['web/404.html', 'css', 'begin']]) {
     const dir = copyTree();
     try {
       const orig = snap(dir, WATCHED);
@@ -484,10 +501,10 @@ test('a marker that is missing from a site page fails --check naming the block, 
 
 test('a marker that is doubled, or out of order, in a site page fails --check naming the block, and --write generates the page again', () => {
   for (const [what, f, k, fn, re] of [
-    ['doubled begin', 'web/index.html', 'en', (x, m) => x.replace(m.begin, m.begin + '\n' + m.begin), /doubled/],
+    ['doubled begin', 'web/index.html', 'footer', (x, m) => x.replace(m.begin, m.begin + '\n' + m.begin), /doubled/],
     ['doubled end', 'web/404.html', 'header', (x, m) => x.replace(m.end, m.end + '\n' + m.end), /doubled/],
     ['doubled css', 'web/pricing.html', 'css', (x, m) => x.replace(m.begin, m.begin + '\n' + m.begin), /doubled/],
-    ['end before begin', 'web/pricing.html', 'th', (x, m) => x.replace(m.begin, '@@B@@').replace(m.end, m.begin).replace('@@B@@', m.end), /before the begin marker/],
+    ['end before begin', 'web/th/pricing.html', 'footer', (x, m) => x.replace(m.begin, '@@B@@').replace(m.end, m.begin).replace('@@B@@', m.end), /before the begin marker/],
   ]) {
     const dir = copyTree();
     try {
@@ -545,7 +562,7 @@ test('a hand edit of a footer rule makes --check fail on the page and on the has
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stdout, /FAIL web\/index\.html footer css differs from the shared footer rules, line \d+/);
     assert.match(r.stdout, /FAIL web\/_headers style-src does not admit sha256-[A-Za-z0-9+/=]+ \(the <style> block of web\/index\.html\)/);
-    assert.match(r.stdout, /FAIL web\/_headers style-src admits sha256-[A-Za-z0-9+/=]+, which no <style> block/);
+    assert.doesNotMatch(r.stdout, /FAIL web\/_headers style-src admits sha256-[A-Za-z0-9+/=]+, which no <style> block/, 'the old hash is still carried by the other pages, so it is not stale');
     assert.equal(check(dir, '--write').status, 0);
     assert.ok(sameBytes(before, snap(dir, [...TEMPLATE_PAGES, 'web/_headers'])), 'page and _headers are back to their bytes');
     assert.equal(check(dir).status, 0);
@@ -597,10 +614,10 @@ test('--check fails when a style hash of _headers no longer matches any page, an
 // The text of a pair with its markers, and the page with that text cut out / put back.
 const pairText = (x, m) => x.slice(x.indexOf(m.begin), x.indexOf(m.end) + m.end.length);
 const CROSS = [
-  ['overlap: the end marker of the English footer moved past the begin marker of the Thai one', 'web/index.html', 'en', (x, M) => x.replace(M.en.end, '').replace(M.th.begin, M.th.begin + '\n' + M.en.end), /overlap/],
-  ['nesting: the Thai footer pair inside the English one', 'web/pricing.html', 'en', (x, M) => x.replace(M.en.end, '').replace(M.th.end, M.th.end + '\n' + M.en.end), /nest/],
-  ['overlap: the header pair runs into the English footer pair', 'web/404.html', 'header', (x, M) => x.replace(M.header.end, '').replace(M.en.begin, M.en.begin + '\n' + M.header.end), /overlap/],
-  ['order: the English and Thai footer blocks swapped whole', 'web/index.html', 'th', (x, M) => { const e = pairText(x, M.en), t = pairText(x, M.th); return x.replace(e, '@@E@@').replace(t, e).replace('@@E@@', t); }, /expected document order/],
+  ['nesting: the footer pair begins before the header pair and holds it', 'web/index.html', 'footer', (x, M) => x.replace(M.footer.begin, '').replace(M.header.begin, M.footer.begin + '\n' + M.header.begin), /nest/],
+  ['nesting: the header pair inside the footer pair', 'web/pricing.html', 'footer', (x, M) => x.replace(M.header.end, '').replace(M.footer.end, M.footer.end + '\n' + M.header.end), /nest/],
+  ['overlap: the header pair runs into the footer pair', 'web/404.html', 'header', (x, M) => x.replace(M.header.end, '').replace(M.footer.begin, M.footer.begin + '\n' + M.header.end), /overlap/],
+  ['order: the header and footer blocks swapped whole', 'web/index.html', 'footer', (x, M) => { const h = pairText(x, M.header), f = pairText(x, M.footer); return x.replace(h, '@@H@@').replace(f, h).replace('@@H@@', f); }, /expected document order/],
   ['order: the header pair above the footer rules in the style block', 'web/404.html', 'header', (x, M) => { const c = pairText(x, M.css), h = pairText(x, M.header); return x.replace(c, '@@C@@').replace(h, c).replace('@@C@@', h); }, /expected document order/],
 ];
 for (const [what, f, k, fn, re] of CROSS) {
@@ -746,23 +763,29 @@ test('surface-check rule 13 judges style-src-elem and script-src-elem, the direc
 });
 
 // ── the header, the footer as a zone of its own, the grid, the switch ──────────────────────────────────────────────────────────
-// All nine pages as text: the four rendered from their Markdown sources and the five template pages (the committed files, read from disk).
-const eightPages = () => { const pages = { ...renderPages(inputs()).pages }; for (const f of TEMPLATE_PAGES) pages[f] = read(f); return pages; };
+// All 22 pages as text (ORDER 1017j, one language per file): the eight rendered from their Markdown sources and the seven template pages, each in its English file and its Thai one (the committed files, read from disk).
+const eightPages = () => { const pages = { ...renderPages(inputs()).pages }; for (const f of TEMPLATE_PAGES) { pages[f] = read(f); pages[thFile(f)] = read(thFile(f)); } return pages; };
 const mainOf = html => html.slice(html.indexOf('<main'), html.indexOf('</main>') + 7);
 
-test('the header is on every page with its three items, one per language, and no language bar is left anywhere', () => {
+test('the header is on every page with its three items, one per language, and the switch is a link', () => {
   for (const [f, html] of Object.entries(eightPages())) {
+    const lang = f.startsWith('web/th/') ? 'th' : 'en';
+    const oLang = lang === 'th' ? 'en' : 'th';
+    const home = lang === 'th' ? '/th/' : '/';
+    const pricing = lang === 'th' ? '/th/pricing' : '/pricing';
+    const name = f.replace(/^web\/(th\/)?/, '').replace(/\.html$/, '');
+    const enPath = name === '404' ? null : (name === 'index' ? '/' : '/' + name);
+    const oPath = lang === 'th' ? (enPath ?? '/') : (enPath === null || enPath === '/' ? '/th/' : '/th' + enPath);
     assert.equal(count(html, '<header'), 1, f + ' has one header');
     const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
-    assert.equal(count(header, '<nav '), 2, f + ': one labelled nav per language');
-    for (const lang of ['en', 'th']) {
-      const nav = header.slice(header.indexOf(`<nav lang="${lang}"`)).split('</nav>')[0];
-      assert.match(nav, /aria-label="[^"]+"/, f + ' ' + lang + ': the nav is labelled');
-      assert.deepEqual([...nav.matchAll(/<a\b[^>]*\shref="([^"]*)"/g)].map(m => m[1]), ['/', '/pricing'], f + ' ' + lang + ': the mark links to / and then Pricing, and nothing else');
-      assert.match(nav, /<a class="hmark" href="\/" aria-label="[^"]+"><svg[^>]*aria-hidden="true">/, f + ' ' + lang + ': the mark link has an accessible name');
-      assert.equal(count(nav, '<button'), 2, f + ' ' + lang + ': the TH/EN switch');
-      assert.equal(count(nav, 'data-lang-set="en"') + count(nav, 'data-lang-set="th"'), 2);
-    }
+    assert.equal(count(header, '<nav '), 1, f + ': one labelled nav, in the language of the file');
+    const nav = header.slice(header.indexOf(`<nav lang="${lang}"`)).split('</nav>')[0];
+    assert.match(nav, /aria-label="[^"]+"/, f + ': the nav is labelled');
+    assert.deepEqual([...nav.matchAll(/<a\b[^>]*\shref="([^"]*)"/g)].map(m => m[1]), [home, pricing, oPath], f + ': the mark, then Pricing, then the switch to the other language');
+    assert.match(nav, /<a class="hmark" href="[^"]*" aria-label="[^"]+"><svg[^>]*aria-hidden="true">/, f + ': the mark link has an accessible name');
+    assert.equal(count(nav, '<button'), 0, f + ': no button: the switch is a link');
+    assert.match(nav, new RegExp(`<span lang="${lang}" aria-current="page">`), f + ': the current language is shown as text');
+    assert.match(nav, new RegExp(`<a class="lang-link" href="${oPath}" lang="${oLang}" hreflang="${oLang}">`), f + ': the other language is a link to its own address');
     assert.ok(!/dashboard|sign.?in|log.?in|แดชบอร์ด|เข้าสู่ระบบ/i.test(header), f + ': no Dashboard and no Sign in until the service exists');
     assert.ok(!/langbar|id="lang-(en|th)"/.test(html), f + ': no language bar and no id-keyed switch is left, in markup or in CSS');
     assert.ok(html.indexOf('<header') < html.indexOf('<main'), f + ': the header comes before main');
@@ -774,8 +797,8 @@ test('the footer and the header are outside main on every page, so their width d
     const main = mainOf(html);
     assert.ok(!main.includes('<footer') && !main.includes('<header'), f + ': nothing of the shared blocks is inside main');
     const after = html.slice(html.indexOf('</main>'));
-    assert.equal(count(after, '<footer class="site-footer"'), 2, f + ': both footers follow main');
-    assert.deepEqual(footersOf(html), [siteFooterHtml('en'), siteFooterHtml('th')], f);
+    assert.equal(count(after, '<footer class="site-footer"'), 1, f + ': the footer follows main');
+    assert.equal(footersOf(html).length, 1, f + ': one footer, in the language of the file');
   }
 });
 
@@ -802,56 +825,52 @@ test('reflow at 320px, structurally: every track may shrink to zero, every link 
 
 test('the registration slot prints nothing until it is set: no placeholder text and no empty element', () => {
   for (const lang of ['en', 'th']) {
-    assert.equal(siteFooterHtml(lang), siteFooterHtml(lang, null));
-    assert.ok(!siteFooterHtml(lang).includes('freg'), 'no slot element');
-    assert.equal(siteFooterHtml(lang, { en: '', th: '' }), siteFooterHtml(lang), 'an empty value prints nothing');
-    assert.equal(siteFooterHtml(lang, {}), siteFooterHtml(lang));
+    const ctx = { lang, path: '/' };
+    assert.equal(siteFooterHtml(ctx), siteFooterHtml(ctx, null));
+    assert.ok(!siteFooterHtml(ctx).includes('freg'), 'no slot element');
+    assert.equal(siteFooterHtml(ctx, { en: '', th: '' }), siteFooterHtml(ctx), 'an empty value prints nothing');
+    assert.equal(siteFooterHtml(ctx, {}), siteFooterHtml(ctx));
   }
   assert.equal(lib.REGISTRATION, null, 'nothing is set today');
-  const set = siteFooterHtml('en', { en: 'Registration no. 123', th: 'เลขทะเบียน 123' });
-  assert.match(set, /<p class="fine freg">Registration no\. 123<\/p>/);
-  assert.ok(!set.includes('เลขทะเบียน'), 'each language prints its own');
-  assert.match(siteFooterHtml('th', { en: 'Registration no. 123', th: 'เลขทะเบียน 123' }), /<p class="fine freg">เลขทะเบียน 123<\/p>/);
+  const reg = { en: 'Registration no. 123', th: 'เลขทะเบียน 123' };
+  assert.match(siteFooterHtml({ lang: 'en', path: '/' }, reg), /<p class="fine freg">Registration no\. 123<\/p>/);
+  assert.ok(!siteFooterHtml({ lang: 'en', path: '/' }, reg).includes('เลขทะเบียน'), 'each language prints its own');
+  assert.match(siteFooterHtml({ lang: 'th', path: '/' }, reg), /<p class="fine freg">เลขทะเบียน 123<\/p>/);
 });
 
-test("the switch keeps its storage key and its behaviour: one key 'kolwen-lang', one getItem, one setItem, no cookie, on every page", () => {
-  assert.equal(count(lib.SCRIPT, "var KEY = 'kolwen-lang';"), 1);
-  assert.equal(count(lib.SCRIPT, 'localStorage.setItem(KEY'), 1);
-  assert.equal(count(lib.SCRIPT, 'localStorage.getItem(KEY'), 1);
-  assert.equal(count(lib.SCRIPT, 'localStorage.'), 2, 'localStorage is used by those two calls and nothing else');
+test('the page script keeps no storage: it clears the key the old switch wrote, and reads and writes nothing; every page carries it once and one plain link per switch', () => {
+  assert.equal(count(lib.SCRIPT, "localStorage.removeItem('kolwen-lang')"), 1, 'the old key is cleared');
+  assert.equal(count(lib.SCRIPT, 'localStorage.setItem'), 0, 'nothing is written');
+  assert.equal(count(lib.SCRIPT, 'localStorage.getItem'), 0, 'nothing is read');
   assert.ok(!/cookie|sessionStorage|indexedDB/.test(lib.SCRIPT.split('\n').filter(l => !l.trim().startsWith('//')).join('\n')), 'no other storage in the code (a comment may name the cookie it avoids)');
-  assert.match(lib.SCRIPT, /if \(saved === 'th' \|\| saved === 'en'\) apply\(saved, false\);/, 'the saved language is applied without being saved again');
-  assert.match(lib.SCRIPT, /var lang = button\.getAttribute\('data-lang-set'\);[\s\S]*?apply\(lang, true\)/, 'a click applies the language and saves it');
+  assert.match(lib.SCRIPT, /a\.lang-link/, 'the script handles the other-language link (the section fragment, M5)');
   for (const [f, html] of Object.entries(eightPages())) {
     const scripts = [...html.matchAll(/<script>\n([\s\S]*?)\n<\/script>/g)].map(m => m[1]);
     assert.equal(scripts.length, 1, f + ' has one page script');
     assert.equal(scripts[0], MARK.script.begin + '\n' + lib.SCRIPT + '\n' + MARK.script.end, f + ' carries the shared script between its markers');
-    assert.equal(count(html, 'data-lang-set='), 8, f + ' has eight switch buttons (four switches) for the one script to keep right');
-    assert.ok(html.includes('id="doc-en"') && html.includes('id="doc-th"'), f + ' keeps the two document ids the script toggles');
+    assert.equal(count(html, 'data-lang-set='), 0, f + ' has no switch button');
+    assert.equal(count(html, 'class="lang-link"'), 2, f + ': one plain link in the header and one in the footer bar');
   }
   assert.match(read('PRIVACY.md'), /one key/, "PRIVACY.md's one-key sentence is still there");
 });
 
-test('the switch also changes the page title: each templated page carries its English title and a Thai one in a meta tag, both from the catalogue; the generated pages carry none and keep theirs', () => {
+test('each page carries its title in the language of its file: the English file the English title, the Thai file the Thai one, and no switch meta tag is left', () => {
   const en = JSON.parse(read('web-src/i18n/en.json')), th = JSON.parse(read('web-src/i18n/th.json'));
-  assert.ok(lib.SCRIPT.includes("document.title = thai && titleTh ? titleTh.getAttribute('content') : titleEn;"), 'the switch sets the title, and keeps the English one where no Thai title exists');
+  assert.ok(!lib.SCRIPT.includes('document.title'), 'the script does not rewrite the title (each file has its own)');
   const TEMPLATED = { 'index.html': 'home', 'pricing.html': 'pricing', '404.html': 'notfound', 'status.html': 'status', 'subprocessors.html': 'subprocessors', 'legal.html': 'legal', 'accessibility.html': 'accessibility' };
   for (const [file, group] of Object.entries(TEMPLATED)) {
-    const html = read('web/' + file);
-    assert.ok(html.includes('<title>' + escText(en[group].meta.title) + '</title>'), file + ' carries its English title');
-    assert.equal(count(html, '<meta name="kolwen-title-th" content="' + escAttr(th[group].meta.title) + '">'), 1, file + ' carries its Thai title, from the catalogue, once');
+    assert.ok(read('web/' + file).includes('<title>' + escText(en[group].meta.title) + '</title>'), file + ' carries its English title');
+    assert.ok(read('web/th/' + file).includes('<title>' + escText(th[group].meta.title) + '</title>'), 'th/' + file + ' carries its Thai title');
+    assert.equal(count(read('web/th/' + file), 'name="kolwen-title-th"'), 0, 'th/' + file + ' carries no switch meta tag');
   }
-  for (const file of ['terms.html', 'privacy.html', 'refund.html', 'changelog.html']) assert.equal(count(read('web/' + file), '<meta name="kolwen-title-th"'), 0, file + ' has no Thai title, so the switch keeps its English one');
 });
 
-test('a reader without script gets no switch and sees the Thai document, header and footer too; one with script sees the language that matches <html lang>', () => {
-  assert.match(lib.NOSCRIPT_STYLE, /\.lswitch\{display:none\}/);
-  assert.match(lib.NOSCRIPT_STYLE, /#doc-th\{display:block !important/);
-  assert.match(lib.NOSCRIPT_STYLE, /\.site-header nav\[lang="th"\]\{display:flex !important\}/);
-  assert.match(lib.NOSCRIPT_STYLE, /\.site-footer\[lang="th"\]\{display:block !important\}/);
-  assert.match(lib.HEADER_CSS, /html\[lang="th"\] \.site-header nav\[lang="en"\]\{display:none\}/);
-  assert.match(lib.FOOTER_CSS, /html\[lang="th"\] \.site-footer\[lang="en"\]\{display:none\}/);
-  for (const [f, html] of Object.entries(eightPages())) assert.match(html, /<html lang="en"(?: data-job="[a-z]+")?>/, f + ': English until the script says otherwise');
+test('with no script a reader gets the page in the language of its file: no rule is needed, and each file declares its own language', () => {
+  assert.equal(lib.NOSCRIPT_STYLE, '', 'the noscript block is empty: each file is one language, and the switch is a link');
+  for (const [f, html] of Object.entries(eightPages())) {
+    const lang = f.startsWith('web/th/') ? 'th' : 'en';
+    assert.match(html, new RegExp(`<html lang="${lang}"`), f + ': the document language is the file\'s');
+  }
 });
 
 // ── the footer's gaps: llms.txt under Code, the switch in the bottom bar, the contact addresses ──────────────────────────────────
@@ -859,7 +878,7 @@ const groupOf = (block, heading) => { const m = new RegExp('<div class="fgroup">
 
 test('llms.txt is linked under Code, in both languages, and the file exists', () => {
   for (const [lang, heading] of [['en', 'Code'], ['th', 'โค้ด']]) {
-    const code = groupOf(siteFooterHtml(lang), heading);
+    const code = groupOf(siteFooterHtml({ lang, path: '/' }), heading);
     assert.deepEqual([...code.matchAll(/href="([^"]*)"/g)].map(m => m[1]), ['https://github.com/TheColliery/Kolwen', 'https://huggingface.co/kolwen', 'https://www.npmjs.com/package/kolwen', '/llms.txt'], lang);
     assert.match(code, /<a href="\/llms\.txt">llms\.txt<\/a>/, lang + ': the link text is the file name');
   }
@@ -868,19 +887,19 @@ test('llms.txt is linked under Code, in both languages, and the file exists', ()
 
 test("the TH/EN switch is also in the footer's bottom bar, beside the copyright and the unchanged trademark status", () => {
   for (const lang of ['en', 'th']) {
-    const b = siteFooterHtml(lang);
+    const b = siteFooterHtml({ lang, path: '/' });
     const bar = b.slice(b.indexOf('<div class="fbar">'));
     assert.match(bar, /<p class="fine">© 2026 Kolwen · (trademark application pending|เครื่องหมายการค้าอยู่ระหว่างการจดทะเบียน)<\/p>/, lang + ': the status wording is the one CLAUDE.md fixes');
-    assert.equal(count(bar, '<button'), 2, lang + ': the switch is in the bar');
-    assert.equal(count(bar, 'data-lang-set="en"') + count(bar, 'data-lang-set="th"'), 2);
+    assert.equal(count(bar, 'class="lang-link"'), 1, lang + ': the switch link is in the bar');
+    assert.equal(count(bar, '<button'), 0, lang + ': no button in the bar');
     assert.ok(bar.indexOf('class="fine"') < bar.indexOf('class="lswitch"'), lang + ': the switch follows the copyright');
-    assert.ok(!b.slice(0, b.indexOf('<div class="fbar">')).includes('<button'), lang + ': the switch is only in the bar');
+    assert.ok(!b.slice(0, b.indexOf('<div class="fbar">')).includes('lang-link'), lang + ': the switch is only in the bar');
   }
 });
 
 test('Contact lists info, support, abuse and appeals beside the security.txt, in both languages, each address once and only on kolwen.com', () => {
   for (const [lang, heading] of [['en', 'Contact'], ['th', 'ติดต่อ']]) {
-    const contact = groupOf(siteFooterHtml(lang), heading);
+    const contact = groupOf(siteFooterHtml({ lang, path: '/' }), heading);
     assert.deepEqual([...contact.matchAll(/href="([^"]*)"/g)].map(m => m[1]), ['mailto:info@kolwen.com', 'mailto:support@kolwen.com', 'mailto:abuse@kolwen.com', 'mailto:appeals@kolwen.com', 'https://kolwen.com/.well-known/security.txt'], lang);
   }
 });
@@ -891,15 +910,16 @@ test('surface-check rule 4 lets a no-break space stand before the Thai repetitio
   const dir = surfaceCopy();
   try {
     const NB = String.fromCharCode(0xa0), MAIYAMOK = String.fromCharCode(0xe46);
-    const page = readFileSync(join(dir, 'web/pricing.html'), 'utf8');
+    const page = readFileSync(join(dir, 'web/th/pricing.html'), 'utf8');
     assert.ok(page.includes(NB + MAIYAMOK), 'the pricing page has a no-break space before the repetition mark');
     const base = surface(dir);
     assert.equal(base.status, 0, 'and the committed tree passes: ' + base.stdout + base.stderr);
-    for (const [what, text] of [['between two English words', page.replace('Coming soon', 'Coming' + NB + 'soon')], ['after the repetition mark', page.replace(NB + MAIYAMOK + ' ', NB + MAIYAMOK + NB)]]) {
-      writeFileSync(join(dir, 'web/pricing.html'), text);
+    for (const [what, text] of [['between two English words', readFileSync(join(dir, 'web/pricing.html'), 'utf8').replace('Coming soon', 'Coming' + NB + 'soon')], ['after the repetition mark', page.replace(NB + MAIYAMOK + ' ', NB + MAIYAMOK + NB)]]) {
+      const target = what.startsWith('between') ? 'web/pricing.html' : 'web/th/pricing.html';
+      writeFileSync(join(dir, target), text);
       const r = surface(dir);
       assert.equal(r.status, 1, what + ': ' + r.stdout + r.stderr);
-      assert.match(r.stdout + r.stderr, /web\/pricing\.html: invisible character U\+A0/, what);
+      assert.ok((r.stdout + r.stderr).includes(target + ': invisible character U+A0'), what);
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
@@ -1045,22 +1065,21 @@ test('surface-check rule 4 reads the character references of a Markdown file out
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('surface-check rule 17 allows a live button only when it is exactly a switch button the lib renders and sits inside the shared header or footer block', () => {
+test('surface-check rule 17 allows no live button: the switch is a link, so a button in main, the header or the footer is refused', () => {
   const dir = surfaceCopy();
   try {
     const base = surface(dir);
-    assert.equal(base.status, 0, 'the committed tree passes, the real switch buttons on all nine pages included: ' + base.stdout + base.stderr);
-    const page = join(dir, 'web/pricing.html'), real = readFileSync(page, 'utf8');
-    const REAL = '<button type="button" data-lang-set="en" lang="en" aria-pressed="true">English</button>';
-    assert.ok(real.includes(REAL), 'the page holds the real switch button');
+    assert.equal(base.status, 0, 'the committed tree passes: ' + base.stdout + base.stderr);
+    const page = join(dir, 'web/th/pricing.html'), real = readFileSync(page, 'utf8');
+    assert.ok(real.includes('<a class="lang-link" href="/pricing" lang="en" hreflang="en">'), 'the Thai page holds its plain switch link to the English address');
+    assert.ok(!/<button(?![^>]*\sdisabled)/.test(real), 'every button on the page is a disabled buy button, which rule 17 allows');
     // The page's main element, as the renderer writes it (id and tabindex for the skip link's target, C1): the cases insert their markup right after it.
     const MAIN_OPEN = '<main id="main" tabindex="-1">';
     const cases = [
-      ['a buy button carrying the attribute, in main', x => x.replace(MAIN_OPEN, () => MAIN_OPEN + '<button type="button" data-lang-set="en">Buy now</button>')],
-      ['a buy button carrying the attribute inside the header block', x => x.replace(MARK.header.begin, () => MARK.header.begin + '\n<button type="button" data-lang-set="en">Buy now</button>')],
-      ['a footer-block button with the attribute and another text', x => x.replace(MARK.en.begin, () => MARK.en.begin + '\n<button type="button" data-lang-set="th" lang="th" aria-pressed="false">Buy</button>')],
-      ['the real switch button, moved out of the shared blocks into main', x => x.replace(MAIN_OPEN, () => MAIN_OPEN + REAL)],
-      ['a switch button for a language the page does not have', x => x.replace(MAIN_OPEN, () => MAIN_OPEN + '<button type="button" data-lang-set="fr">Français</button>')],
+      ['a buy button in main', x => x.replace(MAIN_OPEN, () => MAIN_OPEN + '<button type="button">Buy now</button>')],
+      ['a button in the header block', x => x.replace(MARK.header.begin, () => MARK.header.begin + '\n<button type="button">Buy now</button>')],
+      ['a button in the footer block', x => x.replace(MARK.footer.begin, () => MARK.footer.begin + '\n<button type="button">Buy</button>')],
+      ['a switch-looking button in main', x => x.replace(MAIN_OPEN, () => MAIN_OPEN + '<button type="button" data-lang-set="en">English</button>')],
     ];
     for (const [what, fn] of cases) {
       const y = fn(real);
@@ -1068,86 +1087,16 @@ test('surface-check rule 17 allows a live button only when it is exactly a switc
       writeFileSync(page, y);
       const r = surface(dir);
       assert.equal(r.status, 1, what + '\n' + r.stdout + r.stderr);
-      assert.match(r.stdout + r.stderr, /web\/pricing\.html: line \d+: has a button that is not disabled/, what);
+      assert.match(r.stdout + r.stderr, /web\/th\/pricing\.html: line \d+: has a button that is not disabled/, what);
     }
     writeFileSync(page, real);
     assert.equal(surface(dir).status, 0, 'back to the committed page it passes again');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-// ── focus follows the switch (WCAG 2.2 SC 2.4.3 Focus Order, 2.4.7 Focus Visible) ─────────────────────────────────────────────────────────
-// Pressing a switch sets <html lang>, which hides the nav or footer that holds the pressed button. The page script is run here against a small fake DOM built from the REAL
-// rendered header and footers (no browser): a tree of elements with attributes, a selector matcher for the few selectors the script uses, and a focus log.
-function fakeDom(html) {
-  const VOID = new Set(['rect', 'br', 'img', 'meta', 'link']);
-  const mk = (tag, attrs, parent) => ({ tag, attrs, parent, get parentNode() { return this.parent; }, children: [], hidden: false, listeners: [], getAttribute(n) { return n in this.attrs ? this.attrs[n] : null; }, setAttribute(n, v) { this.attrs[n] = String(v); },
-    addEventListener(type, fn) { this.listeners.push([type, fn]); }, focus(opts) { focusLog.push({ node: this, opts }); }, click() { for (const [type, fn] of this.listeners) if (type === 'click') fn(); },
-    closest(sel) { for (let n = this; n && n.parent; n = n.parent) if (matches(n, sel)) return n; return null; } });
-  const focusLog = [];
-  const root = mk('#root', {}, null);
-  let cur = root;
-  for (const m of html.matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g)) {
-    const [, close, tag, rest, self] = m;
-    if (close) { let n = cur; while (n && n.tag !== tag) n = n.parent; if (n && n.parent) cur = n.parent; continue; }
-    const attrs = {}; for (const a of rest.matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs[a[1]] = a[2] === undefined ? '' : a[2];
-    const node = mk(tag, attrs, cur); cur.children.push(node);
-    if (!self && !VOID.has(tag)) cur = node;
-  }
-  const simple = (n, s) => [...s.matchAll(/^([a-z][\w-]*)|\.([\w-]+)|\[([\w-]+)(?:="([^"]*)")?\]/g)].filter(x => x[0]).every(x => (x[1] ? n.tag === x[1] : x[2] ? (n.attrs.class || '').split(/\s+/).includes(x[2]) : x[4] === undefined ? x[3] in n.attrs : n.attrs[x[3]] === x[4]));
-  function matches(n, sel) { const parts = sel.trim().split(/\s+/); if (!simple(n, parts.pop())) return false; let p = n.parent; while (parts.length) { const want = parts.pop(); while (p && !simple(p, want)) p = p.parent; if (!p) return false; p = p.parent; } return true; }
-  const all = [];
-  (function walk(n) { for (const c of n.children) { all.push(c); walk(c); } })(root);
-  const doc = {
-    documentElement: { lang: 'en' },
-    getElementById: id => (id === 'doc-en' || id === 'doc-th' ? (doc[id] = doc[id] || { hidden: id === 'doc-th' }) : null),
-    querySelectorAll: sel => all.filter(n => matches(n, sel)),
-    querySelector: sel => all.find(n => matches(n, sel)) || null,
-  };
-  return { doc, focusLog, all };
-}
-const runPageScript = () => {
-  const html = [lib.siteHeaderHtml(), siteFooterHtml('en'), siteFooterHtml('th')].join('\n');
-  const dom = fakeDom(html);
-  const store = {};
-  vm.runInNewContext(lib.SCRIPT, { document: dom.doc, localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } }, String });
-  return { ...dom, store };
-};
-const blockLang = n => n.parentNode.closest('[lang]').attrs.lang;
-
-test('pressing a switch moves focus to the same switch in the block that is now shown, header to header and footer bar to footer bar, without scrolling', () => {
-  for (const place of ['.site-header', '.site-footer']) {
-    const d = runPageScript();
-    const pressTh = d.all.find(n => n.attrs['data-lang-set'] === 'th' && n.closest(place) && blockLang(n) === 'en');
-    assert.ok(pressTh, place + ': the Thai button of the English block');
-    pressTh.click();
-    assert.equal(d.doc.documentElement.lang, 'th', place + ': the page language changed');
-    assert.equal(d.focusLog.length, 1, place + ': focus moved once');
-    const moved = d.focusLog[0];
-    assert.equal(moved.node.attrs['data-lang-set'], 'th', place + ': to the Thai button');
-    assert.equal(blockLang(moved.node), 'th', place + ': which sits in the Thai block that is now shown');
-    assert.ok(moved.node.closest(place), place + ': in the same place (header or footer), not the other one');
-    assert.equal(moved.opts && moved.opts.preventScroll, true, place + ': without a scroll jump'); // not deepEqual: the options object is made inside the vm context, a different realm
-    // and back: the English button of the Thai block is pressed, focus goes to the English button of the English block
-    const pressEn = d.all.find(n => n.attrs['data-lang-set'] === 'en' && n.closest(place) && blockLang(n) === 'th');
-    pressEn.click();
-    assert.equal(d.doc.documentElement.lang, 'en');
-    const back = d.focusLog[1];
-    assert.equal(back.node.attrs['data-lang-set'], 'en');
-    assert.equal(blockLang(back.node), 'en');
-    assert.ok(back.node.closest(place));
-  }
-});
-
-test('pressing the language that is already shown moves no focus (the block stays visible), and aria-pressed follows the language on every switch', () => {
-  const d = runPageScript();
-  const pressEn = d.all.find(n => n.attrs['data-lang-set'] === 'en' && n.closest('.site-header') && blockLang(n) === 'en');
-  pressEn.click();
-  assert.equal(d.focusLog.length, 0, 'nothing moved');
-  const pressTh = d.all.find(n => n.attrs['data-lang-set'] === 'th' && n.closest('.site-footer') && blockLang(n) === 'en');
-  pressTh.click();
-  for (const b of d.all.filter(n => 'data-lang-set' in n.attrs)) assert.equal(b.attrs['aria-pressed'], String(b.attrs['data-lang-set'] === 'th'), 'every switch shows Thai as pressed');
-  assert.equal(d.store['kolwen-lang'], 'th', 'the choice is still saved under the same key');
-});
+// ── the switch is a link (ORDER 1017j): focus and the section fragment are measured in the render check, not here ─────────────────────
+// The old tests pressed a switch button and read which block took focus. The scheme has no button to press: the switch is an <a> with its own
+// address, so Tab reaches it, Enter follows it and the page script adds the section fragment. rendered-check.mjs measures all three (keys, m5).
 
 // ── WCAG 2.2 SC 1.4.3: every footer text colour against the background it sits on, at least 4.5:1 ──────────
 // The footer takes its page's colour at full strength (no opacity anywhere in FOOTER_CSS) and hover does not change the colour, so what is
@@ -1197,7 +1146,7 @@ test('every footer text colour measures at least 4.5:1 on every page background 
   const dark = { 'web/index.html': read('web/index.html'), 'web/pricing.html': read('web/pricing.html') };
   const rows = [];
   for (const [file, html] of Object.entries(pages)) {
-    assert.match(html, /<html lang="en" data-job="prose">/, file + ': a prose page');
+    assert.match(html, new RegExp('<html lang="' + (file.startsWith('web/th/') ? 'th' : 'en') + '" data-job="prose">'), file + ': a prose page');
     for (const scheme of ['light', 'dark']) {
       const p = READING[scheme];
       rows.push([`${file} footer (${scheme} scheme)`, ratio(rgb(p.quiet), rgb(p.bg))], [`${file} header (${scheme} scheme)`, ratio(rgb(p.txt), rgb(p.bg))]);
@@ -1269,9 +1218,9 @@ test('a value renders on the privacy page only, in both languages, and an invali
     assert.deepEqual(r.problems, [], name);
     const privacy = r.pages['web/privacy.html'];
     assert.ok(docEn(privacy).includes(escText(name)), name + ': English document');
-    assert.ok(docTh(privacy).includes(escText(name)), name + ': Thai document');
+    assert.ok(docEn(r.pages['web/th/privacy.html']).includes(escText(name)), name + ': Thai document');
     assert.ok(!privacy.includes('controller-name'));
-    for (const [file, html] of Object.entries(r.pages)) if (file !== 'web/privacy.html') assert.ok(!html.includes(escText(name)), file + ' names the controller');
+    for (const [file, html] of Object.entries(r.pages)) if (file !== 'web/privacy.html' && file !== 'web/th/privacy.html') assert.ok(!html.includes(escText(name)), file + ' names the controller');
   }
   const bad = renderPages({ ...inputs(), controller: { schema: 1, name: '<b>x</b>' } });
   assert.ok(bad.problems.some(p => p.startsWith('legal/controller.json:')), bad.problems.join(' | '));

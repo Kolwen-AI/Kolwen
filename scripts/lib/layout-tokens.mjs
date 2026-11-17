@@ -151,7 +151,7 @@ export function readingCss() {
     `  ${prose} h1{font-size:var(${tokenName('font.size.reading-title')})}`,
     `  ${prose} .legal h2{font-size:var(${tokenName('font.size.reading-h2')})}`,
     `  ${prose} .legal h3{font-size:var(${tokenName('font.size.reading-h3')})}`,
-    `  ${prose} #doc-th,${prose} #doc-th *{line-height:var(${tokenName('line-height.thai')})}`,
+    `  ${prose}[lang="th"] main,${prose}[lang="th"] main *{line-height:var(${tokenName('line-height.thai')})}`,
   ].join('\n');
 }
 // The <meta> lines a reading page carries for the browser chrome (W-DISC-10): the colour schemes it supports and a theme colour per scheme.

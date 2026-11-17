@@ -1,15 +1,16 @@
 #!/usr/bin/env node
+// Each page is written twice, once per language: web/<page>.html (English) and web/th/<page>.html (Thai), one language per file. The site pages are listed in SITE_PAGES and the legal pages in PAGES (scripts/lib/legal-render.mjs).
 // Renders web/terms.html, web/privacy.html and web/refund.html from TERMS.md, PRIVACY.md and legal/thai-7day-clause.md, and
 // web/changelog.html from the repository's own CHANGELOG.md (every passage shown as written, no hold), and web/index.html, web/pricing.html, web/404.html and web/status.html and web/subprocessors.html (both unannounced) from their templates
-// (web-src/pages/<home|pricing|notfound|status>.html) and the language catalogue (web-src/i18n/<bcp47>.json), and checks they are the committed pages: all eight pages are generated and none has a part
+// (web-src/pages/<home|pricing|notfound|status>.html) and the language catalogue (web-src/i18n/<bcp47>.json), and checks they are the committed pages: all 22 pages (11 per language) are generated and none has a part
 // kept by hand (build-qc.md C-FMT-02). It also owns the SHARED BLOCKS: the header and its CSS, the footer of each language and its CSS, the rules for a reader without script and
 // the page script (the marker pairs of SYNC_BLOCKS, the link to the font manifest first and the layout tokens second) are written once in scripts/lib/legal-render.mjs (SYNC_BLOCKS) and come into every page between fixed markers, so one
-// edit reaches all eight pages in one run. It keeps the style-src and script-src hashes of web/_headers in step with the pages' inline <style> and <script> blocks, and the <style> of every SVG under web/ (an SVG is a document the policy governs), with the one hash routine
+// edit reaches all 22 pages in one run. It keeps the style-src and script-src hashes of web/_headers in step with the pages' inline <style> and <script> blocks, and the <style> of every SVG under web/ (an SVG is a document the policy governs), with the one hash routine
 // surface-check uses (scripts/lib/csp-hashes.mjs), so a footer CSS edit needs no hand-typed hash. And it judges the catalogue and the templates (scripts/lib/i18n-catalogue.mjs,
 // scripts/lib/page-template.mjs): a visible string that is not a catalogue slot, a key present in one language and absent in another, a bad BCP 47 tag, a split sara am, a plain space before the
 // Thai repetition mark, joined keys.
 //
-//   node scripts/legal-pages.mjs --write    render the eight pages into web/ (the default) and update the style-src and script-src hashes in web/_headers (never a -elem directive). A catalogue,
+//   node scripts/legal-pages.mjs --write    render the 22 pages into web/ and web/th/ (the default) and update the style-src and script-src hashes in web/_headers (never a -elem directive). A catalogue,
 //                                           template or marker problem makes it refuse: exit 1, loud, nothing written anywhere.
 //   node scripts/legal-pages.mjs --check    render in memory; exit 1 with a named difference if a committed page differs, or if the catalogue or a template has a problem, or
 //                                           web/pricing.html does not carry the same style block, a shared block of a site page differs from the shared one or has a marker missing,
@@ -21,9 +22,10 @@
 // (legal/legal-state.json), the hold list (scripts/lib/legal-holds.json) and the text in scripts/lib/legal-page-text.mjs, so nobody
 // edits a page by hand: a hand edit is a difference this check names.
 // Report problems at https://github.com/TheColliery/Kolwen/issues
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { servedFiles } from './lib/web-files.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const HEADERS = 'web/_headers';
@@ -94,15 +96,19 @@ async function main() {
   for (const [lang, messages] of Object.entries(catalogue.messages)) for (const [key, value] of Object.entries(messages)) siteFails.push(...slot.slotProblems(`web-src/i18n/${lang}.json ${key}`, value).map(x => 'FAIL ' + x));
   if (!siteFails.length) {
     let codeKeys = new Set();
-    try { codeKeys = cat.usedKeys(() => { for (const b of lib.SYNC_BLOCKS) b.render(); for (const l of Object.keys(catalogue.messages)) lib.pageNoteHtml(l); }); }
+    // Only the languages the site renders (LANGS): a third catalogue file is checked above, and renders no page, so it has no switch labels to read here.
+    try { codeKeys = cat.usedKeys(() => { for (const l of lib.LANGS) { for (const p of lib.SITE_PAGES) for (const b of lib.syncBlocksAt({ lang: l, path: p.path })) b.render(); lib.pageNoteHtml(l); } }); }
     catch (e) { siteFails.push('FAIL the shared blocks could not be rendered: ' + e.message); }
     if (!siteFails.length) siteFails.push(...tpl.usageProblems({ templates, messages: catalogue.messages, codeKeys }).map(x => 'FAIL ' + x));
   }
   const pages = { ...legal.pages };
+  // Each output file's page context ({ lang, path }): the shared blocks of a page (the head links, the header, the footer) are that page's own.
+  const contexts = { ...legal.contexts };
   if (!siteFails.length) {
     const site = lib.renderSitePages({ templates, messages: catalogue.messages });
     siteFails.push(...site.problems.map(p => 'FAIL ' + p));
     Object.assign(pages, site.pages);
+    Object.assign(contexts, site.contexts);
     const langs = Object.keys(catalogue.messages);
     for (const p of lib.SITE_PAGES) report.push(`${p.file}: template ${p.template} + the catalogue (${Object.keys(catalogue.messages[langs[0]]).length} keys in each of ${langs.map(l => l + '.json').join(', ')})`);
   }
@@ -110,7 +116,8 @@ async function main() {
   for (const l of report) console.log(l);
 
   // Every document on disk under web/ that the policy governs, as text (LF), in name order: the HTML pages, and the SVG images, whose <style> the policy must admit by hash.
-  const webDocuments = () => Object.fromEntries(readdirSync(resolve(ROOT, 'web')).filter(f => /\.(html|svg)$/.test(f)).sort().map(f => ['web/' + f, read('web/' + f)]));
+  // Recursive: the Thai pages live under web/th/, and the policy governs every document of the tree, in any folder.
+  const webDocuments = () => Object.fromEntries(servedFiles(resolve(ROOT, 'web')).filter(f => /\.(html|svg)$/.test(f)).map(f => ['web/' + f, read('web/' + f)]));
   const headersText = () => (existsSync(resolve(ROOT, HEADERS)) ? readFileSync(resolve(ROOT, HEADERS), 'utf8') : null);
 
   if (mode === '--write') {
@@ -134,6 +141,8 @@ async function main() {
       }
     }
     if (fails.length) { fails.forEach(f => console.error(f)); console.error('nothing was written'); process.exitCode = 1; return; }
+    // The Thai pages live in web/th/: the folders are made before the first page is written, so a missing folder cannot leave the tree half written.
+    for (const file of Object.keys(pages)) mkdirSync(dirname(resolve(ROOT, file)), { recursive: true });
     for (const [file, html] of Object.entries(pages)) { writeFileSync(resolve(ROOT, file), html); console.log('wrote ' + file); }
     if (headersNew) { writeFileSync(resolve(ROOT, HEADERS), headersNew.text); console.log(`wrote ${HEADERS} (${headersNew.note})`); }
     return;
@@ -145,17 +154,19 @@ async function main() {
     const d = firstDifference(html, have);
     if (d) fails.push(`FAIL ${file} differs from the render of its sources, ${d} (run node scripts/legal-pages.mjs --write)`);
   }
-  // The pricing page shares the legal pages' style block, so the five pages (terms, privacy, refund, changelog, pricing) carry one CSP hash.
-  if (existsSync(resolve(ROOT, 'web/pricing.html'))) {
-    if (styleOf(read('web/pricing.html')) !== lib.STYLE) fails.push('FAIL web/pricing.html does not carry the same <style> block as the legal pages (the block lives in scripts/lib/legal-render.mjs as STYLE)');
-  } else fails.push('FAIL web/pricing.html is missing, so its style block could not be compared');
+  // The pricing page (both languages) shares the legal pages' style block, so the pages carry one CSP hash.
+  for (const f of ['web/pricing.html', 'web/th/pricing.html']) {
+    if (!existsSync(resolve(ROOT, f))) { fails.push(`FAIL ${f} is missing, so its style block could not be compared`); continue; }
+    if (styleOf(read(f)) !== lib.STYLE) fails.push(`FAIL ${f} does not carry the same <style> block as the legal pages (the block lives in scripts/lib/legal-render.mjs as STYLE)`);
+  }
 
   // The shared blocks have one source (SYNC_BLOCKS). Each site page holds each block between its markers, compared byte for byte, so a drift is named by block as well as by line (the whole page is
   // compared above); a marker that is missing, doubled or out of order is named, never worked around.
-  for (const f of SITE_FILES) {
+  for (const f of Object.keys(pages)) {
     if (!existsSync(resolve(ROOT, f))) { fails.push(`FAIL ${f} is missing, so its shared blocks could not be compared`); continue; }
+    if (!contexts[f]) { fails.push(`FAIL ${f} has no page context (language and address), so its shared blocks could not be rendered for comparison`); continue; }
     let inspected;
-    try { inspected = sync.inspect(read(f), lib.SYNC_BLOCKS); }
+    try { inspected = sync.inspect(read(f), lib.syncBlocksAt(contexts[f])); }
     catch (e) { fails.push(`FAIL ${f}: its shared blocks could not be compared (${e.message})`); continue; }
     for (const r of inspected) {
       if (r.problem) { fails.push(`FAIL ${f} ${r.block.label}: ${r.problem} (restore the marker, then run node scripts/legal-pages.mjs --write)`); continue; }
@@ -169,6 +180,6 @@ async function main() {
   else for (const p of sync.hashProblems(webDocuments(), headers).map(p => 'FAIL ' + p)) fails.push(p + ' (run node scripts/legal-pages.mjs --write)');
 
   if (fails.length) { fails.forEach(f => console.log(f)); console.log(`${fails.length} problem(s)`); process.exitCode = 1; return; }
-  console.log(`legal pages: ${Object.keys(pages).length} pages match the render of their sources (${SITE_FILES.length} of them from templates and the language catalogue); the shared footer is identical on all of them; the pricing page shares their style block`);
+  console.log(`legal pages: ${Object.keys(pages).length} pages (each in English and Thai, one language per file) match the render of their sources (${SITE_FILES.length * 2} of them from templates and the language catalogue); the shared footer is identical on every page of each language; the pricing pages share their style block`);
 }
 main().catch(e => { console.error('FAIL legal-pages: ' + (e && e.message)); process.exitCode = 1; });

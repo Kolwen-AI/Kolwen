@@ -4,11 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{notfound.meta.title}}</title>
-{{lang th}}
-<meta name="kolwen-title-th" content="{{=notfound.meta.title}}">
-{{/lang}}
 <meta name="description" content="{{=notfound.meta.description}}">
 <meta name="robots" content="noindex">
+{{block:site-links}}
 {{block:site-fonts}}
 <style>
 {{block:site-tokens-css}}
@@ -35,23 +33,18 @@ a{color:var(--amber)}
 {{block:site-header}}
 <main id="main" tabindex="-1">
   <img class="band" src="/band-404.svg" width="600" height="300" alt="" decoding="async">
-  <div id="doc-en" lang="en">
 {{lang en}}
   <h1>{{notfound.title}}</h1>
   <p>{{notfound.body}}</p>
   <p><a href="/">{{notfound.home}}</a></p>
 {{/lang}}
-  </div>
-  <div class="th" id="doc-th" lang="th" hidden>
 {{lang th}}
     <h1>{{notfound.title}}</h1>
     <p>{{notfound.body}}</p>
     <p><a href="/">{{notfound.home}}</a></p>
 {{/lang}}
-  </div>
 </main>
-{{block:site-footer:en}}
-{{block:site-footer:th}}
+{{block:site-footer}}
 {{raw:script}}
 </body>
 </html>

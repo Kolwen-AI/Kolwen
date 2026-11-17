@@ -599,7 +599,8 @@ test('RED PROOF: a page that writes a C1 numeric reference and a named reference
 
 test('RED PROOF: a page in a subfolder of web/ is read too, and a character only it renders that the cut lacks fails the check naming that page', () => {
   const dir = webCopy(web => {
-    mkdirSync(join(web, 'th'));
+    // web/th already exists in the copy (the real Thai pages), so the folder is made only if missing (ORDER 1017j)
+    mkdirSync(join(web, 'th'), { recursive: true });
     writeFileSync(join(web, 'th', 'index.html'), '<!doctype html><html lang="th"><head><title>x</title></head><body><p>' + ch(0x2030) + '</p></body></html>');
   });
   try {

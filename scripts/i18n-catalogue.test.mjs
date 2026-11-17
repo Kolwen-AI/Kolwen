@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { htmlTokens } from './lib/html-tokens.mjs';
 import { catalogueProblems, bcp47Problem, loadCatalogue, parseValue, valueJson, withCatalogue, usedKeys, MARKUP } from './lib/i18n-catalogue.mjs';
 import { templateProblems, usageProblems, renderTemplate, slotsOf } from './lib/page-template.mjs';
-import { renderSitePages, SITE_PAGES, SYNC_BLOCKS, pageNoteHtml, siteFooterHtml, siteHeaderHtml } from './lib/legal-render.mjs';
+import { renderSitePages, SITE_PAGES, syncBlocksAt, pageNoteHtml, siteFooterHtml, siteHeaderHtml } from './lib/legal-render.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = rel => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
@@ -46,14 +46,16 @@ test('the real catalogue, the real templates and their use have no problem', () 
 
 // The keys the shared blocks of legal-render.mjs read (the header, the footers, the page note): they are rendered once with a recording catalogue.
 function usedKeysOfShared() {
-  const seen = usedKeys(() => { for (const b of SYNC_BLOCKS) b.render(); for (const l of ['en', 'th']) pageNoteHtml(l); });
+  // Every block is rendered in the context of every page and language it appears on: a block reads the page's language and address (syncBlocksAt).
+  const seen = usedKeys(() => { for (const l of ['en', 'th']) { for (const p of SITE_PAGES) for (const b of syncBlocksAt({ lang: l, path: p.path })) b.render(); pageNoteHtml(l); } });
   return seen;
 }
 
 test('(a) the four pages are rendered from the templates and the catalogue, and the committed pages are that render, byte for byte', () => {
   const { pages, problems } = renderSitePages({ templates: TEMPLATES, messages: CAT.messages });
   assert.deepEqual(problems, []);
-  assert.deepEqual(Object.keys(pages).sort(), ['web/404.html', 'web/accessibility.html', 'web/index.html', 'web/legal.html', 'web/pricing.html', 'web/status.html', 'web/subprocessors.html']);
+  // Each page is written twice, once per language, in its own file (ORDER 1017j): web/<page>.html English, web/th/<page>.html Thai.
+  assert.deepEqual(Object.keys(pages).sort(), SITE_PAGES.flatMap(p => [p.file, p.file.replace('web/', 'web/th/')]).sort());
   for (const [file, html] of Object.entries(pages)) assert.equal(html, read(file), file + ' is the render of its template');
 });
 
@@ -128,9 +130,12 @@ test('(b) a catalogue value that changes changes the page, in the English docume
   o.en['pricing.title'] = 'Prices, changed';
   o.th['pricing.title'] = 'ราคา เปลี่ยน';
   const { pages } = renderSitePages({ templates: TEMPLATES, messages: o });
-  const html = pages['web/pricing.html'];
-  assert.ok(html.includes('<h1>Prices, changed</h1>') && html.includes('<h1>ราคา เปลี่ยน</h1>'));
-  assert.notEqual(html, read('web/pricing.html'));
+  // one language per file: the English value is in the English file, the Thai value in the Thai one
+  const en = pages['web/pricing.html'], th = pages['web/th/pricing.html'];
+  assert.ok(en.includes('<h1>Prices, changed</h1>'), 'the English file has the English value');
+  assert.ok(th.includes('<h1>ราคา เปลี่ยน</h1>'), 'the Thai file has the Thai value');
+  assert.notEqual(en, read('web/pricing.html'));
+  assert.notEqual(th, read('web/th/pricing.html'));
 });
 
 test('(b) a template that holds a literal visible string fails: a text node, a visible attribute, a meta text and a structured-data value', () => {
@@ -301,10 +306,11 @@ test('the header, the footers and the page note read the shared group, so one ed
   o.en['shared.header.pricing'] = 'Plans!';
   o.th['shared.footer.terms'] = 'ข้อกำหนด!';
   withCatalogue(o, () => {
-    assert.ok(siteHeaderHtml().includes('<a href="/pricing">Plans!</a>'));
-    assert.ok(siteFooterHtml('th').includes('<a href="/terms">ข้อกำหนด!</a>'));
+    assert.ok(siteHeaderHtml({ lang: 'en', path: '/' }).includes('<a href="/pricing">Plans!</a>'));
+    // the Thai footer links to the Thai address of the terms page (one language per file)
+    assert.ok(siteFooterHtml({ lang: 'th', path: '/' }).includes('<a href="/th/terms">ข้อกำหนด!</a>'));
   });
-  assert.ok(siteHeaderHtml().includes('<a href="/pricing">Pricing</a>'), 'and the override ends with the call');
+  assert.ok(siteHeaderHtml({ lang: 'en', path: '/' }).includes('<a href="/pricing">Pricing</a>'), 'and the override ends with the call');
   const used = usedKeysOfShared();
   assert.ok(used.has('shared.brand') && used.has('shared.footer.terms') && used.has('shared.page.note'));
   assert.ok([...used].every(k => k.startsWith('shared.')), 'the shared blocks read only the shared group');
@@ -314,13 +320,20 @@ test('the render is a pure function of the templates, the catalogue and the shar
   const a = renderSitePages({ templates: TEMPLATES, messages: CAT.messages }).pages;
   const b = renderSitePages({ templates: TEMPLATES, messages: structuredClone(CAT.messages) }).pages;
   assert.deepEqual(a, b);
-  assert.ok(renderTemplate('{{lang th}}\n<p>{{home.origin}}</p>\n{{/lang}}\n<p>{{home.origin}}</p>\n', { messages: CAT.messages, blocks: {}, raw: {} }).includes('<p>สร้างในประเทศไทย</p>\n<p>Made in Thailand'), 'a region sets the language of its slots, and outside one the default (en) applies');
+  // A region sets the language of its slots, and a page holds one language: the Thai file renders the Thai region and drops the English one, the English file the reverse.
+  const src = '{{lang th}}\n<p>{{home.origin}}</p>\n{{/lang}}\n{{lang en}}\n<p>{{home.origin}}</p>\n{{/lang}}\n';
+  const th = renderTemplate(src, { messages: CAT.messages, blocks: {}, raw: {}, lang: 'th' });
+  const en = renderTemplate(src, { messages: CAT.messages, blocks: {}, raw: {}, lang: 'en' });
+  assert.ok(th.includes('<p>สร้างในประเทศไทย</p>') && !th.includes('Made in Thailand'), 'the Thai file has its Thai slot only');
+  assert.ok(en.startsWith('<p>Made in Thailand'), 'the English file has its English slot only, and no Thai line of the Thai region (the English value itself carries a Thai span)');
 });
 
 // ── the CLI, against a throwaway copy of the tree ────────────────────────────────────────────────────────────────
 const TREE = ['scripts/legal-pages.mjs', 'scripts/lib/legal-render.mjs', 'scripts/lib/layout-tokens.mjs', 'scripts/lib/legal-page-text.mjs', 'scripts/lib/legal-state.mjs', 'scripts/lib/legal-holds.json', 'scripts/lib/headers-file.mjs', 'scripts/lib/page-sync.mjs', 'scripts/lib/csp-hashes.mjs', 'scripts/lib/page-claims.mjs',
   'scripts/lib/i18n-catalogue.mjs', 'scripts/lib/page-template.mjs', 'scripts/lib/html-tokens.mjs', 'scripts/lib/rendered-text.mjs', 'scripts/lib/contained-read.mjs', 'scripts/lib/web-files.mjs', 'scripts/lib/html-entities.json', 'TERMS.md', 'PRIVACY.md', 'legal/thai-7day-clause.md', 'legal/legal-state.json', 'legal/controller.json', 'scripts/lib/controller-slot.mjs', 'CHANGELOG.md', 'web/_headers',
-  'web/terms.html', 'web/privacy.html', 'web/refund.html', 'web/changelog.html', 'web/index.html', 'web/pricing.html', 'web/404.html', 'web/status.html', 'web/subprocessors.html', 'web/accessibility.html', 'web/legal.html', 'web/band-404.svg', 'web/band-home.svg', 'web-src/i18n/en.json', 'web-src/i18n/th.json', ...SITE_PAGES.map(p => p.template)];
+  'web/terms.html', 'web/privacy.html', 'web/refund.html', 'web/changelog.html', 'web/index.html', 'web/pricing.html', 'web/404.html', 'web/status.html', 'web/subprocessors.html', 'web/accessibility.html', 'web/legal.html', 'web/band-404.svg', 'web/band-home.svg', 'web-src/i18n/en.json', 'web-src/i18n/th.json', ...SITE_PAGES.map(p => p.template),
+  // the Thai pages, each in its own file (web/th/), and the Thai legal documents' pages
+  ...SITE_PAGES.map(p => p.file.replace('web/', 'web/th/')), 'web/th/terms.html', 'web/th/privacy.html', 'web/th/refund.html', 'web/th/changelog.html'];
 function copyTree() {
   const dir = mkdtempSync(join(tmpdir(), 'i18n-catalogue-'));
   for (const f of TREE) { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), readFileSync(join(ROOT, f))); }
@@ -335,7 +348,7 @@ test('the CLI: --check passes on the committed tree; a hand edit of a generated 
   try {
     const r = run(dir);
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /11 pages match/);
+    assert.match(r.stdout, /22 pages \(each in English and Thai/);
     for (const f of ['web/index.html', 'web/pricing.html', 'web/404.html', 'web/status.html', 'web/subprocessors.html']) {
       const before = readFileSync(join(dir, f), 'utf8');
       edit(dir, f, s => s.replace('</main>', '<p>hand edit</p></main>'));
@@ -498,15 +511,17 @@ test('(b) the shared blocks (the header, the footers, the page note) are rendere
   const { pages, problems } = renderSitePages({ templates: TEMPLATES, messages: o });
   assert.deepEqual(problems, []);
   for (const [file, html] of Object.entries(pages)) {
-    assert.ok(html.includes('<a href="/pricing">Prices, supplied</a>') && html.includes('<a href="/pricing">ราคา ที่ส่งมา</a>'), file + ': the header reads the supplied values');
-    assert.ok(html.includes('A footer note, supplied.'), file + ': the footer reads the supplied value');
+    // each file reads its own language's supplied value, at its own address (the Thai header links to /th/pricing)
+    const th = file.startsWith('web/th/');
+    assert.ok(html.includes(`<a href="${th ? '/th/pricing' : '/pricing'}">${th ? 'ราคา ที่ส่งมา' : 'Prices, supplied'}</a>`), file + ': the header reads the supplied value');
+    if (!th) assert.ok(html.includes('A footer note, supplied.'), file + ': the footer reads the supplied value');
     const header = html.split('<header class="site-header">')[1].split('</header>')[0];
     assert.ok(!header.includes('>Pricing</a>'), file + ': no value of the loaded catalogue is left in the header');
   }
   // the supplied catalogue is in force for that call only
   const again = renderSitePages({ templates: TEMPLATES, messages: CAT.messages });
   assert.deepEqual(again.problems, [], 'the second render has no problem');
-  assert.deepEqual(Object.keys(again.pages).sort(), SITE_PAGES.map(p => p.file).sort(), 'the second render produced every site page: with none, the loop below would run zero times and could not go red');
+  assert.deepEqual(Object.keys(again.pages).sort(), SITE_PAGES.flatMap(p => [p.file, p.file.replace('web/', 'web/th/')]).sort(), 'the second render produced every site page: with none, the loop below would run zero times and could not go red');
   for (const [file, html] of Object.entries(again.pages)) assert.equal(html, read(file), file + ' is the committed page again');
 });
 

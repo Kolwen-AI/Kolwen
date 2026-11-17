@@ -173,7 +173,8 @@ test('every page links the font manifest once and no link fetches anything from 
     assert.equal(manifestLinks.length, 1, p + ' links the manifest once');
     assert.match(manifestLinks[0], /rel="stylesheet"/, p);
     for (const tag of linkTags(html)) {
-      if (/rel="canonical"/i.test(tag)) continue; // a canonical link names the page itself and is never fetched
+      // A canonical or alternate link names a page of this site (the head links, ORDER 1017j): it is never fetched, and it stays on kolwen.com.
+      if (/rel="(?:canonical|alternate)"/i.test(tag)) { assert.match(tag, /href="https:\/\/kolwen\.com\//i, p + ' a head link names another host: ' + tag); continue; }
       assert.ok(!/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(attr(tag, 'href') || ''), p + ' fetches from outside the site: ' + tag);
     }
     assert.ok(!/rel="(?:preconnect|dns-prefetch|preload|prefetch)"/i.test(html) || linkTags(html).filter(t => /rel="(?:preconnect|dns-prefetch)"/i.test(t)).length === 0, p + ' opens no connection to another origin');

@@ -21,7 +21,8 @@ const CLAIM = {
   en: { every: /(not yet available|no product ships yet)[^.]*says so on every page/i, home: /(not yet available|no product ships yet)[^.]*and the home page says so/i },
   th: { every: /ยังไม่มีผลิตภัณฑ์ใดเปิดให้ใช้งาน[^.]*บอกเช่นนี้ในทุกหน้า/, home: /ยังไม่มีผลิตภัณฑ์ใดเปิดให้ใช้งาน[^.]*หน้าแรกของเว็บไซต์บอกเช่นนี้/ },
 };
-const ID = { en: 'doc-en', th: 'doc-th' };
+// One language per file (ORDER 1017j): a language's block is its page's <main>, in web/ (English) or web/th/ (Thai).
+const ID = { en: 'main', th: 'main' };
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 // The visible text of one language element: its own text, through its matching closing tag, and not the text under a hidden element.
 // Null when the page has no such element, or the element is never closed.
@@ -47,12 +48,15 @@ function visibleText(html, id) {
 
 function problems(root) {
   const read = f => readFileSync(join(root, f), 'utf8');
-  const served = readdirSync(join(root, 'web')).filter(f => f.endsWith('.html')).sort();
+  const servedEn = readdirSync(join(root, 'web')).filter(f => f.endsWith('.html')).sort();
+  const servedTh = readdirSync(join(root, 'web', 'th')).filter(f => f.endsWith('.html')).sort();
   const out = [];
-  if (!served.includes('index.html') || served.length < 2) {
-    out.push(`the served page list holds ${served.length} page(s) (${served.join(', ') || 'none'}); the guard needs index.html and more than one page`);
+  if (!servedEn.includes('index.html') || servedEn.length < 2) {
+    out.push(`the served page list holds ${servedEn.length} page(s) (${servedEn.join(', ') || 'none'}); the guard needs index.html and more than one page`);
   }
   for (const lang of ['en', 'th']) {
+    const served = lang === 'th' ? servedTh : servedEn;
+    const dir = lang === 'th' ? 'web/th/' : 'web/';
     const what = JSON.parse(read(`web-src/i18n/${lang}.json`)).accessibility.what;
     const c = CLAIM[lang];
     const every = c.every.test(what), home = c.home.test(what);
@@ -61,10 +65,10 @@ function problems(root) {
       continue;
     }
     for (const f of every ? served : ['index.html']) {
-      const html = served.includes(f) ? read('web/' + f) : '';
+      const html = served.includes(f) ? read(dir + f) : '';
       const seen = visibleText(html, ID[lang]);
       if (seen === null || !NOTICE[lang].test(seen)) {
-        out.push(`${lang}: accessibility.what says the notice is on ${every ? 'every page' : 'the home page'}, but web/${f} carries no ${lang} notice in its ${lang} block: "${what}"`);
+        out.push(`${lang}: accessibility.what says the notice is on ${every ? 'every page' : 'the home page'}, but ${dir}${f} carries no ${lang} notice in its ${lang} block: "${what}"`);
       }
     }
   }
@@ -100,8 +104,8 @@ test('witness: a sentence that names the home page without tying the notice to i
 });
 
 test('witness: a page whose Thai block lacks the notice is refused, though English metadata carries it', () => {
-  withCopy(d => edit(d, 'web/index.html', s => s.split('ยังไม่เปิดให้ใช้งาน').join('').split('กำลังพัฒนา').join('')), d => {
-    assert.ok(problems(d).some(p => p.startsWith('th:') && p.includes('web/index.html carries no th notice')), JSON.stringify(problems(d)));
+  withCopy(d => edit(d, 'web/th/index.html', s => s.split('ยังไม่เปิดให้ใช้งาน').join('').split('กำลังพัฒนา').join('')), d => {
+    assert.ok(problems(d).some(p => p.startsWith('th:') && p.includes('web/th/index.html carries no th notice')), JSON.stringify(problems(d)));
   });
 });
 
@@ -113,8 +117,8 @@ test('witness: an empty served page list is refused, not passed', () => {
 
 // The statement guard reads each language element whole, and only the notice a visitor can see inside it.
 test('witness: a Thai notice placed after the Thai element, outside it, does not count', () => {
-  withCopy(d => edit(d, 'web/index.html', s => s.split('ยังไม่เปิดให้ใช้งาน').join('').split('กำลังพัฒนา').join('').split('</main>').join('<p>ยังไม่เปิดให้ใช้งาน</p></main>')), d => {
-    assert.ok(problems(d).some(p => p.startsWith('th:') && p.includes('web/index.html carries no th notice')), JSON.stringify(problems(d)));
+  withCopy(d => edit(d, 'web/th/index.html', s => s.split('ยังไม่เปิดให้ใช้งาน').join('').split('กำลังพัฒนา').join('').split('</main>').join('</main><p>ยังไม่เปิดให้ใช้งาน</p>')), d => {
+    assert.ok(problems(d).some(p => p.startsWith('th:') && p.includes('web/th/index.html carries no th notice')), JSON.stringify(problems(d)));
   });
 });
 
@@ -136,7 +140,7 @@ test('witness: a notice inside an element the visitor cannot see (hidden) does n
 
 // A-1: a language element that is never closed fails closed: its read does not run past </main> to a notice outside it.
 test('witness A-1: a Thai element that is never closed is refused, even when a Thai notice sits after </main>', () => {
-  withCopy(d => edit(d, 'web/index.html', s => { const i = s.indexOf('<div id="doc-th"'); return s.slice(0, i) + '<div id="doc-th" lang="th" hidden><p>ภาษาไทย</p></main><p>ยังไม่เปิดให้ใช้งาน</p></body></html>'; }), d => {
-    assert.ok(problems(d).some(p => p.startsWith('th:') && p.includes('web/index.html carries no th notice')), JSON.stringify(problems(d)));
+  withCopy(d => edit(d, 'web/th/index.html', s => { const i = s.indexOf('<main'); return s.slice(0, i) + '<main id="main" tabindex="-1"><p>ภาษาไทย</p></div><p>ยังไม่เปิดให้ใช้งาน</p></body></html>'; }), d => {
+    assert.ok(problems(d).some(p => p.startsWith('th:') && p.includes('web/th/index.html carries no th notice')), JSON.stringify(problems(d)));
   });
 });
