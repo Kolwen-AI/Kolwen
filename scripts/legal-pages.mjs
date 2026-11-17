@@ -22,7 +22,7 @@
 // (legal/legal-state.json), the hold list (scripts/lib/legal-holds.json) and the text in scripts/lib/legal-page-text.mjs, so nobody
 // edits a page by hand: a hand edit is a difference this check names.
 // Report problems at https://github.com/TheColliery/Kolwen/issues
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { servedFiles } from './lib/web-files.mjs';

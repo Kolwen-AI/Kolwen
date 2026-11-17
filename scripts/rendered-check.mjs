@@ -507,10 +507,13 @@ export function langUrlProblems(head, path, lang, file) {
 }
 // M5, measured: the English page is scrolled to its middle at the given width, the section at the top of the window is named, the other-language link is clicked, and the same
 // section, looked up on the page the click opens, must sit at the top of the window. Without the page script's fragment the browser opens the top of the page instead.
+// The one shape a section id can take: the sectionIds generator writes s-1, s-2 ... An id read from the page is code only through this pattern (CodeQL #65).
+const SECTION_ID = /^s-\d+$/;
 async function measureFragmentSwitch(page, origin, path, width) {
   await page.setViewport(width, 800);
   await page.goto(origin + path);
   const before = await page.evaluate(`(() => { const max = document.documentElement.scrollHeight - window.innerHeight; window.scrollTo(0, Math.floor(max / 2)); const hs = [...document.querySelectorAll('main h2[id]')].filter(h => h.getBoundingClientRect().top < 1); const h = hs[hs.length - 1]; return { id: h ? h.id : null, vh: window.innerHeight, max }; })()`);
+  if (before.id !== null && !SECTION_ID.test(before.id)) return { id: null, error: `the heading id ${reportField(before.id)} is not a section id (s-N), so no measurement is taken on it` };
   if (!before.id) return { id: null, error: `no section heading is above the top of the window at ${width} px, scrolled to the middle of a ${before.max} px page, so the measurement has no section to follow` };
   await page.evaluate(`document.querySelector('a.lang-link').click()`);
   // the switch goes to the other language: from the English file to Thai, from the Thai file to English (M5, both directions)
