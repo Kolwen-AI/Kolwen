@@ -225,8 +225,8 @@
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="t"><em>Measured: <code>curl -sI https://kolwen.com/</code> and the same on an asset—no <code>Set-Cookie</code> header on either (re-measured 2026-10-08, after the zone&#39;s JavaScript Detections were switched off).</em></p>
       <p class="t"><strong>A note on what could change that:</strong> per Cloudflare&#39;s own cookie and clearance pages (read 2026-10-08), Bot Fight Mode sets the <code>__cf_bm</code> cookie, and Turnstile sets <code>cf_clearance</code> only when its pre-clearance option is enabled. If either is ever switched on for this site, the sentence above, &quot;no cookies at all&quot;, would be reworded the same day. Both are off today.</p>
-      <p class="t">Your language choice (English or Thai) is stored in your browser&#39;s <code>localStorage</code>, which is not a cookie, is never sent to a server, and never leaves your device. Clearing your browser data removes it.</p>
-      <p class="t"><em>Measured: <code>web/index.html</code> uses <code>localStorage.setItem</code> / <code>getItem</code> for one key, and nothing else.</em></p>
+      <p class="t">The site itself stores nothing in your browser. It sets no cookie and keeps no language choice: English and Thai are two addresses, and the switch between them is a link. An earlier version kept your language choice in your browser&#39;s <code>localStorage</code>, under one key, <code>kolwen-lang</code>. Every page now deletes that one key on your next visit, and does nothing else with your browser&#39;s storage.</p>
+      <p class="t"><em>Measured: in <code>web/</code>, the one storage call is <code>localStorage.removeItem(&#39;kolwen-lang&#39;)</code>, which every page runs; nothing calls <code>setItem</code> or <code>getItem</code>, and no page sets a cookie.</em></p>
       <h3>When the assistant ships, this changes, and here is exactly how</h3>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
       <p class="pending">[pending legal review] This part is waiting for legal review and is not shown yet.</p>
@@ -271,7 +271,7 @@
       <p class="pending">[pending legal review] Full Thai versions of the Terms, the Refunds and the Privacy pages, equal in substance to the English, are still to come.</p>
     </div>
 
-<p class="fine">This page: your language choice is stored locally in your browser</p>
+<p class="fine">This page: this site stores nothing in your browser</p>
 </main>
 <!-- site-footer:begin -->
 <footer class="site-footer" lang="en">

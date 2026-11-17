@@ -225,8 +225,8 @@
       <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
       <p class="t" lang="en"><em>Measured: <code>curl -sI https://kolwen.com/</code> and the same on an asset—no <code>Set-Cookie</code> header on either (re-measured 2026-10-08, after the zone&#39;s JavaScript Detections were switched off).</em></p>
       <p class="t" lang="en"><strong>A note on what could change that:</strong> per Cloudflare&#39;s own cookie and clearance pages (read 2026-10-08), Bot Fight Mode sets the <code>__cf_bm</code> cookie, and Turnstile sets <code>cf_clearance</code> only when its pre-clearance option is enabled. If either is ever switched on for this site, the sentence above, &quot;no cookies at all&quot;, would be reworded the same day. Both are off today.</p>
-      <p class="t" lang="en">Your language choice (English or Thai) is stored in your browser&#39;s <code>localStorage</code>, which is not a cookie, is never sent to a server, and never leaves your device. Clearing your browser data removes it.</p>
-      <p class="t" lang="en"><em>Measured: <code>web/index.html</code> uses <code>localStorage.setItem</code> / <code>getItem</code> for one key, and nothing else.</em></p>
+      <p class="t" lang="en">The site itself stores nothing in your browser. It sets no cookie and keeps no language choice: English and Thai are two addresses, and the switch between them is a link. An earlier version kept your language choice in your browser&#39;s <code>localStorage</code>, under one key, <code>kolwen-lang</code>. Every page now deletes that one key on your next visit, and does nothing else with your browser&#39;s storage.</p>
+      <p class="t" lang="en"><em>Measured: in <code>web/</code>, the one storage call is <code>localStorage.removeItem(&#39;kolwen-lang&#39;)</code>, which every page runs; nothing calls <code>setItem</code> or <code>getItem</code>, and no page sets a cookie.</em></p>
       <h3 lang="en">When the assistant ships, this changes, and here is exactly how</h3>
       <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
       <p class="pending">[รอที่ปรึกษากฎหมาย] ส่วนนี้รอที่ปรึกษากฎหมายตรวจสอบ จึงยังไม่แสดง</p>
@@ -271,7 +271,7 @@
       <p class="pending">[รอที่ปรึกษากฎหมาย] ฉบับภาษาไทยเต็มของข้อกำหนด การคืนเงิน และความเป็นส่วนตัว ที่เนื้อหาเท่ากับฉบับภาษาอังกฤษ ยังจะตามมา</p>
     </div>
 
-<p class="fine">หน้านี้: ภาษาที่เลือกถูกเก็บไว้ในเบราว์เซอร์ของคุณ</p>
+<p class="fine">หน้านี้: เว็บไซต์ไม่เก็บข้อมูลใดไว้ในเบราว์เซอร์ของคุณ</p>
 </main>
 <!-- site-footer:begin -->
 <footer class="site-footer" lang="th">

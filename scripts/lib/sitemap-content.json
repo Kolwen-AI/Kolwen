@@ -1,72 +1,72 @@
 {
   "https://kolwen.com/": {
     "page": "web/index.html",
-    "sha256": "65349fdaa12621925793979b60254a015865d6a4753c27d6bfa05630c51f7e0d",
-    "lastmod": "2026-11-16"
+    "sha256": "e9d569799862c762a9a0a5bfc3e8935c3b9e0fc059ac0f5100178017b64e68ae",
+    "lastmod": "2026-11-17"
   },
   "https://kolwen.com/th/": {
     "page": "web/th/index.html",
-    "sha256": "977f438afe9c668c19db035070ae3067cc0ee36629e8d22267d430e8b77c3281",
-    "lastmod": "2026-11-16"
+    "sha256": "991015e4e8d9da9569f99eb291f1175d3c0b7187f421e2835875767d48454887",
+    "lastmod": "2026-11-17"
   },
   "https://kolwen.com/pricing": {
     "page": "web/pricing.html",
-    "sha256": "79eabcb9ef2bfa6ee788dcbbe0908e17af79587298db6a0ff93e8faf8d2c41f8",
-    "lastmod": "2026-11-16"
+    "sha256": "a7bd4bfd33202764b681630ef3adc2d411f1231521d96774500bbcdafa223290",
+    "lastmod": "2026-11-17"
   },
   "https://kolwen.com/th/pricing": {
     "page": "web/th/pricing.html",
-    "sha256": "9e67e74ca78ad5dcc49d02e082e603604d01c86b37c716ffa715f09a3d775e4a",
-    "lastmod": "2026-11-16"
+    "sha256": "f1455a0540686ccc52b470d400f3ebaac834f62b8a66bfd6ae7f037921e0d372",
+    "lastmod": "2026-11-17"
   },
   "https://kolwen.com/terms": {
     "page": "web/terms.html",
-    "sha256": "000c2c2c9d32e4e0f1c16139a6a21ad403b514efebb937ac4068ec71904ed255",
-    "lastmod": "2026-11-16"
+    "sha256": "8333486c560f3d0e53c7e8d3d73f81ae7aa6bddc1946eef89a9055f585a0a2f6",
+    "lastmod": "2026-11-17"
   },
   "https://kolwen.com/th/terms": {
     "page": "web/th/terms.html",
-    "sha256": "95f4f96783de5b145d409763e70cf7909e4443907cd010ad722c27161661749c",
+    "sha256": "627ca793e9e8cac9a03ace4c21dc5513d92ae4e1aa724e755fe16951a20b092e",
     "lastmod": "2026-11-17"
   },
   "https://kolwen.com/privacy": {
     "page": "web/privacy.html",
-    "sha256": "7494982ae557c2e560faff5a34b4aa5fca4b8d72a5e90d5e793ce298ce65d260",
-    "lastmod": "2026-11-16"
+    "sha256": "abb577571d17da0709edeafb1e8ee5a8cdb00b40bf9e1e4675b1029ef43d715e",
+    "lastmod": "2026-11-17"
   },
   "https://kolwen.com/th/privacy": {
     "page": "web/th/privacy.html",
-    "sha256": "83ca4ca92cf8b51e6a661f84304912067d4d1f939e04365c2e4d14e47bf021d1",
+    "sha256": "178af15207d38ceb1baa6c8ae0b555b0d1bd62d2d74d2537245c5237a67559a3",
     "lastmod": "2026-11-17"
   },
   "https://kolwen.com/refund": {
     "page": "web/refund.html",
-    "sha256": "7af8ec913d1c96af1285b67ff6ea2a9f2b8cc8852bb8f0912b72ca5a5ae32068",
-    "lastmod": "2026-11-16"
+    "sha256": "1991e6c5c3e259a72d609dcd3fd69376b1c5f55b7b92da9492756b1c52dafc23",
+    "lastmod": "2026-11-17"
   },
   "https://kolwen.com/th/refund": {
     "page": "web/th/refund.html",
-    "sha256": "1782ec6e8db2ee103e54207e4b6ceb6741825f77d127f72384b6476e43f5d55b",
+    "sha256": "8510a713a8bb7b31b5181504f424bbe0a54140bb8970ca4718f2dea2ead459eb",
     "lastmod": "2026-11-17"
   },
   "https://kolwen.com/changelog": {
     "page": "web/changelog.html",
-    "sha256": "870f050266cac6c631301dc4cd4ba5425d183d0dc764d604952449de916bee04",
-    "lastmod": "2026-11-16"
+    "sha256": "b78aee03615ac490620cb30a04767d9729a6fe20cf215714e1640301fb18d7f0",
+    "lastmod": "2026-11-17"
   },
   "https://kolwen.com/th/changelog": {
     "page": "web/th/changelog.html",
-    "sha256": "9b299cb1a2d40647f60ee19e7edebbfbac68f578c72d10badc7c9bc8563acc4a",
+    "sha256": "b4358df785bf7c4d1acd3285a31dafa1351c3bf0013efe6f9aa9cc0f3e7f37e3",
     "lastmod": "2026-11-17"
   },
   "https://kolwen.com/accessibility": {
     "page": "web/accessibility.html",
-    "sha256": "a7e68d21c7bfec84ce54fbe898f9aae212b27bc0238ca533424b9bb67d554713",
-    "lastmod": "2026-11-16"
+    "sha256": "29987d0eaaf4742cfb8f2072e4c4a78a8dfea3f8372d035af73e57ddfc5dfdbe",
+    "lastmod": "2026-11-17"
   },
   "https://kolwen.com/th/accessibility": {
     "page": "web/th/accessibility.html",
-    "sha256": "06a51e69db13da19a129d8553785f53a456282464fab711fd439a1df37749bb7",
-    "lastmod": "2026-11-16"
+    "sha256": "ff7232f08ea7914e4a32ef582859e8933f72617dd122a9924d8a6365229916cf",
+    "lastmod": "2026-11-17"
   }
 }

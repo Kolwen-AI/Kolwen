@@ -43,11 +43,13 @@ Bot Fight Mode sets the `__cf_bm` cookie, and Turnstile sets `cf_clearance` only
 enabled. If either is ever switched on for this site, the sentence above, "no cookies at all", would be
 reworded the same day. Both are off today.
 
-Your language choice (English or Thai) is stored in your browser's `localStorage`, which is not a
-cookie, is never sent to a server, and never leaves your device. Clearing your browser data
-removes it.
+The site itself stores nothing in your browser. It sets no cookie and keeps no language choice: English and
+Thai are two addresses, and the switch between them is a link. An earlier version kept your language choice
+in your browser's `localStorage`, under one key, `kolwen-lang`. Every page now deletes that one key on your
+next visit, and does nothing else with your browser's storage.
 
-*Measured: `web/index.html` uses `localStorage.setItem` / `getItem` for one key, and nothing else.*
+*Measured: in `web/`, the one storage call is `localStorage.removeItem('kolwen-lang')`, which every page runs;
+nothing calls `setItem` or `getItem`, and no page sets a cookie.*
 
 ### When the assistant ships, this changes, and here is exactly how
 
