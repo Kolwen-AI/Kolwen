@@ -26,7 +26,7 @@ is a named rank with no model behind it yet—reserved, not shipped.
 
 **Pre-release.** Nothing is downloadable yet. This repository is the product's public face—documentation, releases, and community—in the same shape as [`anthropics/claude-code`](https://github.com/anthropics/claude-code): the kitchen is not here.
 
-- Planned to be built on Qwen (Apache-2.0 base)—base attribution will ship with every release.
+- The base model is chosen by audition, not named in advance—base attribution will ship with every release.
 - The open weights, named Kolwen Fern, have not been released and no release date is set; they are a separate product from the Kolwen service. If and when they are released, each release will carry its own license.
 - Issues and pull requests are welcome now—see [CONTRIBUTING.md](CONTRIBUTING.md), which asks you
   to open an issue first.
