@@ -499,6 +499,27 @@ test('the seam map is the file the rule reads', () => {
   assert.ok(tracked.includes(SEAMS_FILE), 'it is tracked');
 });
 
+// CodeRabbit 4601272506: a Thai page the gate cannot read is named as unreadable, and the gate does not stop with a stack trace
+test('surface-check: a Thai page that cannot be read is named as unreadable, and the gate does not stop with a stack trace', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'surface-unread-'));
+  const home = join(dir, '.sandbox-home');
+  mkdirSync(home, { recursive: true });
+  const env = { ...process.env, HOME: home, USERPROFILE: home, TEMP: home, TMP: home, TMPDIR: home, XDG_CONFIG_HOME: home };
+  const run = (cmd, args) => spawnSync(cmd, args, { cwd: dir, env, encoding: 'utf8', timeout: 120000 });
+  try {
+    for (const f of tracked) { mkdirSync(dirname(join(dir, f)), { recursive: true }); writeFileSync(join(dir, f), readFileSync(f)); }
+    for (const args of [['init', '-q'], ['add', '-A']]) assert.equal(run('git', args).status, 0, 'git ' + args[0]);
+    // the index still lists web/th/index.html; on disk it is a folder, so the gate's read of it fails
+    rmSync(join(dir, 'web', 'th', 'index.html'));
+    mkdirSync(join(dir, 'web', 'th', 'index.html'));
+    const r = run(process.execPath, ['--max-old-space-size=2048', 'scripts/surface-check.mjs']);
+    const out = r.stdout + r.stderr;
+    assert.match(out, /web\/th\/index\.html: could not be read/, out);
+    assert.doesNotMatch(out, /\n\s+at /, 'no stack trace: ' + out);
+    assert.equal(r.status, 1, 'the unreadable page is a failure, named: ' + out);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 // ── the rule runs in the gate every push runs ──────────────────────────────────────────────────────────────────
 test('surface-check rule 20 runs the seams on a copy of the tree: clean passes, and a planted Set-Cookie header, an orphan page and a missing legal link each fail it', () => {
   const dir = mkdtempSync(join(tmpdir(), 'seams-'));

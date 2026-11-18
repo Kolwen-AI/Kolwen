@@ -12,7 +12,10 @@
     "renderedAs": [
       "web/terms.html",
       "web/privacy.html",
-      "web/refund.html"
+      "web/refund.html",
+      "web/th/terms.html",
+      "web/th/privacy.html",
+      "web/th/refund.html"
     ],
     "generatedBy": [
       "scripts/lib/legal-page-text.mjs",
@@ -46,7 +49,18 @@
         "/legal",
         "/404",
         "/status",
-        "/subprocessors"
+        "/subprocessors",
+        "/th/",
+        "/th/pricing",
+        "/th/terms",
+        "/th/privacy",
+        "/th/refund",
+        "/th/changelog",
+        "/th/accessibility",
+        "/th/legal",
+        "/th/404",
+        "/th/status",
+        "/th/subprocessors"
       ]
     }
   }

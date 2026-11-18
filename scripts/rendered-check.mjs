@@ -6,7 +6,7 @@
 //              measured: a box that grows with its text is not a loss, and text a script moves is not read.
 //   csp      the browser reports no Content-Security-Policy violation while the page loads under the real headers (a hash that no longer matches shows here, in a real browser). Only a CSP violation
 //            fails it. What the browser says about the Permissions-Policy header (a feature name it does not know) is printed on a separate NOTE line and never fails the run.
-// Before any check, the language of the page is set by pressing its switch, and a page whose switch does not set the wanted lang fails (check name: language).
+// Each file is one language (web/<page>.html English, web/th/<page>.html Thai): nothing is clicked, and a page whose html lang is not its file's language fails (check name: language).
 // And for the reading theme (layout-tokens.mjs), on the pages that declare data-job="prose", in the light and the dark colour scheme, each emulated on its own:
 //   theme      the ground is the solid colour of the scheme (no background image), and the page says it supports both schemes;
 //   contrast   every element that holds text has a computed text colour against the colour it really sits on of at least 4.5:1, or 3:1 for large text (SC 1.4.3). A translucent colour is composited
@@ -56,10 +56,12 @@ import { READING } from './lib/layout-tokens.mjs';
 import { parseColor } from './lib/contrast.mjs';
 import { reportField } from './lib/report-field.mjs';
 
-export const ALL_CHECKS = ['reflow', 'zoom', 'csp', 'theme', 'contrast', 'lineheight', 'measure', 'glyphs', 'skip', 'header', 'keys'];
+export const ALL_CHECKS = ['reflow', 'zoom', 'csp', 'theme', 'contrast', 'lineheight', 'measure', 'glyphs', 'skip', 'header', 'keys', 'lang-url', 'm5'];
 const READING_CHECKS = ['theme', 'contrast', 'lineheight', 'measure'];
 export const MAX_LATIN_CHARS = 80; // SC 1.4.8 (AAA), the target the reading theme holds itself to
 export const urlPathOf = file => (file === 'index.html' ? '/' : '/' + file.replace(/\.html$/, '').replace(/\/index$/, '/'));
+// One language per file: web/th/* is Thai, every other page English (ORDER 1017j, one language per URL).
+const langOf = file => (file.startsWith('th/') ? 'th' : 'en');
 
 // ── page-side measurements, as functions whose source is sent to the page ────────────────────────────────────────
 function measureReflow() {
@@ -210,7 +212,9 @@ function measureLines(rootSelector, locale) {
   const last = new Set();
   for (const [block] of blocks) { const mine = lines.filter(l => l.block === block); if (mine.length) last.add(mine[mine.length - 1]); }
   const full = lines.filter(l => !last.has(l));
-  const col = root.getBoundingClientRect().width;
+  // the column is the text column: the box less its own inline padding (the 33em column is the max-width of the content, the inset sits outside it)
+  const colCs = getComputedStyle(root);
+  const col = root.getBoundingClientRect().width - parseFloat(colCs.paddingLeft) - parseFloat(colCs.paddingRight);
   const fontPx = parseFloat(getComputedStyle(root.querySelector('.legal p, .legal li') || root.querySelector('p, li')).fontSize); // the BODY text (a subtitle or a note before it is not the body)
   return { lines: lines.length, max: lines.reduce((m, l) => Math.max(m, l.chars), 0), average: full.length ? full.reduce((s, l) => s + l.chars, 0) / full.length : null, columnPx: col, fontPx, columnEm: col / fontPx };
 }
@@ -309,11 +313,14 @@ function focusInfo() {
   let kind = 'other:' + el.tagName.toLowerCase();
   if (el.matches('a.skip')) kind = 'skip:' + el.getAttribute('lang');
   else if (el.matches('.site-header a.hmark')) kind = 'mark';
-  else if (el.matches('.site-header a[href="/pricing"]')) kind = 'pricing';
-  else if (el.matches('.site-header [data-lang-set]')) kind = 'switch:' + el.getAttribute('data-lang-set') + '@' + el.closest('nav').getAttribute('lang');
+  else if (el.matches('.site-header a:not(.lang-link)[href="/pricing"], .site-header a:not(.lang-link)[href="/th/pricing"]')) kind = 'pricing';
+  else if (el.matches('.site-header a.lang-link')) kind = 'lang:' + el.getAttribute('hreflang');
   else if (el.tagName === 'MAIN') kind = 'main:' + el.id;
   const r = el.getBoundingClientRect();
-  return { kind, rect: { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }, clip: getComputedStyle(el).clipPath, vw: document.documentElement.clientWidth, vh: window.innerHeight };
+  // The effective opacity: the product of the element's own and its ancestors' opacity (a focused link at opacity 0 is invisible, whatever its colour).
+  let opacity = 1;
+  for (let e = el; e; e = e.parentElement) opacity *= parseFloat(getComputedStyle(e).opacity);
+  return { kind, opacity, rect: { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }, clip: getComputedStyle(el).clipPath, vw: document.documentElement.clientWidth, vh: window.innerHeight };
 }
 // Presses Tab until the focus is `kind`, and returns that focus. When it is not reached, the focus returned is the last one, and `path` names every focus the presses passed.
 async function tabTo(page, kind, max = 6) {
@@ -329,7 +336,6 @@ async function tabTo(page, kind, max = 6) {
 // The skip link at rest: its copies, which of them is shown, and the clip of the shown one.
 function skipRest(lang) {
   const shown = document.querySelector('a.skip[lang="' + lang + '"]');
-  const other = document.querySelector('a.skip[lang="' + (lang === 'th' ? 'en' : 'th') + '"]');
   const cs = shown ? getComputedStyle(shown) : null;
   // The hit test: at rest, the browser must not hit the link at its centre. A clip-path that clips nothing (inset(0px)) passes the clip test and fails this one.
   let restHit = false;
@@ -338,7 +344,7 @@ function skipRest(lang) {
     const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     restHit = !!h && (h === shown || shown.contains(h));
   }
-  return { shown: !!shown, clip: cs ? cs.clipPath : null, display: cs ? cs.display : null, otherDisplay: other ? getComputedStyle(other).display : null, restHit };
+  return { shown: !!shown, clip: cs ? cs.clipPath : null, display: cs ? cs.display : null, restHit };
 }
 // The header's visible items at the current width: the rows they sit on, whether any is outside the viewport, each link's visible text against its accessible name, and repeated names.
 function measureHeader() {
@@ -353,7 +359,7 @@ function measureHeader() {
     const r = e.getBoundingClientRect();
     const row = rows.find(w => r.top < w.b && r.bottom > w.t);
     if (row) { row.t = Math.min(row.t, r.top); row.b = Math.max(row.b, r.bottom); } else rows.push({ t: r.top, b: r.bottom });
-    if (r.left < 0 || r.top < 0 || r.right > vw || r.bottom > vh) outside.push(e.tagName.toLowerCase() + (e.getAttribute('data-lang-set') ? '[' + e.getAttribute('data-lang-set') + ']' : '') + (e.classList.contains('hmark') ? '.hmark' : ''));
+    if (r.left < 0 || r.top < 0 || r.right > vw || r.bottom > vh) outside.push(e.tagName.toLowerCase() + (e.getAttribute('hreflang') ? '[' + e.getAttribute('hreflang') + ']' : '') + (e.classList.contains('hmark') ? '.hmark' : ''));
   }
   const norm = s => s.replace(/\s+/g, ' ').trim();
   const links = [...nav.querySelectorAll('a')].map(a => ({ name: norm(a.getAttribute('aria-label') || a.textContent), visible: norm(a.innerText || a.textContent) }));
@@ -374,77 +380,77 @@ async function accessibleName(page, selector) {
   const { nodes } = await page.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false });
   return nodes && nodes[0] && nodes[0].name ? nodes[0].name.value : '';
 }
-// The verdict of the three checks on one page in one language. Each adds its findings to `failures` and its readings to `measured`.
+// The addresses of the two languages: English at /<page>, Thai at /th/<page> (/th/ for the home page). englishOf takes either address back to the English one.
+export const langPath = (englishPath, lang) => (lang === 'th' ? (englishPath === '/' ? '/th/' : '/th' + englishPath) : englishPath);
+export const englishOf = path => path.replace(/^\/th(?=\/|$)/, '') || '/';
+const pause = ms => new Promise(r => setTimeout(r, ms));
+// The header checks on one page in one language. Each check runs in its own error boundary: one that throws records a finding, and the others still run.
 export async function headerChecks(page, origin, path, lang, tag, checks, failures, measured) {
   const fail = (check, detail) => failures.push({ ...tag, check, detail });
   const wanted = HEADER_CHECKS.filter(c => checks.includes(c));
   if (!wanted.length) return;
+  const guard = async (check, body) => {
+    try { await body(); }
+    catch (e) { fail(check, 'the check threw, so its readings are missing: ' + reportField(String(e && e.message ? e.message : e)).slice(0, 160)); }
+  };
+  if (checks.includes('skip')) await guard('skip', () => skipCheck(page, origin, path, lang, tag, fail, measured));
+  if (checks.includes('header')) await guard('header', () => headerCheck(page, origin, path, lang, tag, fail, measured));
+  if (checks.includes('keys')) await guard('keys', () => keysCheck(page, origin, path, lang, tag, fail, measured));
+}
+async function skipCheck(page, origin, path, lang, tag, fail, measured) {
+  const label = JSON.parse(readFileSync(join(CATALOGUE_DIR, lang + '.json'), 'utf8')).shared.skip;
+  await freshLoad(page, origin, path, lang);
+  const rest = await page.evaluate(`(${skipRest})(${JSON.stringify(lang)})`);
+  measured.push({ ...tag, check: 'skip', rest: rest.shown, clip: rest.clip });
+  if (!rest.shown) fail('skip', `no skip link in ${lang}`);
+  else if (rest.clip === 'none' || rest.restHit) fail('skip', 'at rest the skip link is not clipped away, so it is visible before it is focused');
+  const name = await accessibleName(page, `a.skip[lang="${lang}"]`);
+  if (name !== label) fail('skip', `its accessible name is "${reportField(String(name))}", the catalogue string is "${reportField(label)}"`);
+  await pressKey(page, 'Tab');
+  const first = await page.evaluate(`(${focusInfo})()`);
+  if (first.kind !== 'skip:' + lang) { fail('skip', `the first Tab from a fresh load focuses ${reportField(first.kind)}, not the skip link of ${lang}`); return; }
+  const inside = first.rect.w > 0 && first.rect.h > 0 && first.rect.l >= 0 && first.rect.t >= 0 && first.rect.r <= first.vw && first.rect.b <= first.vh;
+  if (!inside) fail('skip', `the focused skip link is not visible inside the viewport (${JSON.stringify(first.rect)} in ${first.vw}x${first.vh})`);
+  if (first.clip !== 'none') fail('skip', `the focused skip link is still clipped (${reportField(first.clip)})`);
+  if (first.opacity === 0) fail('skip', 'the focused skip link has an effective opacity of 0, so it is invisible while it holds focus');
+  await pressKey(page, 'Enter');
+  const after = await page.evaluate(`(${focusInfo})()`);
+  if (after.kind !== 'main:main') fail('skip', `Enter on the skip link leaves focus on ${reportField(after.kind)}, not main#main`);
+}
+async function headerCheck(page, origin, path, lang, tag, fail, measured) {
+  await freshLoad(page, origin, path, lang, 320, 400);
+  const m = await page.evaluate(`(${measureHeader})()`);
+  measured.push({ ...tag, check: 'header', rows: m.rows, items: m.items });
+  if (!m.navs || m.items < 3) { fail('header', `the header's visible items at 320 px were ${m.items || 0}, so the header check measured too little`); return; }
+  if (m.rows > 2) fail('header', `at 320 px the header items sit on ${m.rows} rows, past the two the design allows (C3's trigger: reopen the menu decision)`);
+  for (const o of m.outside) fail('header', `at 320 px the header item ${reportField(o)} is outside the viewport`);
+  for (const n of m.notContained) fail('header', `a header link's visible text is not in its accessible name: ${reportField(n)}`);
+  for (const d of m.dupes) fail('header', `two header links share the label ${reportField(d)}`);
+}
+async function keysCheck(page, origin, path, lang, tag, fail, measured) {
   const other = lang === 'th' ? 'en' : 'th';
-  if (checks.includes('skip')) {
-    const label = JSON.parse(readFileSync(join(CATALOGUE_DIR, lang + '.json'), 'utf8')).shared.skip;
-    await freshLoad(page, origin, path, lang);
-    const rest = await page.evaluate(`(${skipRest})(${JSON.stringify(lang)})`);
-    measured.push({ ...tag, check: 'skip', rest: rest.shown, clip: rest.clip });
-    if (!rest.shown) fail('skip', `no skip link in ${lang}`);
-    else if (rest.clip === 'none' || rest.restHit) fail('skip', 'at rest the skip link is not clipped away, so it is visible before it is focused');
-    if (rest.shown && rest.otherDisplay !== 'none') fail('skip', `the ${other} copy of the skip link is not hidden (display ${rest.otherDisplay}), so it would sit in the tab order too`);
-    const name = await accessibleName(page, `a.skip[lang="${lang}"]`);
-    if (name !== label) fail('skip', `its accessible name is "${reportField(String(name))}", the catalogue string is "${reportField(label)}"`);
+  await freshLoad(page, origin, path, lang);
+  const order = [];
+  for (let i = 0; i < 4; i++) {
     await pressKey(page, 'Tab');
-    const first = await page.evaluate(`(${focusInfo})()`);
-    if (first.kind !== 'skip:' + lang) fail('skip', `the first Tab from a fresh load focuses ${reportField(first.kind)}, not the skip link of ${lang}`);
-    else {
-      const inside = first.rect.w > 0 && first.rect.h > 0 && first.rect.l >= 0 && first.rect.t >= 0 && first.rect.r <= first.vw && first.rect.b <= first.vh;
-      if (!inside) fail('skip', `the focused skip link is not visible inside the viewport (${JSON.stringify(first.rect)} in ${first.vw}x${first.vh})`);
-      if (first.clip !== 'none') fail('skip', `the focused skip link is still clipped (${reportField(first.clip)})`);
-      await pressKey(page, 'Enter');
-      const after = await page.evaluate(`(${focusInfo})()`);
-      if (after.kind !== 'main:main') fail('skip', `Enter on the skip link leaves focus on ${reportField(after.kind)}, not main#main`);
-    }
+    order.push((await page.evaluate(`(${focusInfo})()`)).kind);
   }
-  if (checks.includes('header')) {
-    await freshLoad(page, origin, path, lang, 320, 400);
-    const m = await page.evaluate(`(${measureHeader})()`);
-    measured.push({ ...tag, check: 'header', rows: m.rows, items: m.items });
-    if (!m.navs || m.items < 4) fail('header', `the header's visible items at 320 px were ${m.items || 0}, so the header check measured too little`);
-    else {
-      if (m.rows > 2) fail('header', `at 320 px the header items sit on ${m.rows} rows, past the two the design allows (C3's trigger: reopen the menu decision)`);
-      for (const o of m.outside) fail('header', `at 320 px the header item ${reportField(o)} is outside the viewport`);
-      for (const n of m.notContained) fail('header', `a header link's visible text is not in its accessible name: ${reportField(n)}`);
-      for (const d of m.dupes) fail('header', `two header links share the label ${reportField(d)}`);
-    }
-  }
-  if (checks.includes('keys')) {
-    await freshLoad(page, origin, path, lang);
-    const order = [];
-    for (let i = 0; i < 5; i++) {
-      await pressKey(page, 'Tab');
-      order.push((await page.evaluate(`(${focusInfo})()`)).kind);
-    }
-    const expected = ['skip:' + lang, 'mark', 'pricing', 'switch:en@' + lang, 'switch:th@' + lang];
-    measured.push({ ...tag, check: 'keys', order: order.join(' > ') });
-    if (JSON.stringify(order) !== JSON.stringify(expected)) fail('keys', `Tab from a fresh load visits ${reportField(order.join(' > '))}, not ${reportField(expected.join(' > '))}`);
-    // The language switch: pressed with Space and with Enter, the other language moves the focus to the same-language button of the header now shown, and the page does not jump;
-    // the language already shown moves nothing. Each press is a fresh load, so the focus starts where a keyboard visitor's would.
-    const cases = lang === 'en'
-      ? [{ to: 'switch:th@en', key: 'Space', next: 'th' }, { to: 'switch:th@en', key: 'Enter', next: 'th' }, { to: 'switch:en@en', key: 'Enter', next: 'en' }]
-      : [{ to: 'switch:en@th', key: 'Enter', next: 'en' }, { to: 'switch:th@th', key: 'Space', next: 'th' }];
-    for (const c of cases) {
-      await freshLoad(page, origin, path, lang);
-      const at = await tabTo(page, c.to);
-      if (at.kind !== c.to) { fail('keys', `Tab does not reach ${reportField(c.to)} from a fresh load (the focus passed ${reportField(at.path.join(' > '))})`); continue; }
-      const sc = await page.evaluate(SCROLL_TO);
-      if (sc.max < 100) { fail('keys', `the page scrolls only ${sc.max} px at this height, so the scroll position cannot be read`); continue; }
-      await pressKey(page, c.key);
-      const st = await page.evaluate(LANG_STATE);
-      const fo = await page.evaluate(`(${focusInfo})()`);
-      const want = 'switch:' + c.next + '@' + c.next;
-      if (st.lang !== c.next) fail('keys', `${c.key} on the ${reportField(c.to)} button leaves html lang "${reportField(st.lang)}", not "${c.next}"`);
-      if (fo.kind !== want) fail('keys', `${c.key} on ${reportField(c.to)} leaves focus on ${reportField(fo.kind)}, not on ${reportField(want)}`);
-      if (st.y !== sc.y) fail('keys', `${c.key} on ${reportField(c.to)} moves the page from ${sc.y} to ${st.y}`);
-      measured.push({ ...tag, check: 'keys', press: c.key + ' ' + c.to, lang: st.lang, focus: fo.kind, y: [sc.y, st.y] });
-    }
-  }
+  const expected = ['skip:' + lang, 'mark', 'pricing', 'lang:' + other];
+  measured.push({ ...tag, check: 'keys', order: order.join(' > ') });
+  if (JSON.stringify(order) !== JSON.stringify(expected)) fail('keys', `Tab from a fresh load visits ${reportField(order.join(' > '))}, not ${reportField(expected.join(' > '))}`);
+  // The other-language link is a plain link: Enter on it opens the page in the other language, at the other address.
+  await freshLoad(page, origin, path, lang);
+  const at = await tabTo(page, 'lang:' + other);
+  if (at.kind !== 'lang:' + other) { fail('keys', `Tab does not reach the ${other} link from a fresh load (the focus passed ${reportField(at.path.join(' > '))})`); return; }
+  await pressKey(page, 'Enter');
+  // The 404 page has no address of its own: its switch goes to the other language's home, as switchHtml maps it.
+  const wantPath = (path === '/404' || path === '/th/404') ? (other === 'th' ? '/th/' : '/') : langPath(englishOf(path), other);
+  let now = null;
+  for (let i = 0; i < 40 && now !== wantPath; i++) { await pause(150); now = await page.evaluate('location.pathname'); }
+  if (now !== wantPath) { fail('keys', `Enter on the ${other} link leaves the address at ${reportField(String(now))}, not ${reportField(wantPath)}`); return; }
+  const st = await page.evaluate('document.documentElement.lang');
+  if (st !== other) fail('keys', `Enter on the ${other} link opens a page whose html lang is "${reportField(String(st))}"`);
+  measured.push({ ...tag, check: 'keys', press: 'Enter ' + 'lang:' + other, lang: st, path: now });
 }
 // What the browser's own log says about a page's response headers, sorted. A Content-Security-Policy violation is what the csp check is for and fails it. A message about the Permissions-Policy
 // header (the browser does not know a feature name that another engine, or a later version of the same one, does) is not a CSP violation: it is returned as a note and never fails the check, so
@@ -473,6 +479,63 @@ export const violationDetail = l => `the browser reports: ${reportField(l.text.s
 // One FAIL line of a run. The detail arrives already escaped where it was built, so the line is one line by construction.
 export const failLine = f => `FAIL ${reportField(f.page)} [${f.lang}] ${f.check}: ${f.detail}`;
 
+// The head links of the page as the browser holds them: the canonical, the alternates, and og:locale. Paths only: the origin the page is served from is not the public one.
+function headLinks() {
+  const can = document.querySelector('link[rel="canonical"]');
+  const alts = [...document.querySelectorAll('link[rel="alternate"][hreflang]')].map(l => ({ hreflang: l.getAttribute('hreflang'), pathname: new URL(l.href).pathname }));
+  const loc = document.querySelector('meta[property="og:locale"]');
+  return { canonical: can ? new URL(can.href).pathname : null, alternates: alts, locale: loc ? loc.getAttribute('content') : null };
+}
+// What the head of a page must say, judged against its own address and language (the 404 page has none of its own, so no canonical and no alternates).
+export function langUrlProblems(head, path, lang, file) {
+  const out = [], english = englishOf(path);
+  if (/(^|\/)404\.html$/.test(file)) {
+    if (head.canonical !== null) out.push(`the 404 page carries a canonical link (${reportField(String(head.canonical))}); it has no address of its own`);
+    if (head.alternates.length) out.push(`the 404 page carries ${head.alternates.length} alternate link(s); it has none`);
+  } else {
+    if (head.canonical !== path) out.push(`its canonical link is ${reportField(String(head.canonical))}, not its own address ${reportField(path)}`);
+    for (const [hl, p] of [['en', english], ['th', langPath(english, 'th')], ['x-default', english]]) {
+      const got = head.alternates.filter(a => a.hreflang === hl);
+      if (got.length !== 1) out.push(`the ${hl} alternate link appears ${got.length} time(s), not once`);
+      else if (got[0].pathname !== p) out.push(`the ${hl} alternate link points at ${reportField(got[0].pathname)}, not ${reportField(p)}`);
+    }
+    if (head.alternates.length !== 3) out.push(`the page carries ${head.alternates.length} alternate link(s), not three`);
+  }
+  const wantLocale = lang === 'th' ? 'th_TH' : 'en_US';
+  if (head.locale !== wantLocale) out.push(`og:locale is ${reportField(String(head.locale))}, not ${wantLocale}`);
+  return out;
+}
+// M5, measured: the English page is scrolled to its middle at the given width, the section at the top of the window is named, the other-language link is clicked, and the same
+// section, looked up on the page the click opens, must sit at the top of the window. Without the page script's fragment the browser opens the top of the page instead.
+// The one shape a section id can take: the sectionIds generator writes s-1, s-2 ... An id read from the page is code only through this pattern (CodeQL #65).
+const SECTION_ID = /^s-\d+$/;
+// CodeQL #65: the id read from the page is data. Only its number is built into page code, and only for a section number (s-1, s-2 ...). A regex test is a check, not a sanitizer CodeQL takes, so the code gets Number(...), an integer from 1 up.
+const sectionNumber = id => {
+  if (typeof id !== 'string' || !SECTION_ID.test(id)) return null;
+  const n = Number(id.slice(2));
+  return Number.isInteger(n) && n >= 1 ? n : null;
+};
+// The finding a read that throws becomes: the same words the header checks' boundary uses (CodeRabbit 4601272476).
+const threwDetail = e => 'the check threw, so its readings are missing: ' + reportField(String(e && e.message ? e.message : e)).slice(0, 160);
+async function measureFragmentSwitch(page, origin, path, width) {
+  await page.setViewport(width, 800);
+  await page.goto(origin + path);
+  const before = await page.evaluate(`(() => { const max = document.documentElement.scrollHeight - window.innerHeight; window.scrollTo(0, Math.floor(max / 2)); const hs = [...document.querySelectorAll('main h2[id]')].filter(h => h.getBoundingClientRect().top < 1); const h = hs[hs.length - 1]; return { id: h ? h.id : null, vh: window.innerHeight, max }; })()`);
+  if (before.id !== null && sectionNumber(before.id) === null) return { id: null, error: `the heading id ${reportField(before.id)} is not a section id (s-N, N from 1), so no measurement is taken on it` };
+  if (!before.id) return { id: null, error: `no section heading is above the top of the window at ${width} px, scrolled to the middle of a ${before.max} px page, so the measurement has no section to follow` };
+  const n = sectionNumber(before.id); // not null: the checks above returned for any other id, and for no heading
+  await page.evaluate(`document.querySelector('a.lang-link').click()`);
+  // the switch goes to the other language: from the English file to Thai, from the Thai file to English (M5, both directions)
+  const otherLang = /^\/th(\/|$)/.test(path) ? 'en' : 'th';
+  const want = langPath(englishOf(path), otherLang);
+  let now = null;
+  for (let i = 0; i < 60 && now !== want; i++) { await pause(150); now = await page.evaluate('location.pathname'); }
+  if (now !== want) return { id: before.id, error: `the other-language link did not open ${reportField(want)} (the address is ${reportField(String(now))})` };
+  for (let i = 0; i < 20 && (await page.evaluate('document.readyState')) !== 'complete'; i++) await pause(150);
+  await pause(200);
+  const after = await page.evaluate(`(() => { const h = document.getElementById('s-' + ${n}); return h ? h.getBoundingClientRect().top : null; })()`);
+  return { id: before.id, after, vh: before.vh };
+}
 export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, headers = true }) {
   const failures = [], measured = [], notes = [], languageFailed = new Set(), resourceSeen = new Set();
   const server = await browser.serve(webDir, { headers }); // a real server on 127.0.0.1, or the DevTools channel, whichever the browser can reach
@@ -502,7 +565,7 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
   try {
     for (const file of htmlPages(webDir)) {
       const path = urlPathOf(file);
-      for (const lang of ['en', 'th']) {
+      for (const lang of [langOf(file)]) {
         const tag = { page: file, lang };
         await closePage();
         page = await browser.newPage();
@@ -511,12 +574,11 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
           page.logs.length = 0;
           await page.setViewport(width, 800);
           await page.goto(server.origin + path);
-          // The page script remembers the language in localStorage (one key) of its context, and the context is new for every page and language: still, the language is chosen by pressing its switch on every load, never assumed.
-          const got = await page.evaluate(`(() => { const b = document.querySelector('[data-lang-set="${lang}"]'); if (b) b.click(); return document.documentElement.lang; })()`);
-          // a page whose switch is missing, or does not set the language, would be measured in the language it opens in, not the one asked for: say so, once
+          // The language is the file's own: nothing is clicked. A page whose html lang is not its file's language is measured in another language, so that is said, once.
+          const got = await page.evaluate('document.documentElement.lang');
           if (got !== lang && !languageFailed.has(file + ' ' + lang)) {
             languageFailed.add(file + ' ' + lang);
-            failures.push({ ...tag, check: 'language', detail: `the language switch did not set lang="${lang}" (the page reports lang="${reportField(got)}"), so the measurements of this page in ${lang} would be those of another language` });
+            failures.push({ ...tag, check: 'language', detail: `the page's html lang is "${reportField(got)}", not "${lang}" (one language per file), so the measurements of this page would be those of another language` });
           }
           takeResourceFailures(page, tag);
         };
@@ -526,6 +588,28 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
           measured.push({ ...tag, check: 'reflow', ...m });
           if (m.scrollWidth > m.clientWidth) failures.push({ ...tag, check: 'reflow', detail: `at 320 px the page scrolls sideways: scrollWidth ${m.scrollWidth} > clientWidth ${m.clientWidth}${m.over.length ? '; wider than the viewport: ' + m.over.map(reportField).join(', ') : ''}` });
         }
+        if (checks.includes('lang-url')) {
+          await open(320);
+          // a read that throws is this check's finding, and the rest of the run goes on (CodeRabbit 4601272476)
+          let head = null;
+          try { head = await page.evaluate(`(${headLinks})()`); }
+          catch (e) { failures.push({ ...tag, check: 'lang-url', detail: threwDetail(e) }); }
+          if (head) {
+            measured.push({ ...tag, check: 'lang-url', alternates: head.alternates.length });
+            for (const p of langUrlProblems(head, path, lang, file)) failures.push({ ...tag, check: 'lang-url', detail: p });
+          }
+        }
+        if (checks.includes('m5') && (file === 'terms.html' || file === 'th/terms.html')) {
+          for (const width of [1280, 390]) {
+            let r;
+            try { r = await measureFragmentSwitch(page, server.origin, path, width); }
+            catch (e) { r = { id: null, error: threwDetail(e) }; }
+            measured.push({ ...tag, check: 'm5', width, ...r });
+            if (r.error) failures.push({ ...tag, check: 'm5', detail: r.error });
+            else if (r.after === null) failures.push({ ...tag, check: 'm5', detail: `at ${width} px the section ${reportField(r.id)} is not on the page the other-language link opens` });
+            else if (r.after < -2 || r.after > r.vh * 0.5) failures.push({ ...tag, check: 'm5', detail: `at ${width} px the section ${reportField(r.id)} that was at the top before the switch sits ${Math.round(r.after)} px from the top of the window after it (it should be at the top)` });
+          }
+        }
         if (READING_CHECKS.some(c => checks.includes(c))) {
           // the reading theme: per colour scheme, each emulated on its own (a prose page is light for a light device and dark for a dark one)
           for (const scheme of ['light', 'dark']) {
@@ -534,7 +618,8 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
             const th = await page.evaluate(`(${measureTheme})()`);
             const stag = { ...tag, scheme };
             const wantBg = scheme === 'light' ? READING.light.bg : READING.dark.bg;
-            if (checks.includes('theme') && lang === 'en') {
+            // the theme is a property of the page's file, measured in that file's own language (one language per file, ORDER 1017j)
+            if (checks.includes('theme')) {
               measured.push({ ...stag, check: 'theme', job: th.job, image: th.image, color: th.color, colorScheme: th.scheme });
               if (th.job === 'prose') {
                 if (th.image !== 'none') failures.push({ ...stag, check: 'theme', detail: `a prose page has a background image (${reportField(th.image.slice(0, 60))}): the reading theme's ground is solid` });
@@ -553,13 +638,13 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
                 for (const x of m.fails) failures.push({ ...stag, check: 'contrast', detail: `under the floor in the ${scheme} scheme: ${reportField(x)}${m.failCount > m.fails.length ? ` (and ${m.failCount - m.fails.length} more)` : ''}` });
               }
               if (checks.includes('measure') && scheme === 'light') {
-                const m = await page.evaluate(`(${measureLines})(${JSON.stringify(lang === 'th' ? '#doc-th' : '#doc-en')}, ${JSON.stringify(lang)})`);
+                const m = await page.evaluate(`(${measureLines})(${JSON.stringify('main')}, ${JSON.stringify(lang)})`);
                 measured.push({ ...tag, check: 'measure', ...m });
                 if (m.lines < (lang === 'th' ? 2 : 5)) failures.push({ ...tag, check: 'measure', detail: `only ${m.lines} lines were read` });
                 if (lang === 'en' && m.max > MAX_LATIN_CHARS) failures.push({ ...tag, check: 'measure', detail: `a rendered line holds ${m.max} characters; the reading measure is at most ${MAX_LATIN_CHARS} (SC 1.4.8, as a target)` });
               }
               if (checks.includes('lineheight') && scheme === 'light') {
-                const rows = await page.evaluate(`(${measureLineHeights})(${JSON.stringify(lang === 'th' ? '#doc-th' : '#doc-en')})`);
+                const rows = await page.evaluate(`(${measureLineHeights})(${JSON.stringify('main')})`);
                 const want = lang === 'th' ? [1.65, 1.65] : [1.5, Infinity];
                 const off = rows.filter(r => r.ratio === null || r.ratio < want[0] - 0.005 || r.ratio > want[1] + 0.005);
                 const ratios = rows.map(r => r.ratio).filter(x => x !== null);
@@ -643,9 +728,10 @@ async function main() {
     const { failures, measured, notes } = await renderedChecks({ webDir, browser, checks, headers: !args.includes('--no-headers') });
     for (const f of failures) console.log(failLine(f));
     if (notes.length) console.log(noteLine(notes));
+    for (const m of measured.filter(x => x.check === 'm5')) console.log('M5 ' + JSON.stringify({ page: m.page, width: m.width, section: m.id, after_top_px: m.after === undefined ? null : Math.round(m.after * 10) / 10, window_height: m.vh, error: m.error ?? null }));
     const pages = new Set(measured.map(m => m.page)).size;
     if (failures.length) { console.error(`rendered-check FAILED: ${failures.length} finding(s) over ${pages} page(s)`); process.exitCode = 1; return; }
-    console.log(`rendered-check passed: ${pages} page(s) x 2 languages, ${checks.join(' + ')} (${measured.length} measurements) in ${reportField(browser.label)}`);
+    console.log(`rendered-check passed: ${pages} page(s), one language per file, ${checks.join(' + ')} (${measured.length} measurements) in ${reportField(browser.label)}`);
   } finally { await browser.close(); }
 }
 

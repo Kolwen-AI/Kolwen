@@ -4,19 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{pricing.meta.title}}</title>
-{{lang th}}
-<meta name="kolwen-title-th" content="{{=pricing.meta.title}}">
-{{/lang}}
 <meta name="description" content="{{=pricing.meta.description}}">
-<link rel="canonical" href="https://kolwen.com/pricing">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://kolwen.com/pricing">
 <meta property="og:title" content="{{=pricing.meta.title}}">
 <meta property="og:description" content="{{=pricing.meta.og-description}}">
 <meta property="og:image" content="https://kolwen.com/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{=pricing.meta.title}}">
 <meta name="twitter:description" content="{{=pricing.meta.og-description}}">
@@ -24,6 +18,7 @@
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#15130f">
+{{block:site-links}}
 {{block:site-fonts}}
 <style>{{raw:style}}</style>
 <noscript><style>
@@ -33,7 +28,6 @@
 <body>
 {{block:site-header}}
 <main id="main" tabindex="-1">
-  <div id="doc-en" lang="en">
 {{lang en}}
     <div>
       <h1>{{pricing.title}}</h1>
@@ -150,9 +144,7 @@
 
     <p class="fine">{{shared.page.note}}</p>
 {{/lang}}
-  </div>
 
-  <div id="doc-th" lang="th" hidden>
 {{lang th}}
     <div>
       <h1>{{pricing.title}}</h1>
@@ -269,10 +261,8 @@
 
     <p class="fine">{{shared.page.note}}</p>
 {{/lang}}
-  </div>
 </main>
-{{block:site-footer:en}}
-{{block:site-footer:th}}
+{{block:site-footer}}
 {{raw:script}}
 </body>
 </html>

@@ -4,22 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kolwen—verifiable AI, made in Thailand · in development</title>
-<meta name="kolwen-title-th" content="Kolwen—AI ที่ตรวจสอบได้ สร้างในประเทศไทย · กำลังพัฒนา">
 <meta name="description" content="Kolwen (โคลเวน) — a verifiable AI assistant made in Thailand. In development, not yet available. Answers will ship with sources and a confidence level.">
-<link rel="canonical" href="https://kolwen.com/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#15130f">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://kolwen.com">
 <meta property="og:title" content="Kolwen—verifiable AI, made in Thailand · in development">
 <meta property="og:description" content="In development, not yet available. Every answer will ship with its sources and a confidence level; answers that cannot be verified will be flagged, never hidden.">
 <meta property="og:image" content="https://kolwen.com/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:locale" content="en_US">
-<meta property="og:locale:alternate" content="th_TH">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
 {
@@ -38,6 +33,15 @@
 	]
 }
 </script>
+<!-- site-links:begin -->
+<link rel="canonical" href="https://kolwen.com/">
+<link rel="alternate" hreflang="en" href="https://kolwen.com/">
+<link rel="alternate" hreflang="th" href="https://kolwen.com/th/">
+<link rel="alternate" hreflang="x-default" href="https://kolwen.com/">
+<meta property="og:url" content="https://kolwen.com/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="th_TH">
+<!-- site-links:end -->
 <!-- site-fonts:begin -->
 <link rel="stylesheet" href="/fonts/fonts.css">
 <!-- site-fonts:end -->
@@ -99,7 +103,7 @@
   html[data-job="prose"] h1{font-size:var(--kw-font-size-reading-title)}
   html[data-job="prose"] .legal h2{font-size:var(--kw-font-size-reading-h2)}
   html[data-job="prose"] .legal h3{font-size:var(--kw-font-size-reading-h3)}
-  html[data-job="prose"] #doc-th,html[data-job="prose"] #doc-th *{line-height:var(--kw-line-height-thai)}
+  html[data-job="prose"][lang="th"] main,html[data-job="prose"][lang="th"] main *{line-height:var(--kw-line-height-thai)}
 /* site-tokens-css:end */
   :root{--bg:#0f0d0b;--bg2:#15130f;--card:#1a1714;--line:rgba(255,255,255,.08);--txt:#ece4d9;--txt2:#a89a8c;--quiet:#a2968a;--accent:#e8833a;--accent2:#ffbb7a}
   *{box-sizing:border-box;margin:0}
@@ -122,7 +126,6 @@
   .warn{font-size:var(--kw-font-size-2);color:var(--txt2)}
   .warn b{color:var(--txt);font-weight:600}
   footer{margin-top:6px;font-size:var(--kw-font-size-1);color:var(--quiet);display:flex;flex-direction:column;gap:4px}
-  #doc-en > * + *,#doc-th > * + *{margin-top:var(--kw-space-section)}
   [hidden]{display:none !important}
   .band{display:block;width:100%;height:auto;margin-block:1rem}
   .ka{fill:var(--accent)}.ks{stroke:var(--accent)}
@@ -134,29 +137,20 @@
 /* site-header-css:begin */
   .site-header{border-bottom:1px solid rgba(128,128,128,.35);padding-block:var(--kw-space-header-top) var(--kw-space-header-block);padding-inline:var(--kw-space-gutter-inline)}
   .site-header nav{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;font-size:var(--kw-font-size-header-link)}
-  .site-header nav[lang="th"]{display:none}
-  html[lang="th"] .site-header nav[lang="en"]{display:none}
-  html[lang="th"] .site-header nav[lang="th"]{display:flex}
   .site-header a{color:inherit;text-decoration:none;display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);overflow-wrap:anywhere}
   .site-header a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
   .site-header .hmark{gap:10px;font-weight:700;font-size:var(--kw-font-size-header-name);letter-spacing:.01em;margin-right:auto}
   .site-header .hglyph,.site-footer .fglyph{flex:none;display:block;fill:var(--accent,var(--amber,#e8833a))}
-  .lswitch{display:inline-flex;gap:6px}
-  .lswitch button{font:inherit;font-size:var(--kw-font-size-header-switch);color:inherit;background:transparent;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:var(--kw-size-header-switch);cursor:pointer}
-  .lswitch button:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
-  .lswitch button[aria-pressed="true"]{border-color:currentColor;font-weight:600}
+  .lswitch{display:inline-flex;align-items:center;gap:6px}
+  .lswitch a,.lswitch [aria-current="page"]{font-size:var(--kw-font-size-header-switch);color:inherit;border:1px solid var(--kw-color-switch-border);border-radius:8px;padding:6px 12px;min-height:var(--kw-size-header-switch);display:inline-flex;align-items:center;text-decoration:none}
+  .lswitch a:hover{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+  .lswitch [aria-current="page"]{border-color:currentColor;font-weight:600}
   .site-header :focus-visible,.site-footer :focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .skip{position:absolute;z-index:100;inset-block-start:var(--kw-space-header-top);inset-inline-start:max(var(--kw-space-inset-inline), env(safe-area-inset-left, 0px));display:inline-flex;align-items:center;min-height:var(--kw-size-header-row);padding-inline:var(--kw-space-button);color:var(--txt);background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:var(--kw-font-size-header-link);text-decoration:none;clip-path:inset(50%)}
 .skip:focus-visible{clip-path:none;outline:2px solid currentColor;outline-offset:2px}
-  .skip[lang="th"]{display:none}
-  html[lang="th"] .skip[lang="en"]{display:none}
-  html[lang="th"] .skip[lang="th"]{display:inline-flex}
 /* site-header-css:end */
 /* site-footer-css:begin */
   .site-footer{display:block;margin-top:var(--kw-space-footer-offset);padding-block:var(--kw-space-footer-top) var(--kw-space-footer-end);padding-inline:var(--kw-space-gutter-inline);border-top:1px solid rgba(128,128,128,.35);font-size:var(--kw-font-size-4);line-height:1.7}
-  .site-footer[lang="th"]{display:none}
-  html[lang="th"] .site-footer[lang="en"]{display:none}
-  html[lang="th"] .site-footer[lang="th"]{display:block}
   .site-footer .fwrap{width:100%;max-width:var(--kw-size-container-wide);margin:0 auto;display:flex;flex-direction:column;gap:28px}
   .site-footer .fbrand{display:flex;align-items:center;gap:10px;margin:0;font-size:var(--kw-font-size-10);font-weight:700;letter-spacing:.01em}
   .site-footer .fgroups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 18px}
@@ -172,28 +166,17 @@
 </style>
 <noscript><style>
 /* site-noscript-css:begin */
-  .lswitch{display:none}
-  #doc-th{display:block !important;border-top:1px solid var(--line);padding-top:28px}
-  .site-header nav[lang="th"]{display:flex !important}
-  .site-footer[lang="th"]{display:block !important}
-  .skip[lang="th"]{display:inline-flex !important}
 /* site-noscript-css:end */
 </style></noscript>
 </head>
 <body>
 <!-- site-header:begin -->
 <a class="skip" href="#main" lang="en">Skip to main content</a>
-<a class="skip" href="#main" lang="th">ข้ามไปยังเนื้อหาหลัก</a>
 <header class="site-header">
 <nav lang="en" aria-label="Main">
 <a class="hmark" href="/" aria-label="Kolwen home"><svg class="hglyph" viewBox="0 0 100 100" width="26" height="26" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg><span>Kolwen</span></a>
 <a href="/pricing">Pricing</a>
-<div class="lswitch" role="group" aria-label="Language"><button type="button" data-lang-set="en" lang="en" aria-pressed="true">English</button><button type="button" data-lang-set="th" lang="th" aria-pressed="false">ไทย</button></div>
-</nav>
-<nav lang="th" aria-label="เมนูหลัก">
-<a class="hmark" href="/" aria-label="หน้าแรกของ Kolwen"><svg class="hglyph" viewBox="0 0 100 100" width="26" height="26" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg><span>Kolwen</span></a>
-<a href="/pricing">ราคา</a>
-<div class="lswitch" role="group" aria-label="ภาษา"><button type="button" data-lang-set="en" lang="en" aria-pressed="true">English</button><button type="button" data-lang-set="th" lang="th" aria-pressed="false">ไทย</button></div>
+<div class="lswitch" role="group" aria-label="Language"><span lang="en" aria-current="page">English</span><a class="lang-link" href="/th/" lang="th" hreflang="th">ไทย</a></div>
 </nav>
 </header>
 <!-- site-header:end -->
@@ -209,7 +192,6 @@
   </div>
 
   <img class="band" src="/band-home.svg" width="1100" height="220" alt="" decoding="async">
-  <div id="doc-en" lang="en">
     <div>
       <span class="spot-h1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"><path d="M35 41.3C26.3 36 15.8 36 7 39.5V76.3C15.8 72.8 26.3 72.8 35 78C43.8 72.8 54.3 72.8 63 76.3V39.5C54.3 36 43.8 36 35 41.3V78"/><path d="M7 81.5C15.8 78 26.3 78 35 83.3C43.8 78 54.3 78 63 81.5"/><path class="ks" stroke="#e8833a" d="M13.1 51.8C17.5 48.3 21 55.3 28.9 50.9M13.1 61.4C17.5 57.9 21 64.9 28.9 60.5"/></g><path class="ka" fill="#e8833a" d="M33.3 81.5V90.3L35 87.8 36.8 90.3V81.5Z"/><circle cx="62" cy="30" r="17" fill="none" stroke="currentColor" stroke-width="3.4"/><path class="ka" fill="#e8833a" d="M47.5 33C56 26 65 37 76.6 30C75 39 52 45 47.5 33Z"/><path d="M73.7 44.3L84.1 56.9" stroke="currentColor" stroke-width="6.5" stroke-linecap="round"/></svg></span>
       <h1>A <span class="hl">verifiable</span> AI assistant—every answer will ship with its sources and a confidence level.</h1>
@@ -221,7 +203,7 @@
 
     <div class="card">
       <span class="spot-h3"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M20 11C15 8 9 8 4 10V31C9 29 15 29 20 32C25 29 31 29 36 31V10C31 8 25 8 20 11V32"/><path d="M4 34C9 32 15 32 20 35C25 32 31 32 36 34"/><path class="ks" stroke="#e8833a" d="M7.5 17C10 15 12 19 16.5 16.5M7.5 22.5C10 20.5 12 24.5 16.5 22"/></g><path class="ka" fill="#e8833a" d="M19 34V39L20 37.6 21 39V34Z"/></svg></span>
-      <h2>Official channels</h2>
+      <h2 id="s-1">Official channels</h2>
       <div class="ch">
         <a href="https://github.com/TheColliery/Kolwen" rel="me">GitHub</a>
         <a href="https://huggingface.co/kolwen" rel="me">Hugging Face</a>
@@ -231,34 +213,10 @@
       <p class="warn"><span class="spot-h4"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 2 1 15.5h15z"/><path d="M8.5 6.6v4.2m0 2.2v.1"/><circle cx="17.4" cy="17.4" r="3.4" stroke-width="1.6"/><path d="m19.9 19.9 2.6 2.6" stroke-width="2.2"/></g><path class="ka" fill="#e8833a" d="M15 18c1-.9 2.6.3 4.7-.4-.4 1.5-1.6 2.3-2.8 2.2-.8-.3-1.5-1-1.9-1.8z"/></svg></span><b>Beware of impersonators:</b> Kolwen has no official accounts other than the channels on this page. We will never message you asking for personal details, a one-time code, or money.</p>
     </div>
 
-    <p class="fine">This page: your language choice is stored locally in your browser</p>
-  </div>
+    <p class="fine">This page: this site stores nothing in your browser</p>
 
-  <div id="doc-th" lang="th" hidden>
-    <div>
-      <span class="spot-h1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"><path d="M35 41.3C26.3 36 15.8 36 7 39.5V76.3C15.8 72.8 26.3 72.8 35 78C43.8 72.8 54.3 72.8 63 76.3V39.5C54.3 36 43.8 36 35 41.3V78"/><path d="M7 81.5C15.8 78 26.3 78 35 83.3C43.8 78 54.3 78 63 81.5"/><path class="ks" stroke="#e8833a" d="M13.1 51.8C17.5 48.3 21 55.3 28.9 50.9M13.1 61.4C17.5 57.9 21 64.9 28.9 60.5"/></g><path class="ka" fill="#e8833a" d="M33.3 81.5V90.3L35 87.8 36.8 90.3V81.5Z"/><circle cx="62" cy="30" r="17" fill="none" stroke="currentColor" stroke-width="3.4"/><path class="ka" fill="#e8833a" d="M47.5 33C56 26 65 37 76.6 30C75 39 52 45 47.5 33Z"/><path d="M73.7 44.3L84.1 56.9" stroke="currentColor" stroke-width="6.5" stroke-linecap="round"/></svg></span>
-      <h1>ผู้ช่วย AI ที่<span class="hl">ตรวจสอบได้</span> — ทุกคำตอบจะมีที่มาและระดับความมั่นใจ คำตอบที่ยืนยันไม่ได้จะถูกติดป้าย ไม่ถูกซ่อน</h1>
-      <p class="origin">สร้างในประเทศไทย</p>
-    </div>
-
-    <div class="disclosure"><span class="spot-h2"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path class="ka" fill="#e8833a" transform="translate(11.5 17.2)rotate(-32)" d="M5.8 0C1.2 3.8 -5.7 3.5 -5.7 0S1.2 -3.8 5.8 0Z"/><path class="ka" fill="#e8833a" transform="translate(18.2 9)rotate(-58)" d="M4.1 0C.8 2.9 -4.1 2.6 -4.1 0S.8 -2.9 4.1 0Z"/><path class="ka" fill="#e8833a" transform="translate(7 6.2)rotate(-48)" d="M3.6 0C.7 2.5 -3.6 2.2 -3.6 0S.7 -2.5 3.6 0Z"/></svg></span>กำลังพัฒนา · ยังไม่เปิดให้ใช้งาน — หน้านี้คือบ้านอย่างเป็นทางการระหว่างก่อสร้าง</div>
-
-    <div class="card">
-      <span class="spot-h3"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M20 11C15 8 9 8 4 10V31C9 29 15 29 20 32C25 29 31 29 36 31V10C31 8 25 8 20 11V32"/><path d="M4 34C9 32 15 32 20 35C25 32 31 32 36 34"/><path class="ks" stroke="#e8833a" d="M7.5 17C10 15 12 19 16.5 16.5M7.5 22.5C10 20.5 12 24.5 16.5 22"/></g><path class="ka" fill="#e8833a" d="M19 34V39L20 37.6 21 39V34Z"/></svg></span>
-      <h2>ช่องทางทางการ</h2>
-      <div class="ch">
-        <a href="https://github.com/TheColliery/Kolwen" rel="me">GitHub</a>
-        <a href="https://huggingface.co/kolwen" rel="me">Hugging Face</a>
-        <a href="https://www.npmjs.com/package/kolwen" rel="me">npm</a>
-        <a href="mailto:info@kolwen.com">info@kolwen.com</a>
-      </div>
-      <p class="warn"><span class="spot-h4"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 2 1 15.5h15z"/><path d="M8.5 6.6v4.2m0 2.2v.1"/><circle cx="17.4" cy="17.4" r="3.4" stroke-width="1.6"/><path d="m19.9 19.9 2.6 2.6" stroke-width="2.2"/></g><path class="ka" fill="#e8833a" d="M15 18c1-.9 2.6.3 4.7-.4-.4 1.5-1.6 2.3-2.8 2.2-.8-.3-1.5-1-1.9-1.8z"/></svg></span><b>ระวังของปลอม:</b> Kolwen ไม่มีบัญชีทางการอื่นนอกจากช่องทางในหน้านี้ ไม่มีการทักไปขอข้อมูล รหัส OTP หรือเงินจากใครทุกกรณี</p>
-    </div>
-
-    <p class="fine">หน้านี้: ภาษาที่เลือกถูกเก็บไว้ในเบราว์เซอร์ของคุณ</p>
-  </div>
 </main>
-<!-- site-footer:en:begin -->
+<!-- site-footer:begin -->
 <footer class="site-footer" lang="en">
 <div class="fwrap">
 <p class="fbrand"><svg class="fglyph" viewBox="0 0 100 100" width="24" height="24" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg>Kolwen</p>
@@ -271,78 +229,27 @@
 </nav>
 <div class="fbar">
 <p class="fine">© 2026 Kolwen · trademark application pending</p>
-<div class="lswitch" role="group" aria-label="Language"><button type="button" data-lang-set="en" lang="en" aria-pressed="true">English</button><button type="button" data-lang-set="th" lang="th" aria-pressed="false">ไทย</button></div>
+<div class="lswitch" role="group" aria-label="Language"><span lang="en" aria-current="page">English</span><a class="lang-link" href="/th/" lang="th" hreflang="th">ไทย</a></div>
 </div>
 </div>
 </footer>
-<!-- site-footer:en:end -->
-<!-- site-footer:th:begin -->
-<footer class="site-footer" lang="th">
-<div class="fwrap">
-<p class="fbrand"><svg class="fglyph" viewBox="0 0 100 100" width="24" height="24" aria-hidden="true"><rect x="8.5" y="9.1" width="64.3" height="25"/><rect x="17.85" y="46.25" width="64.3" height="19.66"/><rect x="27.2" y="75.46" width="64.3" height="15.45"/></svg>Kolwen</p>
-<nav class="fgroups" aria-label="ส่วนท้ายเว็บ">
-<div class="fgroup"><p class="fh">Kolwen</p><a href="/">หน้าแรก</a></div>
-<div class="fgroup"><p class="fh">สินค้า</p><a href="/pricing">ราคา</a><a href="/changelog">บันทึกการเปลี่ยนแปลง</a></div>
-<div class="fgroup"><p class="fh">กฎหมาย</p><a href="/terms">ข้อกำหนด</a><a href="/privacy">ความเป็นส่วนตัว</a><a href="/refund">การคืนเงิน</a></div>
-<div class="fgroup"><p class="fh">โค้ด</p><a href="https://github.com/TheColliery/Kolwen">GitHub</a><a href="https://huggingface.co/kolwen">Hugging Face</a><a href="https://www.npmjs.com/package/kolwen">npm</a><a href="/llms.txt">llms.txt</a></div>
-<div class="fgroup"><p class="fh">ติดต่อ</p><a href="mailto:info@kolwen.com">อีเมล</a><a href="mailto:support@kolwen.com">ขอความช่วยเหลือ</a><a href="mailto:abuse@kolwen.com">แจ้งการละเมิด</a><a href="mailto:appeals@kolwen.com">ยื่นอุทธรณ์</a><a href="https://kolwen.com/.well-known/security.txt">ความปลอดภัย</a></div>
-</nav>
-<div class="fbar">
-<p class="fine">© 2026 Kolwen · เครื่องหมายการค้าอยู่ระหว่างการจดทะเบียน</p>
-<div class="lswitch" role="group" aria-label="ภาษา"><button type="button" data-lang-set="en" lang="en" aria-pressed="true">English</button><button type="button" data-lang-set="th" lang="th" aria-pressed="false">ไทย</button></div>
-</div>
-</div>
-</footer>
-<!-- site-footer:th:end -->
+<!-- site-footer:end -->
 <script>
 /* site-script:begin */
 (function () {
-  var KEY = 'kolwen-lang';
-  var en = document.getElementById('doc-en');
-  var th = document.getElementById('doc-th');
-  var buttons = document.querySelectorAll('[data-lang-set]');
-  // The title follows the language: a page with a Thai title carries it in a meta tag written on its Thai line only, and a page without one keeps its English title.
-  // The meta description is not switched: crawlers read it from the served page, and a reader never sees a change made here, so it would reach no one.
-  var titleEn = document.title;
-  var titleTh = document.querySelector('meta[name="kolwen-title-th"]');
-
-  function apply(lang, persist) {
-    var thai = lang === 'th';
-    th.hidden = !thai;
-    en.hidden = thai;
-    document.documentElement.lang = thai ? 'th' : 'en';
-    document.title = thai && titleTh ? titleTh.getAttribute('content') : titleEn;
-    for (var i = 0; i < buttons.length; i++) {
-      buttons[i].setAttribute('aria-pressed', String(buttons[i].getAttribute('data-lang-set') === lang));
-    }
-    if (persist) {
-      // Language preference only. localStorage, never a cookie: it is a
-      // client-only concern that never needs to ride on an HTTP request.
-      try { localStorage.setItem(KEY, lang); } catch (e) {}
-    }
+  try { localStorage.removeItem('kolwen-lang'); } catch (e) {}
+  function sectionAbove() {
+    var found = null, hs = document.querySelectorAll('main h2[id]');
+    for (var i = 0; i < hs.length; i++) { if (hs[i].getBoundingClientRect().top < 1) found = hs[i].id; else break; }
+    return found;
   }
-
-  var saved = null;
-  try { saved = localStorage.getItem(KEY); } catch (e) {}
-  if (saved === 'th' || saved === 'en') apply(saved, false);
-
-  // Pressing a switch changes the page language on the root element, which hides the header nav or the footer holding the pressed button. So focus goes to the same switch in the block that is now shown,
-  // in the same place (header to header, footer to footer), and without a scroll jump (WCAG 2.2 SC 2.4.3 and 2.4.7). Pressing the language already shown hides nothing and moves nothing.
-  function bind(button) {
-    button.addEventListener('click', function () {
-      var lang = button.getAttribute('data-lang-set');
-      var changed = document.documentElement.lang !== lang;
-      var place = button.closest('.site-header') ? '.site-header' : (button.closest('.site-footer') ? '.site-footer' : '');
-      apply(lang, true);
-      if (!changed || !place) return;
-      var same = document.querySelectorAll(place + ' [data-lang-set]');
-      for (var j = 0; j < same.length; j++) {
-        if (same[j].getAttribute('data-lang-set') === lang && same[j].parentNode.closest('[lang]').getAttribute('lang') === lang) { same[j].focus({ preventScroll: true }); return; }
-      }
+  var links = document.querySelectorAll('a.lang-link');
+  for (var i = 0; i < links.length; i++) {
+    links[i].addEventListener('click', function () {
+      var id = sectionAbove();
+      if (id) this.href = this.href.split('#')[0] + '#' + id;
     });
   }
-  for (var i = 0; i < buttons.length; i++) bind(buttons[i]);
-
   // The status page is the one page with a [data-status] element. It reads /status.json, the last health check the Worker stored, and writes the state, the time and one row per
   // probed page as text: the numbers, paths and times come from the data, and every word on the page comes from the catalogue. Without the fetch the page keeps its unavailable line.
   if (document.querySelector('[data-status]')) {

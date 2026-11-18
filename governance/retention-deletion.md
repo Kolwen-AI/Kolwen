@@ -9,8 +9,8 @@
 ## Today
 
 **The site retains nothing server-side, because it collects nothing there.** It sets no cookie and
-has no server-side store; the one thing it remembers, a language preference, lives only in the
-visitor's own browser. What Cloudflare handles when it serves a request, and what
+has no server-side store, and it keeps nothing in the visitor's browser: a language preference is no longer
+stored (each page only deletes the key an earlier version used). What Cloudflare handles when it serves a request, and what
 the contact mailbox retains, are described in `PRIVACY.md` and cannot be measured from this
 repository. Measured, with the commands, in `PRIVACY.md`.
 

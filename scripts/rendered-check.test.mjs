@@ -62,7 +62,7 @@ test('the built pages pass all three checks, in both languages, under their real
   assert.deepEqual(failures, []);
   const pages = new Set(measured.map(m => m.page));
   assert.equal(pages.size, PAGE_COUNT, 'every page was measured: ' + pages.size);
-  assert.equal(measured.filter(m => m.check === 'reflow').length, pages.size * 2, 'one reflow measurement per page and language');
+  assert.equal(measured.filter(m => m.check === 'reflow').length, pages.size, 'one reflow measurement per page: each file is one language (ORDER 1017j)');
   for (const m of measured.filter(m => m.check === 'zoom')) {
     assert.equal(m.rootPx, 32, `${m.page} [${m.lang}] was measured at a root font size of 200% of 16 px`);
     assert.ok(m.textElementsRead > 5, `${m.page} [${m.lang}] read its text elements (${m.textElementsRead})`);
@@ -73,15 +73,15 @@ test('a 400 px wide element fails the 320 px reflow check on the page that has i
   const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<div style="width:400px;height:20px;background:#f00">planted</div><main id="main" tabindex="-1">')));
   const { failures } = await run(web, ['reflow']);
   const hit = where(failures, 'terms.html', 'reflow');
-  assert.equal(hit.length, 2, 'both languages: ' + JSON.stringify(failures));
+  assert.equal(hit.length, 1, 'the English file: ' + JSON.stringify(failures));
   assert.match(hit[0].detail, /at 320 px the page scrolls sideways: scrollWidth \d+ > clientWidth 320/);
-  assert.equal(failures.length, 2, 'no other page fails');
+  assert.equal(failures.length, 1, 'no other page fails: the Thai twin is a file of its own, and is not planted');
 });
 
-test('the Thai document is measured too: an element only the Thai side holds fails there and not in English', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<div id="doc-th" lang="th" hidden>', '<div id="doc-th" lang="th" hidden><div style="width:400px;height:20px">planted</div>')));
+test('the Thai page is measured on its own: an element only the Thai page holds fails there and not in English', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'th/terms.html', h => h.replace('<main id="main" tabindex="-1">', '<div style="width:400px;height:20px">planted</div><main id="main" tabindex="-1">')));
   const { failures } = await run(web, ['reflow']);
-  assert.deepEqual(failures.map(f => [f.page, f.lang]), [['terms.html', 'th']], JSON.stringify(failures));
+  assert.deepEqual(failures.map(f => [f.page, f.lang]), [['th/terms.html', 'th']], JSON.stringify(failures));
 });
 
 test('the 320 px check is not the same as any viewport: the planted element passes at a width that holds it', { skip: SKIP }, async () => {
@@ -99,12 +99,15 @@ test('the plan table scrolls inside its own wrapper: a table wider than 320 px n
   const server = await browser.serve(web, { headers: false });
   const page = await browser.newPage();
   try {
-    await page.setViewport(320, 800);
-    await page.goto(server.origin + '/pricing');
-    const wraps = await page.evaluate(`[...document.querySelectorAll('.plans-wrap')].map(e => ({ overflowX: getComputedStyle(e).overflowX, scrolls: e.scrollWidth > e.clientWidth, role: e.getAttribute('role'), tabindex: e.getAttribute('tabindex'), named: (e.getAttribute('aria-label') || '').length > 0, holdsTable: !!e.querySelector('table.plans'), inCard: e.parentElement.classList.contains('card') }))`);
-    assert.equal(wraps.length, 2, 'one wrapper in each language document: ' + JSON.stringify(wraps));
-    for (const x of wraps) assert.deepEqual({ ...x, scrolls: undefined }, { overflowX: 'auto', scrolls: undefined, role: 'region', tabindex: '0', named: true, holdsTable: true, inCard: true });
-    assert.equal(wraps[0].scrolls, true, 'in the visible (English) document the table really is wider than its wrapper and scrolls there');
+    // one wrapper in each language's own file: the English pricing page and the Thai one (ORDER 1017j)
+    for (const [path, lang] of [['/pricing', 'en'], ['/th/pricing', 'th']]) {
+      await page.setViewport(320, 800);
+      await page.goto(server.origin + path);
+      const wraps = await page.evaluate(`[...document.querySelectorAll('.plans-wrap')].map(e => ({ overflowX: getComputedStyle(e).overflowX, scrolls: e.scrollWidth > e.clientWidth, role: e.getAttribute('role'), tabindex: e.getAttribute('tabindex'), named: (e.getAttribute('aria-label') || '').length > 0, holdsTable: !!e.querySelector('table.plans'), inCard: e.parentElement.classList.contains('card') }))`);
+      assert.equal(wraps.length, 1, `one wrapper in the ${lang} document: ` + JSON.stringify(wraps));
+      for (const x of wraps) assert.deepEqual({ ...x, scrolls: undefined }, { overflowX: 'auto', scrolls: undefined, role: 'region', tabindex: '0', named: true, holdsTable: true, inCard: true });
+      if (lang === 'en') assert.equal(wraps[0].scrolls, true, 'in the English document the table really is wider than its wrapper and scrolls there');
+    }
   } finally { await page.close(); await server.close(); }
 });
 
@@ -120,7 +123,7 @@ test('an element that fits at 100% and not at 200% makes the page scroll sideway
   const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<div style="min-width:45rem;height:20px">planted</div><main id="main" tabindex="-1">')));
   const hit = where((await run(web, ['zoom'])).failures, 'terms.html', 'zoom');
   assert.ok(hit.some(f => /at 200% text: the page scrolls sideways: scrollWidth \d+ > clientWidth/.test(f.detail)), JSON.stringify(hit));
-  assert.deepEqual((await run(web, ['reflow'])).failures.filter(f => f.page === 'terms.html').length, 2, 'and at 320 px it fails the reflow check too');
+  assert.deepEqual((await run(web, ['reflow'])).failures.filter(f => f.page === 'terms.html').length, 1, 'and at 320 px it fails the reflow check too (one file, one language, one failure)');
 });
 
 test('text that sticks out of a clipping parent fails the 200% text check', { skip: SKIP }, async () => {
@@ -149,10 +152,10 @@ test('a Permissions-Policy message alone does not fail the csp check and is repo
   assert.deepEqual(r.failures, [], 'no csp failure for a Permissions-Policy message: ' + JSON.stringify(r.failures));
   // only the planted name is counted: the runner's Chrome also reports the real _headers features it does not know ('bluetooth', 'web-share'), so a page carries more notes than the planted one
   const mine = r.notes.filter(n => /Unrecognized feature: 'kolwen-no-such-feature'/.test(n.text));
-  assert.equal(mine.length, PAGE_COUNT * 2, 'one note for the planted name per page and language (' + PAGE_COUNT + ' pages x 2): ' + mine.length);
+  assert.equal(mine.length, PAGE_COUNT, 'one note for the planted name per page, each file in its one language (' + PAGE_COUNT + ' pages): ' + mine.length);
   assert.ok(mine.every(n => n.kind === 'permissions-policy'), JSON.stringify(mine[0]));
   const csp = r.measured.filter(m => m.check === 'csp');
-  assert.equal(csp.length, PAGE_COUNT * 2, 'a csp measurement for every page and language');
+  assert.equal(csp.length, PAGE_COUNT, 'a csp measurement for every page (one language each)');
   assert.ok(csp.every(m => m.violations === 0 && m.notes >= 1), JSON.stringify(csp.find(m => m.violations !== 0 || m.notes < 1)));
   const both = copyWeb(w => { planted(w); editPage(w, 'index.html', h => h.replace('</head>', '<style>body{outline:0}</style></head>')); });
   const hit = where((await run(both, ['csp'], true)).failures, 'index.html', 'csp');
@@ -176,15 +179,14 @@ test('classifyLogs: a CSP violation is a violation, a Permissions-Policy or Feat
   assert.deepEqual(classifyLogs([]), { violations: [], notes: [] });
 });
 
-test('a page whose language switch does not set the wanted lang fails, and a page is never measured in a language another page left behind', { skip: SKIP }, async () => {
-  // every page and language opens in a browser context of its own, so a page with no working switch opens in its own default (en) and passes there, and its Thai pass is the one that cannot get Thai:
-  // with one shared context, the same page failed in English instead, because the Thai pass of the page before it had left "th" in localStorage
-  const web = copyWeb(w => editPage(w, 'pricing.html', h => h.split('data-lang-set=').join('data-lang-x=')));
+test('a page whose html lang is not its file\'s language fails, and a page is measured in the language of its own file (one language per file, nothing clicked)', { skip: SKIP }, async () => {
+  // The language is the file's own (ORDER 1017j): a file that declares another language is measured in that language, so it is named, and the check does not guess.
+  const web = copyWeb(w => editPage(w, 'pricing.html', h => h.replace('<html lang="en"', '<html lang="th"')));
   const { failures } = await run(web, ['reflow']);
   const lang = failures.filter(f => f.check === 'language');
-  assert.deepEqual(lang.map(f => [f.page, f.lang]), [['pricing.html', 'th']], JSON.stringify(failures));
-  assert.match(lang[0].detail, /the language switch did not set lang="th" \(the page reports lang="en"\)/);
-  assert.deepEqual((await run(copyWeb(), ['reflow'])).failures, [], 'with its switch the same page is measured in both languages, with no failure');
+  assert.deepEqual(lang.map(f => [f.page, f.lang]), [['pricing.html', 'en']], JSON.stringify(failures));
+  assert.match(lang[0].detail, /the page's html lang is "th", not "en"/);
+  assert.deepEqual((await run(copyWeb(), ['reflow'])).failures, [], 'with its own language the same page is measured with no failure');
 });
 
 test('the zoom check really runs at 200%: the root font size is 32 px on every page', { skip: SKIP }, async () => {
@@ -197,22 +199,22 @@ test('the reading theme: prose pages are solid and follow the device in both col
   const { failures, measured } = await run(join(ROOT, 'web'), ['theme', 'contrast', 'lineheight', 'measure'], true);
   assert.deepEqual(failures, []);
   const prose = ['accessibility.html', 'changelog.html', 'legal.html', 'privacy.html', 'refund.html', 'subprocessors.html', 'terms.html'];
-  for (const p of prose) for (const scheme of ['light', 'dark']) {
-    const th = measured.find(m => m.page === p && m.check === 'theme' && m.scheme === scheme);
-    assert.ok(th && th.job === 'prose' && th.image === 'none', `${p} ${scheme}: prose, no background image`);
-    assert.equal(th.color, scheme === 'light' ? 'rgb(251, 250, 248)' : 'rgb(15, 13, 11)', `${p} ${scheme}: the ground`);
-    for (const lang of ['en', 'th']) {
-      const c = measured.find(m => m.page === p && m.check === 'contrast' && m.lang === lang && m.scheme === scheme);
-      assert.ok(c && c.read > 20 && c.worst >= 4.5, `${p} [${lang}] ${scheme}: ${c && c.read} text elements, worst ${c && c.worst}`);
-    }
+  // one language per file (ORDER 1017j): each prose page is two files, the English one and its Thai twin under web/th/, and each is measured in its own language
+  const files = prose.flatMap(p => [[p, 'en', p], [p, 'th', 'th/' + p]]);
+  for (const [, lang, f] of files) for (const scheme of ['light', 'dark']) {
+    const th = measured.find(m => m.page === f && m.check === 'theme' && m.scheme === scheme);
+    assert.ok(th && th.job === 'prose' && th.image === 'none', `${f} ${scheme}: prose, no background image`);
+    assert.equal(th.color, scheme === 'light' ? 'rgb(251, 250, 248)' : 'rgb(15, 13, 11)', `${f} ${scheme}: the ground`);
+    const c = measured.find(m => m.page === f && m.check === 'contrast' && m.lang === lang && m.scheme === scheme);
+    assert.ok(c && c.read > 20 && c.worst >= 4.5, `${f} [${lang}] ${scheme}: ${c && c.read} text elements, worst ${c && c.worst}`);
   }
   for (const p of prose) {
-    const en = measured.find(m => m.page === p && m.check === 'lineheight' && m.lang === 'en'), th = measured.find(m => m.page === p && m.check === 'lineheight' && m.lang === 'th');
+    const en = measured.find(m => m.page === p && m.check === 'lineheight'), th = measured.find(m => m.page === 'th/' + p && m.check === 'lineheight');
     assert.ok(en.min >= 1.5 - 0.005, `${p} Latin line height ${en.min}`);
-    assert.ok(Math.abs(th.min - 1.65) < 0.005 && Math.abs(th.max - 1.65) < 0.005, `${p} Thai line height ${th.min}..${th.max}`);
+    assert.ok(Math.abs(th.min - 1.65) < 0.005 && Math.abs(th.max - 1.65) < 0.005, `th/${p} Thai line height ${th.min}..${th.max}`);
   }
   for (const p of prose) {
-    const en = measured.find(m => m.page === p && m.check === 'measure' && m.lang === 'en'), th = measured.find(m => m.page === p && m.check === 'measure' && m.lang === 'th');
+    const en = measured.find(m => m.page === p && m.check === 'measure'), th = measured.find(m => m.page === 'th/' + p && m.check === 'measure');
     assert.ok(en.lines >= 5 && en.max <= 80, `${p} Latin: ${en.lines} lines, longest ${en.max} characters`);
     // the body text is 18 px and the column is 33em of it (594 px), in both languages: the px value is the one knob and the column follows it
     assert.equal(en.fontPx, 18, `${p}: the body text is 18 px`);
@@ -220,7 +222,7 @@ test('the reading theme: prose pages are solid and follow the device in both col
     assert.ok(th.lines >= 2 && th.fontPx === 18 && Math.abs(th.columnEm - 33) < 0.1, `${p} Thai: 18 px, the column is recorded in em (${th.columnEm}), ${th.lines} Thai lines read`);
   }
   for (const p of ['index.html', 'pricing.html', '404.html']) assert.ok(measured.filter(m => m.page === p && m.check === 'theme').every(m => m.job === 'default'), p + ' is the default job');
-  assert.ok(!measured.some(m => m.check === 'contrast' && !prose.includes(m.page)), 'the contrast check reads prose pages only');
+  assert.ok(!measured.some(m => m.check === 'contrast' && !prose.includes(m.page.replace(/^th\//, ''))), 'the contrast check reads prose pages only (a Thai file is its English twin, under th/)');
 });
 
 test('text that is too faint for ONE colour scheme fails that scheme\'s contrast check and not the other\'s', { skip: SKIP }, async () => {
@@ -258,14 +260,15 @@ test('the opacity of an element counts: faded text fails where the same colour a
 });
 
 test('Thai text under 1.65 and Latin text under 1.5 fail the line height check, each in its own language', { skip: SKIP }, async () => {
-  const th = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<div id="doc-th" lang="th" hidden>', '<div id="doc-th" lang="th" hidden><p style="line-height:1.2">ไทยทดสอบ</p>')));
+  // one language per file: the Thai line is planted in the Thai file's own <main>, the Latin one in the English file's
+  const th = copyWeb(w => editPage(w, 'th/terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p style="line-height:1.2">ไทยทดสอบ</p>')));
   const f1 = (await run(th, ['lineheight'])).failures;
-  assert.deepEqual(f1.map(f => [f.page, f.lang]), [['terms.html', 'th']], JSON.stringify(f1));
+  assert.deepEqual(f1.map(f => [f.page, f.lang]), [['th/terms.html', 'th']], JSON.stringify(f1));
   assert.match(f1[0].detail, /p has a line height of 1\.200 times its size; the Thai text is 1\.65/);
   // 1.55 is a good Latin line height and not the Thai one: the floors are per script
-  const th2 = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<div id="doc-th" lang="th" hidden>', '<div id="doc-th" lang="th" hidden><p style="line-height:1.55">ไทยทดสอบ</p>')));
+  const th2 = copyWeb(w => editPage(w, 'th/terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p style="line-height:1.55">ไทยทดสอบ</p>')));
   assert.ok((await run(th2, ['lineheight'])).failures.some(f => f.lang === 'th' && /1\.550 times its size; the Thai text is 1\.65/.test(f.detail)), 'Thai text at 1.55 fails');
-  const en = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<div id="doc-en" lang="en">', '<div id="doc-en" lang="en"><p style="line-height:1.1">Tight Latin</p>')));
+  const en = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p style="line-height:1.1">Tight Latin</p>')));
   const f2 = (await run(en, ['lineheight'])).failures;
   assert.deepEqual(f2.map(f => [f.page, f.lang]), [['terms.html', 'en']], JSON.stringify(f2));
   assert.match(f2[0].detail, /the Latin text is at least 1\.5/);
@@ -273,11 +276,11 @@ test('Thai text under 1.65 and Latin text under 1.5 fail the line height check, 
 
 test('a rendered Latin line of more than 80 characters fails the measure check; the Thai document is measured, never failed', { skip: SKIP }, async () => {
   const long = 'A single line that is far longer than the reading measure allows a line to be, so it holds well over eighty characters at once';
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<div id="doc-en" lang="en">', `<div id="doc-en" lang="en"><p style="width:90rem;max-width:none">${long}</p>`)));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', `<main id="main" tabindex="-1"><p style="width:90rem;max-width:none">${long}</p>`)));
   const { failures } = await run(web, ['measure']);
   assert.deepEqual(failures.map(f => [f.page, f.lang]), [['terms.html', 'en']], JSON.stringify(failures));
   assert.match(failures[0].detail, /a rendered line holds \d+ characters; the reading measure is at most 80/);
-  const thai = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<div id="doc-th" lang="th" hidden>', '<div id="doc-th" lang="th" hidden><p style="width:90rem;max-width:none">ข้อความภาษาไทยที่ยาวมากในบรรทัดเดียวเพื่อทดสอบการวัดความยาวบรรทัดของเอกสารภาษาไทยโดยไม่ให้ล้มเหลว</p>')));
+  const thai = copyWeb(w => editPage(w, 'th/terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><p style="width:90rem;max-width:none">ข้อความภาษาไทยที่ยาวมากในบรรทัดเดียวเพื่อทดสอบการวัดความยาวบรรทัดของเอกสารภาษาไทยโดยไม่ให้ล้มเหลว</p>')));
   assert.deepEqual((await run(thai, ['measure'])).failures, [], 'a long Thai line is recorded and is not a failure');
 });
 
@@ -286,8 +289,9 @@ test('a rendered Latin line of more than 80 characters fails the measure check; 
 // title-home (the sizes measured on main at 8d01a78 at 1280 px: pricing 24 px, home 21 px, 404 21.6 px).
 test('the reading ladder: on every prose page, in both languages and at 390, 1280, 1920 and 2560 px, the title is 30 px, h2 24 px, h3 21 px and the body 18 px, each above the one below; the other pages keep their title', { skip: SKIP }, async () => {
   const server = await browser.serve(join(ROOT, 'web'), { headers: false });
-  const sizesOf = (page, lang) => page.evaluate(`(() => {
-    const root = document.querySelector('#doc-${lang}'), size = el => parseFloat(getComputedStyle(el).fontSize), visible = el => getComputedStyle(el).display !== 'none';
+  // the page's own <main> holds the title and the body in either language (one language per file)
+  const sizesOf = page => page.evaluate(`(() => {
+    const root = document.querySelector('main'), size = el => parseFloat(getComputedStyle(el).fontSize), visible = el => getComputedStyle(el).display !== 'none';
     const first = sel => [...root.querySelectorAll(sel)].filter(visible).map(size);
     return { h1: first('h1'), h2: first('.legal h2'), h3: first('.legal h3'), body: first('.legal p:not(.sub):not(.fine), .legal li') };
   })()`);
@@ -298,10 +302,11 @@ test('the reading ladder: on every prose page, in both languages and at 390, 128
           const page = await browser.newPage();
           try {
             await page.setViewport(width, 800);
-            await page.goto(server.origin + checkLib.urlPathOf(file));
-            const got = await page.evaluate(`(() => { const b = document.querySelector('[data-lang-set="${lang}"]'); if (b) b.click(); return document.documentElement.lang; })()`);
-            assert.equal(got, lang, `${file}: the language switch set ${lang}`);
-            const s = await sizesOf(page, lang), at = `${file} ${lang} ${width} px`;
+            const path = lang === 'th' ? 'th/' + file : file;
+            await page.goto(server.origin + checkLib.urlPathOf(path));
+            const got = await page.evaluate('document.documentElement.lang');
+            assert.equal(got, lang, `${path}: the page's html lang is ${lang}`);
+            const s = await sizesOf(page), at = `${path} ${width} px`;
             assert.deepEqual([...new Set(s.h1)], [30], at + ': the title is 30 px');
             assert.deepEqual([...new Set(s.h2)], s.h2.length ? [24] : [], at + ': h2 is 24 px');
             assert.deepEqual([...new Set(s.h3)], s.h3.length ? [21] : [], at + ': h3 is 21 px');
@@ -334,7 +339,103 @@ test('the theme check finds a prose page with a background image, one without a 
   assert.ok((await run(leak, ['theme'])).failures.some(f => f.page === 'index.html' && /leaked into it/.test(f.detail)));
 });
 
+// ── RED proofs for the four checks the one-language scheme added (ORDER 1017j, round 5): each planted defect is red here and the built pages are green in the full render check ─────
+test('RED lang-url: one alternate link removed from the English page fails lang-url on that page, and names the missing hreflang', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<link rel="alternate" hreflang="th" href="https://kolwen.com/th/terms">', '')));
+  const { failures } = await run(web, ['lang-url']);
+  // the one removed link is two findings: its own hreflang is missing, and the page is left with two alternates where three are required
+  assert.deepEqual(where(failures, 'terms.html', 'lang-url').map(f => f.detail), ['the th alternate link appears 0 time(s), not once', 'the page carries 2 alternate link(s), not three'], JSON.stringify(failures));
+  assert.ok(failures.every(f => f.page === 'terms.html'), 'no other page fails: ' + JSON.stringify(failures));
+});
+
+test('RED m5: the fragment script removed, the other-language link opens the page at its top, so M5 fails at 1280 and at 390 px', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => cutPageScript(h)));
+  const { failures } = await run(web, ['m5']);
+  const hit = where(failures, 'terms.html', 'm5');
+  assert.equal(hit.length, 2, JSON.stringify(failures));
+  for (const f of hit) assert.match(f.detail, /sits \d+ px from the top of the window after it/, f.detail);
+  assert.ok(failures.every(f => f.page === 'terms.html'), 'no other page fails: ' + JSON.stringify(failures));
+});
+
+test('RED skip: a focused skip link at opacity 0 fails the skip check, because it is invisible while it holds focus', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('</head>', '<style>.skip:focus{opacity:0}</style></head>')));
+  const { failures } = await run(web, ['skip']);
+  const hit = where(failures, 'terms.html', 'skip').filter(f => /effective opacity of 0/.test(f.detail));
+  assert.deepEqual(hit.map(f => f.lang), ['en'], JSON.stringify(failures));
+  assert.ok(failures.every(f => f.page === 'terms.html'), 'no other page fails: ' + JSON.stringify(failures));
+});
+
+test('RED header throw: a header read that throws is one finding for that check, and the skip and keys checks still run on the same page', { skip: SKIP }, async () => {
+  const server = await browser.serve(join(ROOT, 'web'), { headers: false });
+  const real = await browser.newPage();
+  try {
+    // only the header's own measurement is refused; every other read goes to the real page
+    const probe = new Proxy(real, {
+      get(target, prop) {
+        if (prop === 'evaluate') return (expr, ...rest) => {
+          if (typeof expr === 'string' && /navs/.test(expr) && /items/.test(expr)) throw new Error('planted: the header read is refused');
+          return target.evaluate(expr, ...rest);
+        };
+        const v = target[prop];
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+    });
+    const failures = [], measured = [];
+    await checkLib.headerChecks(probe, server.origin, '/terms', 'en', { page: 'terms.html', lang: 'en' }, ['skip', 'header', 'keys'], failures, measured);
+    const threw = failures.filter(f => f.check === 'header' && /the check threw, so its readings are missing: .*planted: the header read is refused/.test(f.detail));
+    assert.equal(threw.length, 1, JSON.stringify(failures));
+    assert.ok(measured.some(m => m.check === 'skip'), 'the skip check still ran after the header threw');
+    assert.ok(measured.some(m => m.check === 'keys') || failures.some(f => f.check === 'keys'), 'the keys check still ran after the header threw');
+  } finally { await real.close(); await server.close(); }
+});
+
+// The build writes one known script element per page (terms.html: <script> ... </script>). The cut takes exactly that slice, found by its exact opening and closing text, with no tag regex (CodeQL #68 to #70). A page without the element fails loud.
+const PAGE_SCRIPT_OPEN = '<script>';
+const PAGE_SCRIPT_CLOSE = '</script>';
+function cutPageScript(h) {
+  const a = h.indexOf(PAGE_SCRIPT_OPEN);
+  const b = a < 0 ? -1 : h.indexOf(PAGE_SCRIPT_CLOSE, a + PAGE_SCRIPT_OPEN.length);
+  if (a < 0 || b < 0) throw new Error('the page has no known script element to cut');
+  return h.slice(0, a) + h.slice(b + PAGE_SCRIPT_CLOSE.length);
+}
+// CodeQL #65: a heading id read from the page is code only through the closed pattern; any other id is a finding, and no measurement runs on it
+test('RED m5 id: a section heading id read from the page that is not s-N is a finding, not a measurement', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace(/<h2 id="s-(\d+)"/g, '<h2 id="s-$1&quot;x"')));
+  const { failures } = await run(web, ['m5']);
+  assert.ok(where(failures, 'terms.html', 'm5').some(f => /is not a section id/.test(f.detail)), JSON.stringify(failures));
+});
+
+
+// CodeQL #65, round 2: section numbers start at 1, so s-0 is not a section id: a finding, and no measurement
+test('RED m5 section number: an id of s-0 is a finding, not a measurement', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace(/<h2 id="s-(\d+)"/g, '<h2 id="s-0"')));
+  const { failures } = await run(web, ['m5']);
+  assert.ok(where(failures, 'terms.html', 'm5').some(f => /is not a section id/.test(f.detail)), JSON.stringify(failures));
+});
+
+// CodeQL #68 to #70: the page's script is cut by its exact text, with no tag regex; the rest of the page is left byte for byte, and a page without the element fails loud
+test('the page script is cut by its exact opening and closing text, the rest is left byte for byte, and a page without the element fails loud', () => {
+  assert.equal(cutPageScript('<p>a</p>\n<script>f()</script>\n<p>trail</p>'), '<p>a</p>\n\n<p>trail</p>');
+  assert.throws(() => cutPageScript('<p>no script</p>'), /no known script element/);
+  assert.throws(() => cutPageScript('</script><script>'), /no known script element/);
+});
+
 // ── no browser needed ───────────────────────────────────────────────────────────────────────────────────────────
+// CodeRabbit 4601272476: a page read that throws is that check's finding; the other checks and pages still run
+test('RED a page with no language link: the m5 read throws, that is one m5 finding, and the reflow check still measures the other pages', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.split('<a class="lang-link" href="/th/terms" lang="th" hreflang="th">').join('')));
+  const r = await run(web, ['m5', 'reflow']);
+  assert.ok(where(r.failures, 'terms.html', 'm5').some(f => /the check threw/.test(f.detail)), JSON.stringify(r.failures));
+  assert.ok(r.measured.some(m => m.check === 'reflow' && m.page === 'index.html'), 'the reflow check still ran on the other pages');
+});
+
+test('RED a canonical link the browser cannot read: the lang-url read throws, that is one lang-url finding, and the reflow check still measures the other pages', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.split('<link rel="canonical" href="https://kolwen.com/terms">').join('<link rel="canonical" href="http://[">')));
+  const r = await run(web, ['lang-url', 'reflow']);
+  assert.ok(where(r.failures, 'terms.html', 'lang-url').some(f => /the check threw/.test(f.detail)), JSON.stringify(r.failures));
+  assert.ok(r.measured.some(m => m.check === 'reflow' && m.page === 'index.html'), 'the reflow check still ran on the other pages');
+});
+
 test('findBrowser: an explicit path wins, a wrong explicit path is never replaced by a guess, and the platform lists are searched', () => {
   const me = process.execPath;
   assert.equal(findBrowser({ [BROWSER_ENV]: me }, 'linux'), me);
@@ -613,12 +714,13 @@ test('every page lives in a context of its own: it sees nothing of another page\
   const a = await browser.newPage(), b = await browser.newPage();
   try {
     assert.equal(await contexts(), base + 2, 'one context for each page');
-    await a.goto(server.origin + '/pricing');
-    await a.evaluate('document.querySelector(\'[data-lang-set="th"]\').click()');
-    await a.goto(server.origin + '/terms');
-    assert.equal(await a.evaluate('document.documentElement.lang'), 'th', 'precondition: a context remembers its own language');
+    // the language is the file's own (no stored preference): a Thai file is Thai in any context, and the isolation is proved on storage
+    await a.goto(server.origin + '/th/terms');
+    assert.equal(await a.evaluate('document.documentElement.lang'), 'th', 'a Thai file is Thai, in whichever context it loads');
+    await a.evaluate('localStorage.setItem("kw-probe", "a")');
     await b.goto(server.origin + '/terms');
-    assert.equal(await b.evaluate('document.documentElement.lang'), 'en', 'another context does not');
+    assert.equal(await b.evaluate('document.documentElement.lang'), 'en', 'another context loads the English file');
+    assert.equal(await b.evaluate('localStorage.getItem("kw-probe")'), null, 'and sees none of the first context\'s storage');
     await a.send('Network.setCookie', { name: 'kwctx', value: 'not-for-print', url: server.origin + '/' });
     const mine = await a.cookies();
     assert.deepEqual(mine.map(c => c.name), ['kwctx']);
@@ -659,7 +761,7 @@ test('the jar check: a cookie from outside the served origin fails the run, in t
   const wrapped = { ...browser, newPage: async () => { const p = await browser.newPage(), real = p.cookies; return Object.assign(p, { cookies: async () => [...(await real()), { name: 'kwctxbad', domain: '.bing.com' }] }); } };
   const r2 = await renderedChecks({ webDir: copyWeb(), browser: wrapped, checks: ['reflow'], headers: false });
   const pages = r2.failures.filter(f => f.check === 'cookies');
-  assert.equal(pages.length, PAGE_COUNT * 2, 'one per page and language (' + PAGE_COUNT + ' x 2): ' + pages.length);
+  assert.equal(pages.length, PAGE_COUNT, 'one per page, one language per file (' + PAGE_COUNT + '): ' + pages.length);
   assert.ok(pages.every(f => f.detail === '1 cookie(s) outside the served 127.0.0.1 origin in the browser context of this page: .bing.com (kwctxbad)'), pages[0].detail);
 });
 
@@ -856,12 +958,12 @@ test('makeResponder: a folder link inside the root that points at a folder outsi
 test('a language value with a line break, a carriage return or an escape is reported as one escaped field, with no control character in the finding', { skip: SKIP }, async () => {
   // the value is written by the page, not by us: the page's own html lang attribute holds the three characters (a parser turns a carriage return into a line break)
   const odd = String.fromCharCode(10, 13, 27) + '[31m';
-  const web = copyWeb(w => editPage(w, 'pricing.html', h => h.split('data-lang-set=').join('data-lang-x=').replace('<html lang="en"', '<html lang="en' + odd + '"')));
+  const web = copyWeb(w => editPage(w, 'pricing.html', h => h.replace('<html lang="en"', '<html lang="en' + odd + '"')));
   const lang = (await run(web, ['reflow'])).failures.filter(f => f.page === 'pricing.html' && f.check === 'language');
-  assert.equal(lang.length, 2, 'the two languages of the page, each one finding: ' + JSON.stringify(lang));
+  assert.equal(lang.length, 1, 'one file, one language, one finding: ' + JSON.stringify(lang));
   for (const f of lang) {
     assert.doesNotMatch(f.detail, /[\u0000-\u001f\u007f]/, 'no raw control character in the finding');
-    assert.match(f.detail, /reports lang="en\\n\\n\\u001b\[31m"\)/, 'the value is shown escaped: ' + f.detail);
+    assert.match(f.detail, /the page's html lang is "en\\n\\n\\u001b\[31m"/, 'the value is shown escaped: ' + f.detail);
   }
 });
 
@@ -1298,10 +1400,13 @@ test('the marker records intent, not origin (a stated limit): a folder that hold
 });
 
 test('a resource asked for by host name is a finding: the browser resolves no host name, so it fails, and the run says which address', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<main id="main" tabindex="-1">', '<img src="http://cdn.kolwen-no-such-host.example/x.png" alt=""><main id="main" tabindex="-1">')));
+  const IMG = '<img src="http://cdn.kolwen-no-such-host.example/x.png" alt=""><main id="main" tabindex="-1">';
+  const web = copyWeb(w => { // one language per file: the resource is planted in each file
+    for (const f of ['terms.html', 'th/terms.html']) editPage(w, f, h => h.replace('<main id="main" tabindex="-1">', IMG));
+  });
   const { failures } = await run(web, ['reflow']);
   const hit = failures.filter(f => f.check === 'resources');
-  assert.deepEqual(hit.map(f => [f.page, f.lang]), [['terms.html', 'en'], ['terms.html', 'th']], JSON.stringify(failures));
+  assert.deepEqual(hit.map(f => [f.page, f.lang]), [['terms.html', 'en'], ['th/terms.html', 'th']], JSON.stringify(failures));
   assert.match(hit[0].detail, /^a resource was asked for by host name and could not be reached, because the browser resolves no host name: http:\/\/cdn\.kolwen-no-such-host\.example\/x\.png$/);
   assert.deepEqual((await run(copyWeb(), ['reflow'])).failures.filter(f => f.check === 'resources'), [], 'the built pages ask for nothing by host name');
 });
@@ -1365,15 +1470,16 @@ test('the built pages draw their Thai text with the site\'s Thai face, in both l
   const { failures, measured } = await run(join(ROOT, 'web'), ['glyphs']);
   assert.deepEqual(failures, []);
   const th = measured.filter(m => m.check === 'glyphs' && m.lang === 'th');
-  assert.equal(th.length, PAGE_COUNT, 'every page was measured in Thai');
+  const THAI_FILES = readdirSync(join(ROOT, 'web', 'th')).filter(f => f.endsWith('.html')).length;
+  assert.equal(th.length, THAI_FILES, 'every Thai file was measured in Thai');
   for (const m of th) assert.ok(m.read > 0, `${m.page} [th] read its Thai text elements (${m.read})`);
 });
 
 // The defect this check was written for: a Thai heading in a Latin mono stack with no Thai face in it. It fails in the Thai document only, and on that element.
 test('a Thai heading in a KW Mono stack fails the glyphs check on the page that has it, in the Thai document only', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<div id="doc-th" lang="th" hidden>', '<div id="doc-th" lang="th" hidden><h2 style="font-family:\'KW Mono\',monospace">ช่องทางทางการ</h2>')));
+  const web = copyWeb(w => editPage(w, 'th/terms.html', h => h.replace('<main id="main" tabindex="-1">', '<main id="main" tabindex="-1"><h2 style="font-family:\'KW Mono\',monospace">ช่องทางทางการ</h2>')));
   const { failures } = await run(web, ['glyphs']);
-  const hit = where(failures, 'terms.html', 'glyphs');
+  const hit = where(failures, 'th/terms.html', 'glyphs');
   assert.equal(hit.length, 1, JSON.stringify(failures));
   assert.equal(hit[0].lang, 'th');
   assert.match(hit[0].detail, /h2 "ช่องทางทางการ": a face the site does not ship draws it \(/);
@@ -1414,10 +1520,10 @@ test('the built pages pass the skip link, the header and the keyboard checks, in
 test('a skip link hidden with display:none fails the skip check: it is not in the tab order, so the first Tab focuses the mark', { skip: SKIP }, async () => {
   const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('.skip{position:absolute;', '.skip{display:none !important;position:absolute;')));
   const { failures } = await run(web, ['skip']);
-  // A hidden skip link is not in the tab order (the first Tab focuses the mark, one finding per language) and has no accessible name (a second finding per language):
+  // A hidden skip link is not in the tab order (the first Tab focuses the mark, one finding in this file) and has no accessible name (a second finding in the same file):
   // both are the defect, so the test counts the tab-order finding and requires every finding to be on this page.
   const hit = where(failures, 'terms.html', 'skip');
-  assert.equal(hit.filter(f => /the first Tab from a fresh load focuses mark/.test(f.detail)).length, 2, JSON.stringify(failures));
+  assert.equal(hit.filter(f => /the first Tab from a fresh load focuses mark/.test(f.detail)).length, 1, JSON.stringify(failures));
   assert.ok(failures.every(f => f.page === 'terms.html'), 'no other page fails: ' + JSON.stringify(failures));
   assert.ok(hit.some(f => /accessible name/.test(f.detail)), 'the hidden link has no accessible name: ' + JSON.stringify(failures));
 });
@@ -1429,21 +1535,22 @@ test('a header whose English mark has a name without its visible word fails the 
   assert.match(failures[0].detail, /a header link's visible text is not in its accessible name: Kolwen is not in Home/);
 });
 
-test('a header language button taken out of the tab order fails the keys check: the English-language Tab order skips it', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('data-lang-set="th" lang="th" aria-pressed="false">', 'data-lang-set="th" lang="th" aria-pressed="false" tabindex="-1">')));
+test('a header language link taken out of the tab order fails the keys check: the English file\'s Tab order skips it', { skip: SKIP }, async () => {
+  // the switch is a plain link (no button); the first one in the header is the one planted
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('<a class="lang-link" href="/th/terms" lang="th" hreflang="th">', '<a class="lang-link" href="/th/terms" lang="th" hreflang="th" tabindex="-1">')));
   const { failures } = await run(web, ['keys']);
   const hit = where(failures, 'terms.html', 'keys');
-  assert.ok(hit.some(f => f.lang === 'en' && /Tab does not reach switch:th@en/.test(f.detail)), JSON.stringify(failures));
+  assert.ok(hit.some(f => f.lang === 'en' && /Tab does not reach the th link/.test(f.detail)), JSON.stringify(failures));
   assert.equal(failures.every(f => f.page === 'terms.html'), true, 'no other page fails: ' + JSON.stringify(failures));
 });
 
 // ── the reviewer's findings on the skip, header and keys checks (C151b-2, C151b-3) ────────────────────────────────────────────────────────────────
 // m1: a clip-path that clips nothing. The link is visible at rest, so the centre of its box is hit: the rest check fails it in both languages.
-test('a skip link whose clip-path clips nothing is visible at rest, and fails the skip check in both languages', { skip: SKIP }, async () => {
+test('a skip link whose clip-path clips nothing is visible at rest, and fails the skip check on its own page', { skip: SKIP }, async () => {
   const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace('clip-path:inset(50%)}', 'clip-path:inset(0px)}')));
   const { failures } = await run(web, ['skip']);
   const hit = where(failures, 'terms.html', 'skip').filter(f => /not clipped away/.test(f.detail));
-  assert.deepEqual(hit.map(f => f.lang).sort(), ['en', 'th'], JSON.stringify(failures));
+  assert.deepEqual(hit.map(f => f.lang), ['en'], JSON.stringify(failures));
   assert.ok(failures.every(f => f.page === 'terms.html'), 'no other page fails: ' + JSON.stringify(failures));
 });
 

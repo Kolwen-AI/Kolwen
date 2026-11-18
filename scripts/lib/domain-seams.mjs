@@ -122,7 +122,10 @@ export function legalLinkProblems(seams, pages) {
     try {
       links = htmlTokens(html, { scripting: false }).filter(t => t.type === 'tag' && !t.closing && t.name === 'a' && t.attrs.has('href')).map(t => { try { return new URL(t.attrs.get('href'), `https://${group.host}${path}`); } catch { return null; } }).filter(Boolean);
     } catch (e) { out.push(prob(file, `group ${name}: the HTML could not be read (${e.message.slice(0, 120)})`)); continue; }
-    for (const [what, p] of [['terms', lg.terms], ['privacy', lg.privacy]]) {
+    // A Thai page (web/th/…) links the Thai address of each legal page (/th/terms), an English page the English one: one language per file.
+    const thai = /^web\/th\//.test(file);
+    for (const [what, p0] of [['terms', lg.terms], ['privacy', lg.privacy]]) {
+      const p = thai ? '/th' + p0 : p0;
       if (!links.some(u => u.origin === `https://${lg.host}` && u.pathname.replace(/\/$/, '') === p.replace(/\/$/, ''))) out.push(prob(file, `group ${name}: no link to the ${what} page (https://${lg.host}${p}); the one set of legal pages covers every group, so a page of any group links it`));
     }
   }

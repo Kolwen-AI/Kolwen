@@ -190,7 +190,7 @@ test('rule 15 against its dirty fixture: the page set at the parent of 94b9415, 
 test('rule 15 is not emptied by its own scope: a tree whose only tracked page is the pinned changelog is a finding, never a pass', () => {
   const dir = surfaceCopy();
   try {
-    for (const f of pagesOf(dir).filter(f => f !== 'web/changelog.html')) rmSync(join(dir, f));
+    for (const f of [...pagesOf(dir), ...readdirSync(join(dir, 'web', 'th')).map(x => 'web/th/' + x)].filter(f => f !== 'web/changelog.html' && f !== 'web/th/changelog.html')) rmSync(join(dir, f));
     restage(dir);
     const r = surface(dir);
     assert.equal(r.status, 1, r.out);
@@ -209,7 +209,7 @@ test('rule 15 pins: the quoted withdrawn claim on the changelog page passes, and
     const r = surface(dir);
     assert.equal(r.status, 1, r.out);
     assert.match(r.out, /web\/changelog\.html: line \d+: says "no trackers"/);
-    assert.match(r.out, /web\/changelog\.html: pinned passage [0-9a-f]{16} .* appears 3 time\(s\) on the page/);
+    assert.match(r.out, /web\/changelog\.html: pinned passage [0-9a-f]{16} .* appears 2 time\(s\) on the page/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

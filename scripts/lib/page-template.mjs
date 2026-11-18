@@ -232,7 +232,8 @@ export function templateProblems(src, name = 'template') {
 }
 
 // The templates ({ group: source }) read against the catalogue ({ lang: { key: value } }) and the keys the code reads (codeKeys, a Set).
-export function usageProblems({ templates, messages, codeKeys = new Set() }) {
+// renderedLangs: the languages the site renders (a catalogue it does not render is not checked for empty values). Defaults to every catalogue given.
+export function usageProblems({ templates, messages, codeKeys = new Set(), renderedLangs = Object.keys(messages) }) {
   const out = [];
   const langs = Object.keys(messages);
   const used = new Set(codeKeys);
@@ -244,8 +245,9 @@ export function usageProblems({ templates, messages, codeKeys = new Set() }) {
       if (!['shared', group].includes(s.key.split('.')[0])) out.push(`template ${group} line ${s.line}: ${s.key} is outside its own group (a page's template reads its own group and shared only)`);
       const lacking = langs.filter(l => !(s.key in messages[l]));
       if (lacking.length) out.push(`template ${group} line ${s.line}: ${s.key} is missing in ${lacking.map(l => l + '.json').join(', ')}`);
-      const shown = s.region ?? DEFAULT_LANG;
-      if (messages[shown]?.[s.key] === '') out.push(`template ${group} line ${s.line}: ${s.key} would show an empty string in ${shown} (an empty value belongs only where no slot shows it)`);
+      // a region slot is shown in its region's language only; a slot outside every region is shown in each language the site renders (CodeRabbit 4601272459)
+      const shown = s.region ? [s.region] : renderedLangs;
+      for (const l of shown) if (messages[l]?.[s.key] === '') out.push(`template ${group} line ${s.line}: ${s.key} would show an empty string in ${l} (an empty value belongs only where no slot shows it)`);
     }
   }
   for (const key of new Set(langs.flatMap(l => Object.keys(messages[l])))) if (!used.has(key)) out.push(`${key} is used by no template and no code (remove it, or use it)`);
@@ -253,7 +255,7 @@ export function usageProblems({ templates, messages, codeKeys = new Set() }) {
 }
 
 // The page: the template with its directive lines removed and every slot filled. blocks: { name: () => string }, raw: { name: string }.
-export function renderTemplate(src, { messages, blocks, raw }) {
+export function renderTemplate(src, { messages, blocks, raw, lang: pageLang = DEFAULT_LANG }) {
   const lines = [];
   let region = null;
   const msg = (key, lang) => {
@@ -265,16 +267,17 @@ export function renderTemplate(src, { messages, blocks, raw }) {
     const open = LANG_OPEN.exec(line);
     if (open) { region = open[1]; continue; }
     if (LANG_CLOSE.test(line)) { region = null; continue; }
-    const lang = region ?? DEFAULT_LANG;
+    if (region !== null && region !== pageLang) continue; // another language's region: not in this file
+    const cur = region ?? pageLang;
     const text = line.replace(SLOT, (...a) => {
       const m = [a[0], ...a.slice(1, 6)];
       const kind = kindOf(m);
       if (kind === 'block') { if (!blocks[m[4]]) throw new Error(`line ${i + 1}: no block named ${m[4]}`); return blocks[m[4]](); }
       if (kind === 'raw') { if (!(m[4] in raw)) throw new Error(`line ${i + 1}: no raw piece named ${m[4]}`); return raw[m[4]]; }
       const key = m[2] ?? m[5];
-      if (kind === 'text') return valueHtml(msg(key, lang));
-      if (kind === 'attr') return escAttr(valuePlain(msg(key, lang)));
-      return valueJson(msg(key, lang));
+      if (kind === 'text') return valueHtml(msg(key, cur));
+      if (kind === 'attr') return escAttr(valuePlain(msg(key, cur)));
+      return valueJson(msg(key, cur));
     });
     if (/\{\{/.test(text)) throw new Error(`line ${i + 1}: a slot that is not valid is left in the page`);
     lines.push(text);

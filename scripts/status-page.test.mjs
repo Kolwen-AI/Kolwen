@@ -26,19 +26,21 @@ test('the status page loads nothing from a third-party origin: every script, ima
   assert.deepEqual(loads.filter(u => /^(?:https?:)?\/\//.test(u) && !u.startsWith('https://kolwen.com/')), []);
 });
 
-test('the status page fetches /status.json and nothing else', () => {
-  const html = read('web/status.html');
+// Each language is its own page (ORDER 1017j): both files fetch /status.json and nothing else.
+for (const f of ['web/status.html', 'web/th/status.html']) test(`the status page (${f}) fetches /status.json and nothing else`, () => {
+  const html = read(f);
   // The page script finds the status page by its data-status attribute (legal-render.mjs: document.querySelector('[data-status]')), so the test pins the attribute, not the tag's other attributes.
   assert.match(html, /<main\b[^>]*\sdata-status[\s>]/, 'the page script finds the status page by this marker');
   const targets = [...html.matchAll(/fetch\(\s*['"]([^'"]*)['"]/g)].map(m => m[1]);
   assert.deepEqual(targets, ['/status.json']);
 });
 
-test('the "no check yet" line is in both languages', () => {
-  const html = read('web/status.html');
-  assert.match(html, /No stored check result is available yet\./, 'English');
-  assert.match(html, /ยังไม่มีผลการตรวจที่บันทึกไว้/, 'Thai');
-  // the row labels are each language's own: OK and FAIL in the English section, ผ่าน and ไม่ผ่าน in the Thai one
-  assert.match(html, /<div id="doc-en"[\s\S]*data-mark="fail" hidden>FAIL</, 'English row label');
-  assert.match(html, /<div class="th" id="doc-th"[\s\S]*data-mark="fail" hidden>ไม่ผ่าน</, 'Thai row label');
+test('the "no check yet" line is in each language, in its own file (ORDER 1017j: one language per page)', () => {
+  const html = read('web/status.html'), thHtml = read('web/th/status.html');
+  assert.match(html, /No stored check result is available yet\./, 'English file');
+  assert.doesNotMatch(html, /ยังไม่มีผลการตรวจที่บันทึกไว้/, 'the English file holds no Thai line');
+  assert.match(thHtml, /ยังไม่มีผลการตรวจที่บันทึกไว้/, 'Thai file');
+  // the row labels are each language's own: FAIL in the English file, ไม่ผ่าน in the Thai one
+  assert.match(html, /data-mark="fail" hidden>FAIL</, 'English row label');
+  assert.match(thHtml, /data-mark="fail" hidden>ไม่ผ่าน</, 'Thai row label');
 });

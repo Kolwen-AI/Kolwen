@@ -15,7 +15,7 @@
   `post-deploy-check.mjs`.
 
 **The only application logging is one line per page check, one line for each alert decision, made when the result changes (on every failing run while the status record cannot be read), and one line when writing the status record fails.** The Worker's script writes the path,
-status, timing, result and error class of each of its six checks every 15 minutes, and nothing about
+status, timing, result and error class of each of its fourteen addresses every 15 minutes, and nothing about
 a visitor: no request, no response body, no header and no address. Invocation logs are switched off
 in `wrangler.jsonc`, so a visitor's request is not logged. The site is static pages plus that one script.
 

@@ -100,7 +100,7 @@ test('the reading theme is a variant of the colour names the pages already use, 
   assert.match(css, /html\[data-job="prose"\]\{color-scheme:light dark;--bg:#fbfaf8;/);
   assert.match(css, /@media \(prefers-color-scheme:dark\)\{html\[data-job="prose"\]\{--bg:#0f0d0b;/);
   assert.match(css, /html\[data-job="prose"\] body\{background:var\(--bg\)\}/);
-  assert.match(css, /html\[data-job="prose"\] #doc-th,html\[data-job="prose"\] #doc-th \*\{line-height:var\(--kw-line-height-thai\)\}/);
+  assert.match(css, /html\[data-job="prose"\]\[lang="th"\] main,html\[data-job="prose"\]\[lang="th"\] main \*\{line-height:var\(--kw-line-height-thai\)\}/);
   // The prose body is ONE knob, the px value of font.size.body, and the column follows it: main takes the body size as its own, so the column in em is the column in the body's em.
   assert.match(css, /html\[data-job="prose"\] main\{font-size:var\(--kw-font-size-body\);max-width:calc\(var\(--kw-size-measure-reading\) \+ 2 \* var\(--kw-space-inset-inline\)\)\}/);
   assert.equal(TOKENS['font.size.body'], '1.125rem', 'the body text of a reading page is 18 px (1.125rem at the browser default of 16 px)');
@@ -172,7 +172,7 @@ test('a prose page must carry the color-scheme meta and a theme-color for each s
 
 test('the page generator refuses a page that declares no job, or an unknown one', async () => {
   const { shell } = await import('./lib/legal-render.mjs');
-  const page = { title: 'T', description: 'd', path: '/t', en: '', th: '' };
+  const page = { lang: 'en', title: 'T', description: 'd', path: '/t', body: '' };
   assert.throws(() => shell(page), /declares no job/);
   assert.throws(() => shell({ ...page, job: 'article' }), /declares no job/);
   assert.match(shell({ ...page, job: 'prose' }), /<html lang="en" data-job="prose">/);
@@ -184,6 +184,8 @@ test('the page generator refuses a page that declares no job, or an unknown one'
 test('the built pages declare the jobs they are meant to have: the legal pages and the changelog are prose, the home, pricing, 404 and status pages are the default', () => {
   const want = { 'terms.html': 'prose', 'privacy.html': 'prose', 'refund.html': 'prose', 'changelog.html': 'prose', 'index.html': 'default', 'pricing.html': 'default', '404.html': 'default', 'status.html': 'default', 'subprocessors.html': 'prose', 'accessibility.html': 'prose', 'legal.html': 'prose' };
   const pages = htmlPages(WEB);
+  // each page has its Thai twin, with the same job (ORDER 1017j: one language per file)
+  for (const [f, j] of Object.entries({ ...want })) want['th/' + f] = j;
   assert.deepEqual([...pages].sort(), Object.keys(want).sort(), 'every page is judged, none left out');
   for (const f of pages) {
     const html = readFileSync(join(WEB, f), 'utf8');
