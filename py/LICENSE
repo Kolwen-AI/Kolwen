@@ -18,9 +18,11 @@ No trademark rights are granted. "Kolwen", "โคลเวน", "Kolwen Peat",
 "Kolwen Lignite", "Kolwen Anthracite", "Bankfire", and "TheColliery" are
 names claimed by the copyright holder.
 
-Kolwen models are planned to be built on Qwen (Alibaba Cloud) base models; the
-base model for each release is expected to be Apache-2.0, and base-model
-attribution plus the Apache-2.0 notice will ship with every weights release.
+The base model of each Kolwen release is chosen by evaluation and is named
+in that release. If and when weights are released, the base model's
+attribution and its own license notice will ship with that release. This
+sentence is information about what a release will state, not a promise that
+any release will be made.
 
 THE CONTENTS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT
 SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
