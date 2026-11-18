@@ -509,12 +509,19 @@ export function langUrlProblems(head, path, lang, file) {
 // section, looked up on the page the click opens, must sit at the top of the window. Without the page script's fragment the browser opens the top of the page instead.
 // The one shape a section id can take: the sectionIds generator writes s-1, s-2 ... An id read from the page is code only through this pattern (CodeQL #65).
 const SECTION_ID = /^s-\d+$/;
+// CodeQL #65: the id read from the page is data. Only its number is built into page code, and only for a section number (s-1, s-2 ...). A regex test is a check, not a sanitizer CodeQL takes, so the code gets Number(...), an integer from 1 up.
+const sectionNumber = id => {
+  if (typeof id !== 'string' || !SECTION_ID.test(id)) return null;
+  const n = Number(id.slice(2));
+  return Number.isInteger(n) && n >= 1 ? n : null;
+};
 async function measureFragmentSwitch(page, origin, path, width) {
   await page.setViewport(width, 800);
   await page.goto(origin + path);
   const before = await page.evaluate(`(() => { const max = document.documentElement.scrollHeight - window.innerHeight; window.scrollTo(0, Math.floor(max / 2)); const hs = [...document.querySelectorAll('main h2[id]')].filter(h => h.getBoundingClientRect().top < 1); const h = hs[hs.length - 1]; return { id: h ? h.id : null, vh: window.innerHeight, max }; })()`);
-  if (before.id !== null && !SECTION_ID.test(before.id)) return { id: null, error: `the heading id ${reportField(before.id)} is not a section id (s-N), so no measurement is taken on it` };
+  if (before.id !== null && sectionNumber(before.id) === null) return { id: null, error: `the heading id ${reportField(before.id)} is not a section id (s-N, N from 1), so no measurement is taken on it` };
   if (!before.id) return { id: null, error: `no section heading is above the top of the window at ${width} px, scrolled to the middle of a ${before.max} px page, so the measurement has no section to follow` };
+  const n = sectionNumber(before.id); // not null: the checks above returned for any other id, and for no heading
   await page.evaluate(`document.querySelector('a.lang-link').click()`);
   // the switch goes to the other language: from the English file to Thai, from the Thai file to English (M5, both directions)
   const otherLang = /^\/th(\/|$)/.test(path) ? 'en' : 'th';
@@ -524,7 +531,7 @@ async function measureFragmentSwitch(page, origin, path, width) {
   if (now !== want) return { id: before.id, error: `the other-language link did not open ${reportField(want)} (the address is ${reportField(String(now))})` };
   for (let i = 0; i < 20 && (await page.evaluate('document.readyState')) !== 'complete'; i++) await pause(150);
   await pause(200);
-  const after = await page.evaluate(`(() => { const h = document.getElementById(${JSON.stringify(before.id)}); return h ? h.getBoundingClientRect().top : null; })()`);
+  const after = await page.evaluate(`(() => { const h = document.getElementById('s-' + ${n}); return h ? h.getBoundingClientRect().top : null; })()`);
   return { id: before.id, after, vh: before.vh };
 }
 export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, headers = true }) {

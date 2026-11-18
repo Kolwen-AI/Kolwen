@@ -349,7 +349,7 @@ test('RED lang-url: one alternate link removed from the English page fails lang-
 });
 
 test('RED m5: the fragment script removed, the other-language link opens the page at its top, so M5 fails at 1280 and at 390 px', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace(PAGE_SCRIPT, '')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => cutPageScript(h)));
   const { failures } = await run(web, ['m5']);
   const hit = where(failures, 'terms.html', 'm5');
   assert.equal(hit.length, 2, JSON.stringify(failures));
@@ -389,8 +389,15 @@ test('RED header throw: a header read that throws is one finding for that check,
   } finally { await real.close(); await server.close(); }
 });
 
-// The page's one script in any letter case, with a space before either bracket (CodeQL #66): the filter the m5 mutant and its filter test share
-const PAGE_SCRIPT = /<script\b[^>]*>[\s\S]*?<\/script\s*>/gi;
+// The build writes one known script element per page (terms.html: <script> ... </script>). The cut takes exactly that slice, found by its exact opening and closing text, with no tag regex (CodeQL #68 to #70). A page without the element fails loud.
+const PAGE_SCRIPT_OPEN = '<script>';
+const PAGE_SCRIPT_CLOSE = '</script>';
+function cutPageScript(h) {
+  const a = h.indexOf(PAGE_SCRIPT_OPEN);
+  const b = a < 0 ? -1 : h.indexOf(PAGE_SCRIPT_CLOSE, a + PAGE_SCRIPT_OPEN.length);
+  if (a < 0 || b < 0) throw new Error('the page has no known script element to cut');
+  return h.slice(0, a) + h.slice(b + PAGE_SCRIPT_CLOSE.length);
+}
 // CodeQL #65: a heading id read from the page is code only through the closed pattern; any other id is a finding, and no measurement runs on it
 test('RED m5 id: a section heading id read from the page that is not s-N is a finding, not a measurement', { skip: SKIP }, async () => {
   const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace(/<h2 id="s-(\d+)"/g, '<h2 id="s-$1&quot;x"')));
@@ -398,11 +405,19 @@ test('RED m5 id: a section heading id read from the page that is not s-N is a fi
   assert.ok(where(failures, 'terms.html', 'm5').some(f => /is not a section id/.test(f.detail)), JSON.stringify(failures));
 });
 
-// CodeQL #66: the script filter matches a page script in any letter case and with a space before a closing bracket
-test('RED m5 filter: the script filter strips a page script in any letter case and with a space before its closing bracket', () => {
-  const page = '<p>a</p><SCRIPT>f()</SCRIPT >trail<script >g()</script>';
-  const stripped = page.replace(PAGE_SCRIPT, '');
-  assert.doesNotMatch(stripped, /script/i, 'the filter left a script in: ' + stripped);
+
+// CodeQL #65, round 2: section numbers start at 1, so s-0 is not a section id: a finding, and no measurement
+test('RED m5 section number: an id of s-0 is a finding, not a measurement', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace(/<h2 id="s-(\d+)"/g, '<h2 id="s-0"')));
+  const { failures } = await run(web, ['m5']);
+  assert.ok(where(failures, 'terms.html', 'm5').some(f => /is not a section id/.test(f.detail)), JSON.stringify(failures));
+});
+
+// CodeQL #68 to #70: the page's script is cut by its exact text, with no tag regex; the rest of the page is left byte for byte, and a page without the element fails loud
+test('the page script is cut by its exact opening and closing text, the rest is left byte for byte, and a page without the element fails loud', () => {
+  assert.equal(cutPageScript('<p>a</p>\n<script>f()</script>\n<p>trail</p>'), '<p>a</p>\n\n<p>trail</p>');
+  assert.throws(() => cutPageScript('<p>no script</p>'), /no known script element/);
+  assert.throws(() => cutPageScript('</script><script>'), /no known script element/);
 });
 
 // ── no browser needed ───────────────────────────────────────────────────────────────────────────────────────────
