@@ -204,6 +204,13 @@ test('the keys are lowercase ASCII dot-paths, the values are strings, no key rep
   const sub = structuredClone(CAT.messages);
   sub.en['home.hero.sub'] = '';
   assert.ok(usageProblems({ templates: TEMPLATES, messages: sub, codeKeys: usedKeysOfShared() }).some(p => /home\.hero\.sub/.test(p) && /empty string in en/.test(p)), 'the English document does show the sub line');
+  // CodeRabbit 4601272459: a slot outside every language region is rendered in each language, so its empty value is checked in each one, not only the default
+  const region = { home: '<p>{{home.hero.sub}}</p>' };
+  const both = { en: { 'home.hero.sub': 'Hello' }, th: { 'home.hero.sub': '' } };
+  assert.ok(usageProblems({ templates: region, messages: both, codeKeys: new Set() }).some(p => /home\.hero\.sub/.test(p) && /empty string in th/.test(p)), 'an empty Thai value for a region-less slot is a problem');
+  assert.deepEqual(usageProblems({ templates: region, messages: { en: { 'home.hero.sub': 'Hello' }, th: { 'home.hero.sub': 'สวัสดี' } }, codeKeys: new Set() }), [], 'the same slot with both values is clean');
+  // a language the site does not render is not checked: renderedLangs names the ones it does
+  assert.deepEqual(usageProblems({ templates: region, messages: { ...both, fr: { 'home.hero.sub': '' } }, codeKeys: new Set(), renderedLangs: ['en', 'th'] }).filter(p => /empty string in fr/.test(p)), [], 'a catalogue the site does not render is not checked');
 });
 
 test('a name that is not translated is the same in every language, and the default language must have a catalogue', () => {

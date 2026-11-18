@@ -99,7 +99,7 @@ async function main() {
     // Only the languages the site renders (LANGS): a third catalogue file is checked above, and renders no page, so it has no switch labels to read here.
     try { codeKeys = cat.usedKeys(() => { for (const l of lib.LANGS) { for (const p of lib.SITE_PAGES) for (const b of lib.syncBlocksAt({ lang: l, path: p.path })) b.render(); lib.pageNoteHtml(l); } }); }
     catch (e) { siteFails.push('FAIL the shared blocks could not be rendered: ' + e.message); }
-    if (!siteFails.length) siteFails.push(...tpl.usageProblems({ templates, messages: catalogue.messages, codeKeys }).map(x => 'FAIL ' + x));
+    if (!siteFails.length) siteFails.push(...tpl.usageProblems({ templates, messages: catalogue.messages, codeKeys, renderedLangs: lib.LANGS }).map(x => 'FAIL ' + x));
   }
   const pages = { ...legal.pages };
   // Each output file's page context ({ lang, path }): the shared blocks of a page (the head links, the header, the footer) are that page's own.

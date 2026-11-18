@@ -515,6 +515,8 @@ const sectionNumber = id => {
   const n = Number(id.slice(2));
   return Number.isInteger(n) && n >= 1 ? n : null;
 };
+// The finding a read that throws becomes: the same words the header checks' boundary uses (CodeRabbit 4601272476).
+const threwDetail = e => 'the check threw, so its readings are missing: ' + reportField(String(e && e.message ? e.message : e)).slice(0, 160);
 async function measureFragmentSwitch(page, origin, path, width) {
   await page.setViewport(width, 800);
   await page.goto(origin + path);
@@ -588,13 +590,20 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
         }
         if (checks.includes('lang-url')) {
           await open(320);
-          const head = await page.evaluate(`(${headLinks})()`);
-          measured.push({ ...tag, check: 'lang-url', alternates: head.alternates.length });
-          for (const p of langUrlProblems(head, path, lang, file)) failures.push({ ...tag, check: 'lang-url', detail: p });
+          // a read that throws is this check's finding, and the rest of the run goes on (CodeRabbit 4601272476)
+          let head = null;
+          try { head = await page.evaluate(`(${headLinks})()`); }
+          catch (e) { failures.push({ ...tag, check: 'lang-url', detail: threwDetail(e) }); }
+          if (head) {
+            measured.push({ ...tag, check: 'lang-url', alternates: head.alternates.length });
+            for (const p of langUrlProblems(head, path, lang, file)) failures.push({ ...tag, check: 'lang-url', detail: p });
+          }
         }
         if (checks.includes('m5') && (file === 'terms.html' || file === 'th/terms.html')) {
           for (const width of [1280, 390]) {
-            const r = await measureFragmentSwitch(page, server.origin, path, width);
+            let r;
+            try { r = await measureFragmentSwitch(page, server.origin, path, width); }
+            catch (e) { r = { id: null, error: threwDetail(e) }; }
             measured.push({ ...tag, check: 'm5', width, ...r });
             if (r.error) failures.push({ ...tag, check: 'm5', detail: r.error });
             else if (r.after === null) failures.push({ ...tag, check: 'm5', detail: `at ${width} px the section ${reportField(r.id)} is not on the page the other-language link opens` });

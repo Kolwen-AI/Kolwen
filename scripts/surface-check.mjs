@@ -238,7 +238,13 @@ if (existsSync('web/index.html')) {
   if (!/<html lang="en"(?: data-job="[a-z]+")?>/.test(s)) note('web/index.html', 'default document language is not English');
   // One language per file (ORDER 1017j): the English page holds no Thai block, and the Thai page (web/th/index.html) is English-free in its language attribute.
   if (/id="doc-(en|th)"/.test(s)) note('web/index.html', 'carries a language block (doc-en or doc-th); each language is its own file now, so the English page holds English only');
-  if (existsSync('web/th/index.html') && !/<html lang="th"/.test(read('web/th/index.html'))) note('web/th/index.html', 'default document language is not Thai (<html lang="th">)');
+  // A Thai page the gate cannot read is named once, in the unreadable list above; this rule reads it inside its own try so the rules after it still run (CodeRabbit 4601272506)
+  if (existsSync('web/th/index.html')) {
+    let thIndex = null;
+    try { thIndex = read('web/th/index.html'); }
+    catch (e) { if (!unreadable.includes('web/th/index.html')) note('web/th/index.html', `could not be read (${e.code || e.message}), so the language check on it does not run`); }
+    if (thIndex !== null && !/<html lang="th"/.test(thIndex)) note('web/th/index.html', 'default document language is not Thai (<html lang="th">)');
+  }
   if (!/mailto:info@kolwen\.com/.test(s)) note('web/index.html', 'the published contact channel is missing');
 }
 

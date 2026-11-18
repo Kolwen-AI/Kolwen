@@ -421,6 +421,21 @@ test('the page script is cut by its exact opening and closing text, the rest is 
 });
 
 // ── no browser needed ───────────────────────────────────────────────────────────────────────────────────────────
+// CodeRabbit 4601272476: a page read that throws is that check's finding; the other checks and pages still run
+test('RED a page with no language link: the m5 read throws, that is one m5 finding, and the reflow check still measures the other pages', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.split('<a class="lang-link" href="/th/terms" lang="th" hreflang="th">').join('')));
+  const r = await run(web, ['m5', 'reflow']);
+  assert.ok(where(r.failures, 'terms.html', 'm5').some(f => /the check threw/.test(f.detail)), JSON.stringify(r.failures));
+  assert.ok(r.measured.some(m => m.check === 'reflow' && m.page === 'index.html'), 'the reflow check still ran on the other pages');
+});
+
+test('RED a canonical link the browser cannot read: the lang-url read throws, that is one lang-url finding, and the reflow check still measures the other pages', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.split('<link rel="canonical" href="https://kolwen.com/terms">').join('<link rel="canonical" href="http://[">')));
+  const r = await run(web, ['lang-url', 'reflow']);
+  assert.ok(where(r.failures, 'terms.html', 'lang-url').some(f => /the check threw/.test(f.detail)), JSON.stringify(r.failures));
+  assert.ok(r.measured.some(m => m.check === 'reflow' && m.page === 'index.html'), 'the reflow check still ran on the other pages');
+});
+
 test('findBrowser: an explicit path wins, a wrong explicit path is never replaced by a guess, and the platform lists are searched', () => {
   const me = process.execPath;
   assert.equal(findBrowser({ [BROWSER_ENV]: me }, 'linux'), me);
