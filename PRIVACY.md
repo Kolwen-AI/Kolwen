@@ -27,7 +27,7 @@ which parts change on the day the assistant itself ships.
 
 ## What this site is
 
-Static pages, served by a Cloudflare Worker. **The Worker runs one small script of ours** (`worker/index.mjs`). It hands every request for a path with no static file to the pages, so a missing page gets the 404 page, except that it answers `/status.json` and `/subscribe` itself, and every 15 minutes it requests six of our own pages to check that they answer. It does not log, keep or store a visitor's request, and there is no database and no storage of visitor data on our side. The status record holds only the time, each page check's result, and which result the owner was last told of. A subscriber store is built and switched off: while it is switched off, no address can be stored, and no mail goes to a subscriber in this build. Once an alert address is set, the Worker tries to mail the owner when the result of its checks changes: from all passing to a failure, with each failed check's path, HTTP status or error (a timeout or a network error), timing and content-type result, the number of failed checks and the UTC time; and from failing back to all passing, with a recovery note. Once the status record is bound and can be read, a failure that goes on is not mailed again once the owner has been told, and a send that fails is tried again by the next run that still finds the failure (until then, and whenever the record cannot be read, every failing check run is mailed), and no visitor data is in either mail (a send that fails is logged by its error class only). Until an address is set, nothing is sent.
+Static pages, served by a Cloudflare Worker. **The Worker runs one small script of ours** (`worker/index.mjs`). It hands every request for a path with no static file to the pages, so a missing page gets the 404 page, except that it answers `/status.json` and `/subscribe` itself, and every 15 minutes it requests fourteen of our own addresses, the seven pages in English and the same seven in Thai, to check that they answer. It does not log, keep or store a visitor's request, and there is no database and no storage of visitor data on our side. The status record holds only the time, each page check's result, and which result the owner was last told of. A subscriber store is built and switched off: while it is switched off, no address can be stored, and no mail goes to a subscriber in this build. Once an alert address is set, the Worker tries to mail the owner when the result of its checks changes: from all passing to a failure, with each failed check's path, HTTP status or error (a timeout or a network error), timing and content-type result, the number of failed checks and the UTC time; and from failing back to all passing, with a recovery note. Once the status record is bound and can be read, a failure that goes on is not mailed again once the owner has been told, and a send that fails is tried again by the next run that still finds the failure (until then, and whenever the record cannot be read, every failing check run is mailed), and no visitor data is in either mail (a send that fails is logged by its error class only). Until an address is set, nothing is sent.
 
 *Measured: `grep -nE '^[[:space:]]*"main"' wrangler.jsonc` returns one line, `"main": "worker/index.mjs",`; the config declares a name, a compatibility date, the `assets` block, a cron trigger (`*/15 * * * *`), the `observability` block with invocation logs off, the `send_email` binding, one variable (`ALERT_FROM`) and an empty `previews` block. The alert recipient is a secret set outside the file, so the file holds no recipient address; its one address is the sender, the published `info@kolwen.com` in `ALERT_FROM`.*
 
@@ -43,13 +43,16 @@ Bot Fight Mode sets the `__cf_bm` cookie, and Turnstile sets `cf_clearance` only
 enabled. If either is ever switched on for this site, the sentence above, "no cookies at all", would be
 reworded the same day. Both are off today.
 
-The site itself stores nothing in your browser. It sets no cookie and keeps no language choice: English and
-Thai are two addresses, and the switch between them is a link. An earlier version kept your language choice
-in your browser's `localStorage`, under one key, `kolwen-lang`. Every page now deletes that one key on your
-next visit, and does nothing else with your browser's storage.
+The site itself writes nothing to your browser's storage and sets no cookie. It keeps no language choice: English and
+Thai are two addresses, and the switch between them is a link. An earlier version kept your language choice in your
+browser's `localStorage`, under one key, `kolwen-lang`. Each page now tries to remove that one key when it loads. The
+attempt works only where the page's script runs and your browser lets it reach `localStorage`. If scripts or storage
+are blocked, or the removal fails, the key stays, and you can delete it yourself in your browser's site data settings.
+No page reads or writes that key, and our pages do nothing else with your browser's storage.
 
-*Measured: in `web/`, the one storage call is `localStorage.removeItem('kolwen-lang')`, which every page runs;
-nothing calls `setItem` or `getItem`, and no page sets a cookie.*
+*Measured on 2026-11-18: in `web/`, the one storage call is `localStorage.removeItem('kolwen-lang')`, which each of
+the 22 pages runs inside a `try` that ignores a failure; nothing calls `setItem` or `getItem`, and no page sets a
+cookie. No code in `web/` uses `sessionStorage`, `indexedDB` or `document.cookie`.*
 
 ### When the assistant ships, this changes, and here is exactly how
 
