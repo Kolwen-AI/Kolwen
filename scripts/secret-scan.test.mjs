@@ -1369,3 +1369,33 @@ test('(1103f) looksBinary reads the content: a token in text is text, a NUL in t
   late[8000] = 0;
   assert.strictEqual(scanLib.looksBinary(late), false, 'a NUL after the first 8,000 bytes is outside the probe');
 });
+
+// The scanner drops the trailing TAB of a +++ path without a regular-expression replace, and drops exactly one. The two sites were a regular-expression
+// replace of a trailing TAB, which static analysis reports as incomplete sanitisation. The behaviour is unchanged: git writes one TAB after a name
+// with a space, and a name that ends in a real TAB is written with a backslash-t. The positive control shows the check reads the shape it forbids.
+test('the scanner drops the trailing TAB of a +++ path without a regular-expression replace, and drops exactly one', () => {
+  const text = fs.readFileSync(new URL('./lib/secret-scan.mjs', import.meta.url), 'utf8');
+  const SHAPE = /\.replace\(\/\\t\$\/,/;
+  assert.ok(SHAPE.test("l.slice(4).replace(/\\t$/, '')"), 'positive control');
+  assert.ok(!SHAPE.test(text), 'a regular-expression replace of a trailing TAB is back in the scanner');
+  const key = 'gh' + 'p_' + 'aB3dE5gH7jK9mN1pQ3sT5vX7zA9cD1fG3hJ5';
+  const patch = ['diff --git a/my file.txt b/my file.txt', '--- a/my file.txt\t', '+++ b/my file.txt\t', '@@ -0,0 +1 @@', '+token ' + key, ''].join('\n');
+  const hits = scanPatch(patch);
+  assert.deepStrictEqual(hits.map((h) => h.file), ['my file.txt'], 'the one TAB git writes after a name with a space is not part of the name');
+});
+
+// F4, push path (1107ag): a GUARD, green on the lib before this unit too. The same witness as a pushed hunk: the added lines are the file's bytes cut at
+// each 0x0A byte, as git cuts them. The push path's raw patch reading runs without NUL removal, so it never holds a wide key; the key is found only by
+// the decoded run, which is on line 3. The guard keeps it that way if the raw reading ever gains a NUL drop.
+test('F4 push path guard: a pushed wide hunk reports the key on the decoded line (line 3)', () => {
+  const KEY = ['gh', 'p_', 'A'.repeat(36)].join('');
+  const file = Buffer.from('a\n' + String.fromCharCode(0x0e0a) + '\nid ' + KEY + '\n', 'utf16le');
+  const pieces = [];
+  let from = 0;
+  for (let i = 0; i < file.length; i++) if (file[i] === 0x0a) { pieces.push(file.subarray(from, i)); from = i + 1; }
+  const body = pieces.map((p) => '+' + p.toString('latin1') + '\n').join('');
+  const patch = Buffer.from('\0COMMIT ' + '1'.repeat(40) + '\n' + 'diff --git a/w.txt b/w.txt\n--- /dev/null\n+++ b/w.txt\n@@ -0,0 +1,' + pieces.length + ' @@\n' + body, 'latin1');
+  const hits = scanLib.scanPatch(patch).filter((h) => h.pattern === 'github-token');
+  assert.deepStrictEqual(hits.map((h) => h.line), [3], 'the key was reported on the raw patch line');
+  assert.strictEqual(hits[0].fp, scanLib.fingerprint('w.txt', 'github-token', KEY), 'the fingerprint changed');
+});
