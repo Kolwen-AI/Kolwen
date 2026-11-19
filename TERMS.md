@@ -78,11 +78,22 @@ alone.
 
 ## How usage is counted
 
-[pending legal review] Kolwen counts the tokens of each request at Kolwen's own gateway, as the request
+[pending legal review] This section applies to metered use, billed against credits at the prices per
+million tokens Kolwen publishes; a key or subscription is paid for by its own price and carries no
+per-request charge. Kolwen counts the tokens of each request at Kolwen's own gateway, as the request
 passes through it. Your usage page lists each request and the charge for it, and the charge on that page
 is the charge we take. The records we count from are available to you on request.
 
 **GAP 12—[pending legal review]: counsel confirms the clause.**
+
+## Input served from a cache
+
+[pending legal review] **Launch rule.** At launch, input that Kolwen serves from a cache is billed at
+the same rate as ordinary input. A separate rate for such input applies only if Kolwen announces it by
+notice under "Changes to these Terms", and only to requests made after that notice. Adding a lower rate
+is not a price rise.
+
+**GAP 14—[pending legal review]: counsel confirms the clause.**
 
 ## Limits on keys
 
