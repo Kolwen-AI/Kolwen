@@ -119,7 +119,12 @@ test('HEAD /status.json answers as GET does, with every header GET carries and n
   assert.ok(get.headers.get('content-security-policy'), 'GET carries the global Content-Security-Policy');
   assert.equal(head.status, 200, 'HEAD answers 200, not the 404 page');
   assert.equal(await head.text(), '', 'HEAD has no body');
-  assert.deepEqual([...head.headers].sort(), [...get.headers].sort(), 'HEAD carries exactly the headers GET carries');
+  // K-173: the length GET sends, computed from GET's own body (the live GET carries Content-Length: 805).
+  const getBody = await get.text();
+  const getLength = String(new TextEncoder().encode(getBody).length);
+  assert.equal(head.headers.get('content-length'), getLength, 'HEAD carries the Content-Length of the body GET sends (K-173)');
+  assert.equal(get.headers.get('content-length'), getLength, 'GET carries its own Content-Length');
+  assert.deepEqual([...head.headers].sort(), [...get.headers].sort(), 'HEAD carries exactly the headers GET carries, Content-Length included');
   assert.equal(head.headers.get('cache-control'), 'no-store');
   assert.equal(head.headers.get('x-robots-tag'), 'noindex');
 });

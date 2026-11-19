@@ -114,7 +114,10 @@ export async function monitor(env, { fetchImpl = fetch, now = new Date() } = {})
 // GET /status.json: the stored state, or a plain line when no stored check result is available yet.
 export async function statusResponse(env) {
   const state = (await readState(env)) ?? { checked: null, message: 'No stored check result is available yet.' };
-  return secured(new Response(JSON.stringify(state), { headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } }));
+  const body = JSON.stringify(state);
+  // The byte length of THIS body, computed here, never a constant: HEAD copies these headers and sends no body (K-173).
+  const length = String(new TextEncoder().encode(body).length);
+  return secured(new Response(body, { headers: { 'content-type': 'application/json; charset=utf-8', 'content-length': length, 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } }));
 }
 
 const text = (body, status = 200) => secured(new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } }));
