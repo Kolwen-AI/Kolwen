@@ -3,7 +3,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import vm from 'node:vm';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -321,7 +320,6 @@ test('every generated page holds one shared footer, in the language of its own f
 
 test('the four template pages hold the same two footer blocks and carry the footer rules in a style block', () => {
   for (const file of TEMPLATE_PAGES) {
-    const html = read(file);
     // a template holds its footer as one shared block (the renderer writes each language's footer into its own file); the footer rules come in with the style block
     assert.equal(count(read(lib.SITE_PAGES.find(p => p.file === file).template), '{{block:site-footer}}'), 1, file + ' is generated from a template that holds the shared footer block once');
     assert.match(read(lib.SITE_PAGES.find(p => p.file === file).template), /\{\{raw:style\}\}|\{\{block:site-footer-css\}\}/, file + ' template carries the style block, which holds the footer rules');

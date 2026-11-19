@@ -368,9 +368,6 @@ function measureHeader() {
   const dupes = names.filter((n, i) => names.indexOf(n) !== i);
   return { navs: navs.length, items: items.length, rows: rows.length, outside, notContained, dupes, vw, vh };
 }
-// The scroll position a key press must not change: the page is scrolled to 200 px (or to its end, if shorter) and the position read back after the press.
-const SCROLL_TO = `(() => { const max = document.documentElement.scrollHeight - window.innerHeight; const y = Math.min(200, Math.max(0, max)); window.scrollTo(0, y); return { max, y: window.scrollY }; })()`;
-const LANG_STATE = `(() => ({ lang: document.documentElement.lang, y: window.scrollY }))()`;
 // The accessible name of a node, read through the protocol (the browser's own computation, not a re-derivation here).
 async function accessibleName(page, selector) {
   await page.send('DOM.enable');
