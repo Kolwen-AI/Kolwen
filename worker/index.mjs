@@ -163,7 +163,7 @@ export default {
     // RFC 9110 §9.3.2: HEAD answers as GET does, with the same status and headers and no body (K-168).
     if ((request.method === 'GET' || request.method === 'HEAD') && pathname === '/status.json') {
       const res = await statusResponse(env);
-      return request.method === 'HEAD' ? new Response(null, { status: res.status, headers: res.headers }) : res;
+      return request.method === 'HEAD' ? secured(new Response(null, { status: res.status, headers: res.headers })) : res;
     }
     return (await handleSubscription(request, env)) ?? env.ASSETS.fetch(request);
   },
