@@ -28,7 +28,7 @@ const tracked = execSync('git ls-files', { encoding: 'utf8' }).split('\n').filte
 // Binary only. SVG is TEXT — hand-editable XML, tracked, and served at kolwen.com/favicon.svg,
 // so it is exactly the kind of file a path or a private name gets pasted into. The dot is
 // escaped: unescaped, the class also swallowed any name merely ENDING in those letters.
-const isBinary = f => /\.(png|ico|woff2?|ttf)$/i.test(f);
+const isBinary = f => /\.(png|jpe?g|ico|woff2?|ttf)$/i.test(f);
 
 // SCOPE. These rules police PUBLISHED CLAIMS — what a reader of the site, the README, the brand
 // doc or the PyPI page sees. One exclusion, load-bearing: a checker must be able to NAME the
@@ -315,7 +315,7 @@ const SHIPPED = new Set([
   'web/th/accessibility.html', 'web/th/terms.html', 'web/th/privacy.html', 'web/th/refund.html', 'web/th/changelog.html',
   // The plain-text guide for language models (llmstxt.org shape); it states only what the pages state and is not in the sitemap.
   'web/llms.txt',
-  'web/favicon.svg', 'web/favicon-32.png', 'web/apple-touch-icon.png', 'web/og.png',
+  'web/favicon.svg', 'web/favicon-32.png', 'web/apple-touch-icon.png', 'web/og.jpg',
   // The self-hosted fonts, BY NAME like everything above (a new face or a new script is a deliberate act here, with its OFL.txt beside it): the one manifest every page
   // links, and the WOFF2 files and licence texts of KW Sans Thai (a folder per script) and KW Mono, which are subsets of IBM Plex Sans Thai and IBM Plex Mono renamed under OFL-1.1. The WOFF2 names carry a hash of their bytes (scripts/font-subset.mjs writes them, and prints these lines); fonts.test.mjs and font-versions.test.mjs hold name and bytes together. post-deploy-check lists web/ recursively, so these are checked when deployed.
   'web/fonts/fonts.css',
@@ -566,7 +566,7 @@ const gapNote = gapNotes.length ? ' · ' + gapNotes.join(' · ') : '';
 // scanned set, or one that lacks any of five anchor files (three a reader meets, two outside the
 // PUBLISHED set), is a finding, not a pass.
 //
-// STATED LIMITS, not fixed here: an IMAGE of the address (png/ico/font files are never read, og.png
+// STATED LIMITS, not fixed here: an IMAGE of the address (png/jpg/ico/font files are never read, og.jpg
 // included); an address split across two lines (the bracket form tolerates spaces and tabs only);
 // the local part or the domain obfuscated (`[dot]`, entity-encoded letters, a string assembled by
 // concatenation in script); double encoding (`%2540`); base64 or any other wrapper; any surface

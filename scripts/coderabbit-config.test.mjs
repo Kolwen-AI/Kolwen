@@ -223,7 +223,7 @@ test('RED PROOF: a filter that hides a text file is a problem, and so is a citat
   cites('Surface-check rule 13 fails on', 'Surface-check rule 99 fails on', '99');
   cites('surface-check rule 13b', 'surface-check rule 98b', '98b');
   assert.ok(SURFACE_RULES.has('13b') && SURFACE_RULES.has('5') && !SURFACE_RULES.has('14'), 'the rule numbers are read from the file');
-  assert.ok(BINARY.has('web/og.png') && BINARY.has('brand/kolwen-wordmark.png') && !BINARY.has('web/favicon.svg'), 'binary means git i/-text');
+  assert.ok(BINARY.has('web/og.jpg') && BINARY.has('brand/kolwen-wordmark.png') && !BINARY.has('web/favicon.svg'), 'binary means git i/-text');
 });
 
 // Every cited number counts, wherever it stands: in a list at any position, behind the words surface-check or only behind rule (the same sentence cites a second rule with a bare "and rule N"), and in a comment line of the file.

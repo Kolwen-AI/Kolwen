@@ -6,6 +6,8 @@
 # below are content-hashed, and only they may carry `immutable`.
 /*.png
   Cache-Control: public, max-age=86400
+/*.jpg
+  Cache-Control: public, max-age=86400
 /*.svg
   Cache-Control: public, max-age=86400
 /*.ico
