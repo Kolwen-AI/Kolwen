@@ -46,6 +46,10 @@
 	// Today the Workers Logs page above states the Free plan's daily limit and retention. From 2026-12-01 these logs fall under
 	// Cloudflare Observability pricing (https://developers.cloudflare.com/observability/pricing/): on Free, ingestion stops at the daily limit and resumes at 00:00 UTC.
 	"observability": {
+		// Traces off (https://developers.cloudflare.com/workers/observability/traces/, read 2026-11-19: tracing is set by observability.traces.enabled).
+		// Cloudflare's compatibility-flags page (https://developers.cloudflare.com/workers/configuration/compatibility-flags/, read 2026-11-19) says automatic tracing
+		// will ride observability.enabled with a newer compatibility_date, so this pin keeps tracing off if that date lands.
+		"traces": { "enabled": false },
 		"enabled": true,
 		"logs": {
 			"invocation_logs": false

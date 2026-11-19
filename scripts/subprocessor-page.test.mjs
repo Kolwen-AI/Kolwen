@@ -62,7 +62,8 @@ const withoutOwnSwitches = (text, t) => {
     const b = text.indexOf(CLOSE_DIV, a);
     if (b < 0) return out + text.slice(i);
     const end = b + CLOSE_DIV.length, block = text.slice(a, end);
-    const own = block.split('href="').length === 2 && block.includes('class="lang-link" href="' + t + '"');
+    // every URL attribute in the block counts, in any quoting (K-152b): a block with one more link than its own switch is not cut out
+    const own = hrefsIn(block).length === 1 && block.includes('class="lang-link" href="' + t + '"');
     out += text.slice(i, own ? a : end);
     i = end;
   }
@@ -233,5 +234,20 @@ test('K-152 control: a plain link to /subprocessors on a public page is a hit', 
   try {
     const hits = scanRoot(dir, DARK);
     assert.ok(hits.includes('web/index.html href="/subprocessors"'), JSON.stringify(hits));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+// K-152b: the own-switch exemption counts every URL attribute in the block, whatever its quoting. A second, single-quoted link to the twin's own address,
+// planted inside the twin's own switch block, must still be scanned (it is not cut out with the block).
+test('K-152b: a single-quoted link to the twin address, inside the twin page\'s own switch block, is a hit', () => {
+  const dir = copyTree(d => {
+    const p = join(d, 'web/subprocessors.html'), text = readFileSync(p, 'utf8');
+    const a = text.indexOf('<div class="lswitch"');
+    assert.ok(a >= 0, 'web/subprocessors.html holds its switch block');
+    const b = text.indexOf('</div>', a);
+    writeFileSync(p, text.slice(0, b) + "<a href='/th/subprocessors'>x</a>" + text.slice(b));
+  });
+  try {
+    const hits = scanRoot(dir, ['/th/subprocessors']);
+    assert.ok(hits.includes('web/subprocessors.html href="/th/subprocessors"'), 'the single-quoted link is reported: ' + JSON.stringify(hits));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
