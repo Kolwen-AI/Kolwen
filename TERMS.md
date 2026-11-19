@@ -97,7 +97,9 @@ adds to it:
 - **An unredeemed key is refunded in full within 14 days of purchase.** Nothing was used, so the key is
   simply voided.
 - **A subscription starts at once, on your consent.** A refund inside the first billing period deducts
-  the days you used, and Kolwen's usage metering is the proof of those days.
+  the days that have passed since your subscription started, counted from the start time recorded on
+  your Paddle receipt and in your Kolwen account, and the records we count from are available to you on
+  request.
 - **Unused prepaid credits are refundable at the price you paid, in the same 14-day window.**
 - When Kolwen ends the contract without cause, it refunds the unused part (see "Ending the contract").
 
