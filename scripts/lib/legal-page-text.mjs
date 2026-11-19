@@ -13,18 +13,21 @@ export const PAGES = {
     metaTitleEn: 'Kolwen terms of use: a draft that is not yet in force', metaTitleTh: 'ข้อกำหนดการใช้งาน Kolwen: ฉบับร่างที่ยังไม่มีผลบังคับใช้',
     titleEn: 'Terms', titleTh: 'ข้อกำหนด',
     descEn: 'Kolwen terms: a draft, not in force. Nothing is for sale, and parts of it wait for review by counsel.',
+    descTh: 'ข้อกำหนดของ Kolwen: ฉบับร่าง ยังไม่มีผลใช้บังคับ ยังไม่มีสินค้าให้ซื้อ และบางส่วนรอที่ปรึกษากฎหมายตรวจสอบ',
   },
   privacy: {
     file: 'web/privacy.html', path: '/privacy', job: 'prose',
     metaTitleEn: 'Kolwen privacy notice: what the site does today (draft)', metaTitleTh: 'นโยบายความเป็นส่วนตัวของ Kolwen: เว็บไซต์ทำอะไรในวันนี้ (ฉบับร่าง)',
     titleEn: 'Privacy', titleTh: 'ความเป็นส่วนตัว',
     descEn: 'Kolwen privacy notice: a draft. It states what this site does today, and parts of it wait for review by counsel.',
+    descTh: 'นโยบายความเป็นส่วนตัวของ Kolwen: ฉบับร่าง ระบุสิ่งที่เว็บไซต์ทำในวันนี้ และบางส่วนรอที่ปรึกษากฎหมายตรวจสอบ',
   },
   refund: {
     file: 'web/refund.html', path: '/refund', job: 'prose',
     metaTitleEn: 'Kolwen refund terms: a draft, and nothing is for sale yet', metaTitleTh: 'การคืนเงินของ Kolwen: ฉบับร่าง และยังไม่มีสินค้าขาย',
     titleEn: 'Refunds', titleTh: 'การคืนเงิน',
     descEn: 'Kolwen refund terms: a draft. Nothing is for sale yet, and parts of it wait for review by counsel.',
+    descTh: 'การคืนเงินของ Kolwen: ฉบับร่าง ยังไม่มีสินค้าให้ซื้อ และบางส่วนรอที่ปรึกษากฎหมายตรวจสอบ',
   },
 };
 
@@ -35,6 +38,7 @@ PAGES.changelog = {
   // The log is kept in English; the Thai view says so (a status statement, no obligation).
   noteTh: 'บันทึกการเปลี่ยนแปลงนี้เขียนเป็นภาษาอังกฤษ',
   descEn: "Kolwen's changelog, rendered from the repository's CHANGELOG.md. No product has shipped yet.",
+  descTh: 'บันทึกการเปลี่ยนแปลงของ Kolwen แสดงจากไฟล์ CHANGELOG.md ของที่เก็บโค้ด ยังไม่มีผลิตภัณฑ์ใดออกสู่สาธารณะ',
 };
 
 export const BANNER = {

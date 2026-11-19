@@ -109,6 +109,21 @@ test('/status.json answers "No stored check result is available yet." when the s
   assert.equal(after.headers.get('x-robots-tag'), 'noindex');
 });
 
+test('HEAD /status.json answers as GET does, with every header GET carries and no body (K-168, RFC 9110 §9.3.2)', async () => {
+  const store = kv();
+  const env = { STATUS: store, ASSETS: { fetch: async () => new Response('<!doctype html>not found', { status: 404, headers: HTML }) } };
+  await monitor({ STATUS: store, EMAIL: mailbox().EMAIL }, { fetchImpl: fetchWith() });
+  const get = await worker.fetch(new Request('https://kolwen.com/status.json'), env);
+  const head = await worker.fetch(new Request('https://kolwen.com/status.json', { method: 'HEAD' }), env);
+  assert.equal(get.status, 200);
+  assert.ok(get.headers.get('content-security-policy'), 'GET carries the global Content-Security-Policy');
+  assert.equal(head.status, 200, 'HEAD answers 200, not the 404 page');
+  assert.equal(await head.text(), '', 'HEAD has no body');
+  assert.deepEqual([...head.headers].sort(), [...get.headers].sort(), 'HEAD carries exactly the headers GET carries');
+  assert.equal(head.headers.get('cache-control'), 'no-store');
+  assert.equal(head.headers.get('x-robots-tag'), 'noindex');
+});
+
 test('with SUBSCRIBE off both subscription endpoints answer 404, and the store is never written', async () => {
   const subs = kv();
   const env = { SUBSCRIBE: 'off', SUBSCRIBERS: subs };
