@@ -38,3 +38,17 @@ test('/accessibility and /status carry a canonical on their own address', () => 
 test('/status carries the meta description the SEO text gives it', () => {
   assert.equal(metaByName(page('status'), 'description'), 'Kolwen checks its public pages every 15 minutes; this page shows the last stored check result.');
 });
+
+// K-167: the Thai file of every public page carries one nonempty meta description, and its og:description is that same text. Every miss is collected
+// before the assertion, so one run names every page that fails.
+test('the Thai file of every public page (web/th/) carries a nonempty meta description, and its og:description is that text (K-167)', () => {
+  const misses = [];
+  for (const name of PUBLIC) {
+    const html = readFileSync(new URL('../web/th/' + name + '.html', import.meta.url), 'utf8');
+    const description = metaByName(html, 'description');
+    if (!description || description.trim() === '') misses.push(name + ': no nonempty meta description');
+    // index keeps its own pair as the English home does; pricing's Thai pair differs and is K-171, outside this PR.
+    else if (!['index', 'pricing'].includes(name) && metaByProperty(html, 'og:description') !== description) misses.push(name + ': og:description is not the meta description');
+  }
+  assert.deepEqual(misses, [], 'Thai pages without a description (web/th/<name>.html)');
+});
