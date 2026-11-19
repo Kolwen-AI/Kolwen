@@ -284,6 +284,9 @@
     "date": "1 November 2026."
   },
   "shared": {
+    "share": {
+      "image-alt": "The Kolwen wordmark: cream letters beside three orange bars, on a dark background, with a fossil footprint, a fern fossil, an open book, a lump of coal and a magnifying glass at the edges."
+    },
     "brand": "Kolwen",
     "skip": "Skip to main content",
     "header": {

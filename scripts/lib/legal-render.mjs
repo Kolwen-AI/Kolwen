@@ -530,9 +530,10 @@ ${fenced('site-links', ctx)}
 <meta property="og:type" content="website">
 <meta property="og:title" content="${escAttr(title)}">
 ${description ? `<meta property="og:description" content="${escAttr(description)}">` : ''}
-<meta property="og:image" content="https://kolwen.com/og.png">
+<meta property="og:image" content="https://kolwen.com/og.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="${escAttr(t(lang, 'shared.share.image-alt'))}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escAttr(title)}">
 ${description ? `<meta name="twitter:description" content="${escAttr(description)}">` : ''}
