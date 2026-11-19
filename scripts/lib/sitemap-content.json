@@ -21,13 +21,13 @@
   },
   "https://kolwen.com/terms": {
     "page": "web/terms.html",
-    "sha256": "8333486c560f3d0e53c7e8d3d73f81ae7aa6bddc1946eef89a9055f585a0a2f6",
-    "lastmod": "2026-11-17"
+    "sha256": "f383d3e62112a1aad33b70f46f3e19ecc8739491667b0cc816082a87ab5a7e86",
+    "lastmod": "2026-11-19"
   },
   "https://kolwen.com/th/terms": {
     "page": "web/th/terms.html",
-    "sha256": "627ca793e9e8cac9a03ace4c21dc5513d92ae4e1aa724e755fe16951a20b092e",
-    "lastmod": "2026-11-17"
+    "sha256": "7686749d6a2e4551723b487390ef7893bff1cde0451765ae5bc6791ade4b97f3",
+    "lastmod": "2026-11-19"
   },
   "https://kolwen.com/privacy": {
     "page": "web/privacy.html",

@@ -76,6 +76,14 @@ A key is a licence to consume, not a thing you own. It is **non-transferable and
 when you activate it.** Before activation a key can be given as a gift; after activation it is yours
 alone.
 
+## How usage is counted
+
+[pending legal review] Kolwen counts the tokens of each request at Kolwen's own gateway, as the request
+passes through it. Your usage page lists each request and the charge for it, and the charge on that page
+is the charge we take. The records we count from are available to you on request.
+
+**GAP 12—[pending legal review]: counsel confirms the clause.**
+
 ## Limits on keys
 
 These limits exist to stop bulk buying for resale, and are set at what one household should need.
