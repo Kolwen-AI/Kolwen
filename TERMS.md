@@ -84,6 +84,11 @@ per-request charge. Kolwen counts the tokens of each request at Kolwen's own gat
 passes through it. Your usage page lists each request and the charge for it, and the charge on that page
 is the charge we take. The records we count from are available to you on request.
 
+Each model has two published prices per million tokens, listed separately: one for input and one for
+output. Input is the tokens of your request. Output is the tokens the model sends back. Each is billed
+at its own price. Any tokens Kolwen adds around your message to put it in the model's chat format are
+not billed.
+
 **GAP 12—[pending legal review]: counsel confirms the clause.**
 
 ## Input served from a cache
