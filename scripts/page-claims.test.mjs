@@ -361,35 +361,47 @@ const finishedNamed = (r, label, msgs) => {
   assert.equal(r.status, 1, label + ': finished, and it must name the page: ' + (r.stdout + r.stderr).slice(0, 400));
   for (const m of msgs) assert.match(r.stdout + r.stderr, m, label + ': the finding of its own rule is missing');
 };
-// K-172: one size's run, timed. The child is the same surface-check the other rows run; only the size and the clock are here.
-const bulkTimed = (dir, unit, n) => {
-  edit(dir, 'web/index.html', s => s.replace('</body>', unit.repeat(n) + '</body>'));
-  const t0 = Date.now();
-  const r = spawnSync(process.execPath, ['--max-old-space-size=512', join(dir, 'scripts/surface-check.mjs')], { encoding: 'utf8', timeout: 60000, killSignal: 'SIGKILL', cwd: dir, env: childEnv(dir), maxBuffer: 64 << 20 });
-  return { r, ms: Date.now() - t0 };
+// K-172: observe character reads in the planted link region in the real gate's child.
+// Instrument only this child's String prototype; the production reader and its API stay unchanged.
+const bulkLinkWork = (dir, n) => {
+  const unit = '<link ';
+  const after = edit(dir, 'web/index.html', s => s.replace('</body>', unit.repeat(n) + '</body>'));
+  const start = after.indexOf(unit.repeat(n)), end = start + unit.length * n;
+  const child = `
+    const charCodeAt = String.prototype.charCodeAt;
+    let work = 0;
+    String.prototype.charCodeAt = function (i) {
+      if (i >= ${start} && i < ${end} && this.length === ${after.length}) work++;
+      return charCodeAt.call(this, i);
+    };
+    process.on('exit', () => process.stderr.write('LINK_SCAN_WORK ' + work + '\\n'));
+    await import('./scripts/surface-check.mjs');
+  `;
+  const r = spawnSync(process.execPath, ['--max-old-space-size=512', '--input-type=module', '-e', child], { encoding: 'utf8', timeout: 60000, killSignal: 'SIGKILL', cwd: dir, env: childEnv(dir), maxBuffer: 64 << 20 });
+  const measured = /^LINK_SCAN_WORK (\d+)$/m.exec(r.stderr || '');
+  return { r, work: measured ? Number(measured[1]) : NaN };
 };
-// The growth check: 4 times the work may take at most 8 times the time. The base is floored at 500 ms, so a fast run's noise is not read as growth.
-const growthOk = (msSmall, msLarge) => msLarge / Math.max(msSmall, 500) < 8;
+// Four times the openers must do less than eight times the character reads.
+const growthOk = (small, large) => Number.isSafeInteger(small) && small > 0 && Number.isSafeInteger(large) && large >= small && large < 8 * small;
 test('CLASS B gate row, rules 13 and 16: 200,000 unterminated <meta " openers finish, and rule 13 names its own unread tags', () => {
   const dir = surfaceCopy();
   try { finishedNamed(bulkGate(dir, '<meta "'), '<meta "', [/web\/index\.html: has \d+ <meta> tag\(s\) the reader cannot read to its end/]); } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-// K-172: the <link row proves the class by TWO sizes, not one wall-clock figure. Each size must finish with its finding named (not killed), and the time must grow
-// linearly: 4 times the openers may take at most 8 times the time (a linear scan about 4 times, a quadratic one about 16). The 60 s timer stays a kill ceiling.
-test('K-172: <link openers finish at 25,000 and at 100,000, and the time grows linearly, not quadratically', () => {
+// Both sizes must finish with their finding named. Scan work is deterministic; the 60 s timer stays a kill ceiling.
+test('K-172: <link openers finish at 25,000 and at 100,000, and scan work grows linearly', () => {
   const small = surfaceCopy(), large = surfaceCopy();
   const finding = [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/];
   try {
-    const a = bulkTimed(small, '<link ', 25000), b = bulkTimed(large, '<link ', 100000);
+    const a = bulkLinkWork(small, 25000), b = bulkLinkWork(large, 100000);
     finishedNamed(a.r, '<link , 25,000 openers', finding);
     finishedNamed(b.r, '<link , 100,000 openers', finding);
-    assert.ok(growthOk(a.ms, b.ms), `time grew from ${a.ms} ms to ${b.ms} ms for 4 times the openers: a linear scan grows about 4 times, a quadratic one about 16 times`);
+    assert.ok(growthOk(a.work, b.work), `link scan character reads grew from ${a.work} to ${b.work} for 4 times the openers`);
   } finally { rmSync(small, { recursive: true, force: true }); rmSync(large, { recursive: true, force: true }); }
 });
-test('K-172: the growth check accepts linear timings, refuses quadratic ones, and floors a fast base so noise is not read as growth', () => {
+test('K-172: the growth check accepts linear work and refuses quadratic or missing measurements', () => {
   assert.equal(growthOk(1000, 4000), true);
   assert.equal(growthOk(1000, 16000), false);
-  assert.equal(growthOk(10, 40), true);
+  for (const [small, large] of [[0, 0], [NaN, 4000], [1000, NaN], [1000, 0]]) assert.equal(growthOk(small, large), false);
 });
 test('CLASS B gate row, rules 13 and 17: 200,000 unterminated <a openers finish, and each rule names its own unread tags', () => {
   const dir = surfaceCopy();
