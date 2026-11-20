@@ -368,12 +368,17 @@ const bulkWork = (dir, unit, n) => {
     const orig = { charCodeAt: String.prototype.charCodeAt, indexOf: String.prototype.indexOf, slice: String.prototype.slice };
     const START = ${start}, END = ${end}, LEN = ${len};
     const kinds = { charCodeAt: 0, indexOf: 0, slice: 0, exec: 0 };
+    const SPAN_STACK = 64;
     const execOrig = RegExp.prototype.exec;
     Error.stackTraceLimit = 10; // the frame chain of the call, read to its depth: a search by exec, test, search, match or replace, directly or through a helper, has scanStartTag in it
     RegExp.prototype.exec = function (s) {
       const from = (this.global || this.sticky) ? this.lastIndex : 0;
       const m = execOrig.call(this, s);
-      if (typeof s === 'string' && s.length === LEN && new Error().stack.includes('scanStartTag')) charge('exec', from, m ? m.index + m[0].length : (this.sticky ? from + 1 : LEN));
+      if (typeof s === 'string' && s.length === LEN) {
+        const to = m ? m.index + m[0].length : (this.sticky ? from + 1 : LEN);
+        // A search scanning at most SPAN_STACK characters costs a constant per start tag, so it is charged without the chain check (the stack capture is the slow part).
+        if (to - from <= SPAN_STACK || new Error().stack.includes('scanStartTag')) charge('exec', from, to);
+      }
       return m;
     };
     const charge = (kind, lo, hi) => { const a = Math.max(lo, START), b = Math.min(hi, END); if (b > a) kinds[kind] += b - a; };
