@@ -359,8 +359,8 @@ const finishedNamed = (r, label, msgs) => {
 // K-180: RegExp exec is counted only when its caller is scanStartTag, the reader's start-tag search (the child reads the caller's frame name, so a regex in that function is
 // charged by the characters it scans). The page-wide element rules are not charged: on the real reader they grow 15 times for 4 times the openers (exec 0.56 billion at 5,000
 // openers, 8.53 billion at 20,000; `<(script)\b`, `<(meta)\b`, `<(style)\b` and `<(a)\b` are 99.8% of it, the charCodeAt count grows 4.5 times), so counting them would fail the
-// real reader. That growth is a named finding, not a pass: the rules' cost grows quadratically with unrelated openers, and no row here reads it. A regex search that the start-tag
-// scan makes through a helper with another name is not seen; the frame name is the key, and the K-180 mutant sits in scanStartTag itself.
+// real reader. That growth is a named finding, not a pass: the rules' cost grows quadratically with unrelated openers, and no row here reads it. A regex search the start-tag
+// scan makes by any method, directly or through a helper, is charged, because the frame chain is read to its depth; a search outside that chain is not.
 const GROWTH_SMALL = 5000, GROWTH_LARGE = 20000;
 const bulkWork = (dir, unit, n) => {
   const after = edit(dir, 'web/index.html', s => s.replace('</body>', unit.repeat(n) + '</body>'));
@@ -370,11 +370,11 @@ const bulkWork = (dir, unit, n) => {
     const START = ${start}, END = ${end}, LEN = ${len};
     const kinds = { charCodeAt: 0, indexOf: 0, slice: 0, exec: 0 };
     const execOrig = RegExp.prototype.exec;
-    Error.stackTraceLimit = 3; // the header, this wrapper, then the caller: the frame that names the search
+    Error.stackTraceLimit = 10; // the frame chain of the call, read to its depth: a search by exec, test, search, match or replace, directly or through a helper, has scanStartTag in it
     RegExp.prototype.exec = function (s) {
       const from = (this.global || this.sticky) ? this.lastIndex : 0;
       const m = execOrig.call(this, s);
-      if (typeof s === 'string' && s.length === LEN && (new Error().stack.split('\\n')[2] || '').includes('scanStartTag')) charge('exec', from, m ? m.index + m[0].length : LEN);
+      if (typeof s === 'string' && s.length === LEN && new Error().stack.includes('scanStartTag')) charge('exec', from, m ? m.index + m[0].length : LEN);
       return m;
     };
     const charge = (kind, lo, hi) => { const a = Math.max(lo, START), b = Math.min(hi, END); if (b > a) kinds[kind] += b - a; };
@@ -444,6 +444,24 @@ test('K-180: the growth check refuses a regex-exec mutant of the start-tag scan 
   const m = growthRun('<link ', mutateRegexExec);
   t.diagnostic(`regex-exec mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
   refusedByCount(m, 'regex-exec mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+});
+// C180-1: the same search made by a method other than exec (test), and by exec moved into a helper that scanStartTag calls. Both must be charged.
+const mutateRegexTest = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = new RegExp('>', 'g'); re.lastIndex = nameEnd; re.test(s); } // mutant"));
+const mutateRegexHelper = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('export function scanStartTag(s, nameEnd, max = META_MAX, collect = false) {', m => "function findGt(s, from) { const re = new RegExp('>', 'g'); re.lastIndex = from; return re.exec(s); }\n" + m).replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + '\n  findGt(s, nameEnd); // mutant'));
+test('C180-1: the count refuses a regex test() mutant of the start-tag scan by its own count, with both sizes finishing', t => {
+  const m = growthRun('<link ', mutateRegexTest);
+  t.diagnostic(`test mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)})`);
+  refusedByCount(m, 'test mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+});
+test('C180-1: the count refuses a regex exec-in-helper mutant (findGt, called by scanStartTag) by its own count, with both sizes finishing', t => {
+  const m = growthRun('<link ', mutateRegexHelper);
+  t.diagnostic(`helper mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)})`);
+  refusedByCount(m, 'helper mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+});
+test('C180-1: the real reader stays linear under the deeper frame chain, and its ratio is shown', t => {
+  const m = growthRun('<link ');
+  t.diagnostic(`real reader: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)})`);
+  assert.ok(growthOk(m.a.work, m.b.work), 'real reader: scan work must grow linearly');
 });
 // K-183: a mutant child that exits before the reader finishes prints no count (or a zero one), so growthOk is false and the refusal assertion would pass vacuously.
 const mutateEarlyExit = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + '\n  process.exit(0); // mutant'));

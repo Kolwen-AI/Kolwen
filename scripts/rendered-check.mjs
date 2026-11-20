@@ -581,6 +581,27 @@ async function measureBackAfterSwitch(page, origin, path, width) {
   await pause(200);
   return { hash: await page.evaluate('location.hash'), restored };
 }
+// C180-2 (K-181): the pageshow reset. A persisted pageshow must strip the links' fragments, and the remembered section must become the page's own hash (none here), so a
+// keyboard activation at the top adds no fragment. Both are read from the link itself. Red: the reset removed in a scratch copy of web/ (its persisted test disabled).
+async function measurePageshowReset(page, origin, path, width) {
+  await page.setViewport(width, 800);
+  await page.goto('about:blank');
+  await page.goto(origin + path);
+  const other = langPath(englishOf(path), /^\/th(\/|$)/.test(path) ? 'en' : 'th');
+  await page.evaluate(`document.querySelector('a.lang-link').setAttribute('href', String.fromCharCode(${charCodesOf(other + '#compare-title')}))`);
+  await page.evaluate(`window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))`);
+  const afterPageshow = await page.evaluate(`document.querySelector('a.lang-link').getAttribute('href')`);
+  // The remembered section: scroll so a section is above (the scroll keeps it), focus the link (the focus scrolls to the top, which keeps it), then a persisted pageshow.
+  await page.goto('about:blank');
+  await page.goto(origin + path);
+  await page.evaluate(`window.scrollTo(0, Math.floor((document.documentElement.scrollHeight - window.innerHeight) / 2))`);
+  await pause(200);
+  await page.evaluate(`document.querySelector('a.lang-link').focus()`);
+  await pause(200);
+  await page.evaluate(`window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))`);
+  const keptHref = await page.evaluate(`(() => { const a = document.querySelector('a.lang-link'); a.click(); return a.getAttribute('href'); })()`);
+  return { afterPageshow, keptHref };
+}
 export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, headers = true }) {
   const failures = [], measured = [], notes = [], languageFailed = new Set(), resourceSeen = new Set();
   const server = await browser.serve(webDir, { headers }); // a real server on 127.0.0.1, or the DevTools channel, whichever the browser can reach
@@ -662,6 +683,17 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
             measured.push({ ...tag, check: 'fragment', step: 'back', width, ...r });
             if (r.error) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, after Back: ${r.error}` });
             else if (r.hash !== '') failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, a keyboard switch from ${path}#compare-title, Back, then a pointer switch at the top opens ${reportField(r.hash)} (the section the first switch remembered), not the top of the page` });
+          }
+        }
+        if (checks.includes('fragment') && (file === 'pricing.html' || file === 'th/pricing.html')) {
+          for (const width of [1280, 390]) {
+            let r;
+            try { r = await measurePageshowReset(page, server.origin, path, width); }
+            catch (e) { r = { error: threwDetail(e) }; }
+            measured.push({ ...tag, check: 'fragment', step: 'pageshow', width, ...r });
+            if (r.error) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, pageshow: ${r.error}` });
+            else if (typeof r.afterPageshow !== 'string' || r.afterPageshow.includes('#')) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, a persisted pageshow left the fragment in the language link: ${reportField(String(r.afterPageshow))}` });
+            else if (typeof r.keptHref !== 'string' || r.keptHref.includes('#')) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, after a persisted pageshow a keyboard activation at the top still carries the remembered section: ${reportField(String(r.keptHref))}` });
           }
         }
         if (checks.includes('m5') && (file === 'terms.html' || file === 'th/terms.html')) {
@@ -793,7 +825,7 @@ async function main() {
     const { failures, measured, notes } = await renderedChecks({ webDir, browser, checks, headers: !args.includes('--no-headers') });
     for (const f of failures) console.log(failLine(f));
     if (notes.length) console.log(noteLine(notes));
-    for (const m of measured.filter(x => x.check === 'fragment')) console.log('FRAGMENT ' + JSON.stringify({ page: m.page, width: m.width, hash: m.hash ?? null, error: m.error ?? null, step: m.step ?? 'landing', restored: m.restored ?? null, before: m.before && { scrollY: Math.round(m.before.scrollY), max: Math.round(m.before.max), target: m.before.target === null ? null : Math.round(m.before.target) } }));
+    for (const m of measured.filter(x => x.check === 'fragment')) console.log('FRAGMENT ' + JSON.stringify({ page: m.page, width: m.width, hash: m.hash ?? null, error: m.error ?? null, step: m.step ?? 'landing', restored: m.restored ?? null, afterPageshow: m.afterPageshow ?? null, keptHref: m.keptHref ?? null, before: m.before && { scrollY: Math.round(m.before.scrollY), max: Math.round(m.before.max), target: m.before.target === null ? null : Math.round(m.before.target) } }));
     for (const m of measured.filter(x => x.check === 'm5')) console.log('M5 ' + JSON.stringify({ page: m.page, width: m.width, section: m.id, after_top_px: m.after === undefined ? null : Math.round(m.after * 10) / 10, window_height: m.vh, error: m.error ?? null }));
     const pages = new Set(measured.map(m => m.page)).size;
     if (failures.length) { console.error(`rendered-check FAILED: ${failures.length} finding(s) over ${pages} page(s)`); process.exitCode = 1; return; }
