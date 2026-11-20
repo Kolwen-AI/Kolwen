@@ -358,7 +358,7 @@ const finishedNamed = (r, label, msgs) => {
 // The sizes are 5,000 and 20,000, so a quadratic mutant finishes inside the 60 s clock and is refused by its count; the timer stays a kill ceiling.
 // LIMIT, measured: RegExp exec is not counted. The page-wide rules of the real pipeline run regexes over the planted region that examine far more characters than the
 // reader's loop does (8.5 billion against 0.4 billion for charCodeAt at 20,000 openers) and V8 runs them fast, so counting them would fail the real reader. A regex-only
-// mutant that reads the page through exec is caught by the clock alone; a regex per tag that copies the page through slice is caught by its count.
+// mutant that searches the page through exec is not counted and passes the 5,000 and 20,000 rows; the 200,000-opener finish row's clock is what refuses it (measured: a per-tag `exec` from `nameEnd` adds about 3.5 s at 20,000).
 const GROWTH_SMALL = 5000, GROWTH_LARGE = 20000;
 const bulkWork = (dir, unit, n) => {
   const after = edit(dir, 'web/index.html', s => s.replace('</body>', unit.repeat(n) + '</body>'));
@@ -422,6 +422,34 @@ test('K-178: the growth check refuses an indexOf mutant and a slice mutant by th
     assert.equal(m.b.r.error, undefined, `${name} mutant: the large size finished inside the clock`);
     assert.equal(growthOk(m.a.work, m.b.work), false, `${name} mutant: the count must refuse the growth`);
   }
+});
+// C178-1: one 200,000-opener finish row keeps the clock as the ceiling for the work the count does not see (a regex's exec, which the count leaves out). The regex mutant
+// below is refused by that row's clock; the real reader finishes the same row.
+const BULK_N = 200000;
+const bulkGate = (dir, unit) => {
+  edit(dir, 'web/index.html', s => s.replace('</body>', unit.repeat(BULK_N) + '</body>'));
+  return spawnSync(process.execPath, ['--max-old-space-size=512', join(dir, 'scripts/surface-check.mjs')], { encoding: 'utf8', timeout: 60000, killSignal: 'SIGKILL', cwd: dir, env: childEnv(dir), maxBuffer: 64 << 20 });
+};
+// The regex mutant: a per-tag exec from nameEnd, which searches the rest of the page for a '>' that is not there, so it is quadratic over the openers.
+const mutateRegex = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = new RegExp('>', 'g'); re.lastIndex = nameEnd; re.exec(s); } // mutant"));
+test('K-178: the 200,000-opener <link finish row finishes on the real reader, inside its clock', t => {
+  const dir = surfaceCopy();
+  try {
+    const t0 = Date.now();
+    const r = bulkGate(dir, '<link ');
+    t.diagnostic(`real reader at 200,000 <link openers: ${Date.now() - t0} ms, error ${r.error ? r.error.code : 'none'}`);
+    finishedNamed(r, '<link , 200,000 openers', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+test('K-178: the regex mutant is refused by the 200,000-opener row by its clock: the child is killed', t => {
+  const dir = surfaceCopy();
+  try {
+    mutateRegex(dir);
+    const t0 = Date.now();
+    const r = bulkGate(dir, '<link ');
+    t.diagnostic(`regex mutant at 200,000 <link openers: ${Date.now() - t0} ms, error ${r.error ? r.error.code : 'none'}, signal ${r.signal}`);
+    assert.equal(r.error && r.error.code, 'ETIMEDOUT', 'the 60 s clock refuses the regex mutant');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 test('K-172: the growth check accepts linear work and refuses quadratic or missing measurements', () => {
   assert.equal(growthOk(1000, 4000), true);
