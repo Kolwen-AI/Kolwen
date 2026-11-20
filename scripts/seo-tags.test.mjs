@@ -40,7 +40,7 @@ test('/status carries the meta description the SEO text gives it', () => {
 });
 
 // K-167: every Thai page in web/th/ carries one nonempty meta description. The presence leg reads the folder, so a Thai page added later is checked too.
-// Its og:description is that same text on the public pages, except index (its own pair, as the English home has) and pricing (K-171). Every miss is
+// Its og:description is that same text on the public pages, except index (its own pair, as the English home has). Every miss is
 // collected before the assertion, so one run names every page that fails.
 test('every Thai page (web/th/) carries a nonempty meta description, and its og:description is that text on the public pages (K-167)', () => {
   const thaiPages = readdirSync(new URL('../web/th/', import.meta.url)).filter(f => f.endsWith('.html')).map(f => f.slice(0, -'.html'.length));
@@ -50,7 +50,7 @@ test('every Thai page (web/th/) carries a nonempty meta description, and its og:
     const html = readFileSync(new URL('../web/th/' + name + '.html', import.meta.url), 'utf8');
     const description = metaByName(html, 'description');
     if (!description || description.trim() === '') misses.push(name + ': no nonempty meta description');
-    else if (PUBLIC.includes(name) && !['index', 'pricing'].includes(name) && metaByProperty(html, 'og:description') !== description) misses.push(name + ': og:description is not the meta description');
+    else if (PUBLIC.includes(name) && name !== 'index' && metaByProperty(html, 'og:description') !== description) misses.push(name + ': og:description is not the meta description');
   }
   assert.deepEqual(misses, [], 'Thai pages without a description (web/th/<name>.html)');
 });
