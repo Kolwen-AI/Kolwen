@@ -1,12 +1,28 @@
 // Tests for the one reader of web/_headers (scripts/lib/headers-file.mjs): a detach line (`! Name`) is a removal of a header from its rule.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseHeadersFile, declarations, parsePolicy, patternMatches } from './lib/headers-file.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const WEB = join(ROOT, 'web');
+// K-175: the shipped list is read from web/ (every image and font file there), never written by hand.
+const shippedFiles = readdirSync(WEB, { recursive: true }).map(p => '/' + String(p).split('\\').join('/')).filter(p => /\.(png|jpe?g|svg|ico|woff2)$/i.test(p));
+
+test('K-175: every shipped font file has its own one-year immutable rule, every one-year rule names a shipped font file, and a missing font path matches none', () => {
+  const file = process.env.KOLWEN_HEADERS_FILE || join(WEB, '_headers');
+  const rules = parseHeadersFile(readFileSync(file, 'utf8'));
+  const year = rules.filter(r => r.headers.some(h => h.name === 'Cache-Control' && /max-age=31536000/.test(h.value)));
+  const fonts = shippedFiles.filter(p => p.startsWith('/fonts/') && p.endsWith('.woff2'));
+  assert.ok(fonts.length > 0, `${file}: web/ holds font files to read`);
+  for (const f of fonts) assert.ok(year.some(r => r.pattern === f), `${file}: ${f} has its own one-year rule`);
+  assert.deepEqual(year.map(r => r.pattern).filter(p => !fonts.includes(p)), [], `${file}: every one-year rule names a shipped font file`);
+  for (const missing of ['/fonts/thai/kw-sans-thai-400.0000000000.woff2', '/fonts/mono/kw-mono-400.0000000000.woff2']) {
+    assert.deepEqual(year.filter(r => patternMatches(r.pattern, missing)).map(r => r.pattern), [], `${missing} matches a one-year rule`);
+  }
+});
 
 test('a detach line in a rule is kept as a removal of that header, and never as one of the rule\'s headers', () => {
   const rules = parseHeadersFile('/*\n  X-Frame-Options: DENY\n  ! Content-Security-Policy\n');

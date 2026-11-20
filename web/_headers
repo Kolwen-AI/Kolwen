@@ -28,12 +28,22 @@
 # together), so changed bytes are a new url and a year in every cache is safe. The patterns name the
 # .woff2 files only. fonts.css, the one unhashed file that names them and that every page links,
 # and the OFL.txt licence texts keep the platform default (revalidated), because their urls never
-# change. One rule per folder with one splat each, and no other Cache-Control rule matches these
-# paths: a header set by two matching rules is joined with a comma (see the security-headers note
-# below). font-versions.test.mjs holds both.
-/fonts/thai/*.woff2
+# change. Each font file is NAMED with its own rule (K-175): a splat such as `/fonts/thai/*.woff2` would
+# give a missing font path the one-year immutable cache, so a 404 for a font that is not deployed would
+# be held in every browser for a year. A missing path matches none of these rules. No other Cache-Control
+# rule matches these paths: a header set by two matching rules is joined with a comma (see the
+# security-headers note below). font-versions.test.mjs and headers-file.test.mjs hold both.
+/fonts/thai/kw-sans-thai-400.7a93a32da9.woff2
   Cache-Control: public, max-age=31536000, immutable
-/fonts/mono/*.woff2
+/fonts/thai/kw-sans-thai-500.bab87050a2.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/thai/kw-sans-thai-600.4e5f5074ff.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/thai/kw-sans-thai-700.b87d41e0f9.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/mono/kw-mono-400.e8d30e29b8.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/mono/kw-mono-500.78ee778fb0.woff2
   Cache-Control: public, max-age=31536000, immutable
 
 # The page itself must always be revalidated: it carries the claims, and a stale claim is the

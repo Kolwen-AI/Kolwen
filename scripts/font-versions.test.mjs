@@ -65,7 +65,7 @@ test('web/_headers: every versioned font url gets exactly one Cache-Control rule
     assert.equal(hits[0].value, FONT_CACHE_CONTROL, url);
   }
   for (const path of ['/fonts/fonts.css', '/fonts/thai/OFL.txt', '/fonts/mono/OFL.txt']) assert.deepEqual(cache.filter(d => patternMatches(d.pattern, path)), [], path + ' keeps the platform default');
-  for (const r of rules.filter(r => r.headers.some(h => /immutable/i.test(h.value)))) assert.match(r.pattern, /^\/fonts\/[a-z]+\/\*\.woff2$/, 'immutable only on the hashed font files');
+  for (const r of rules.filter(r => r.headers.some(h => /immutable/i.test(h.value)))) assert.ok(manifestUrls().includes(r.pattern), 'immutable only on a named, hashed font file (K-175)');
 });
 
 test('fontCacheMiss accepts the long immutable value and names what is wrong with any other', () => {
