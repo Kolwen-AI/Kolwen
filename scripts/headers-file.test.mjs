@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseHeadersFile, declarations, parsePolicy } from './lib/headers-file.mjs';
+import { parseHeadersFile, declarations, parsePolicy, patternMatches } from './lib/headers-file.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -35,4 +35,20 @@ test('the served policy limits connections to the site itself: connect-src is \'
   const connect = dirs.get('connect-src'), fallback = dirs.get('default-src') || [];
   const limited = connect ? connect.length === 1 && connect[0] === "'self'" : fallback.length === 1 && fallback[0] === "'self'";
   assert.ok(limited, `${file}: connect-src is ${connect ? connect.join(' ') : 'absent'}, and with no connect-src the connection control falls back to default-src, which is ${fallback.join(' ') || 'absent'}; under CSP Level 3 "directive fallback" (https://www.w3.org/TR/CSP3/#directive-fallback-list) neither limits connections to 'self'`);
+});
+
+// K-170: a one-day image rule is named for each shipped image, so a missing image path matches none. Cloudflare JOINS the values of every matching
+// rule, so a wildcard image rule could never sit beside a named one.
+test('a missing .jpg, .png or .svg path matches no one-day Cache-Control rule, and every shipped image has a rule of its own (K-170)', () => {
+  const file = process.env.KOLWEN_HEADERS_FILE || join(ROOT, 'web', '_headers');
+  const rules = parseHeadersFile(readFileSync(file, 'utf8'));
+  const oneDay = rules.filter(r => r.headers.some(h => h.name === 'Cache-Control' && /max-age=86400/.test(h.value)));
+  for (const missing of ['/no-such-image.jpg', '/no-such-image.png', '/no-such-image.svg']) {
+    const hits = oneDay.filter(r => patternMatches(r.pattern, missing)).map(r => r.pattern);
+    assert.deepEqual(hits, [], `${file}: ${missing} matches a one-day rule`);
+  }
+  assert.deepEqual(oneDay.filter(r => r.pattern.includes('*')).map(r => r.pattern), [], `${file}: no one-day rule is a wildcard`);
+  for (const shipped of ['/og.jpg', '/favicon.svg', '/favicon-32.png', '/apple-touch-icon.png', '/band-404.svg', '/band-home.svg']) {
+    assert.ok(oneDay.some(r => r.pattern === shipped), `${file}: ${shipped} has its own named one-day rule`);
+  }
 });
