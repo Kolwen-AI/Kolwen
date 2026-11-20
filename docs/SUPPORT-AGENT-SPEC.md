@@ -43,6 +43,19 @@ set before launch, and no statute supplies it.
 for helping improve Kolwen. Their exact text is drafted and PENDING THE OWNER'S SIGNATURE — it is
 not reproduced here, and no wording in this file should be treated as final.**
 
+## Support opens an account only with recorded permission
+
+**PRELIMINARY: the wording below is counsel's draft (LWK3-041), not yet signed. Nothing in it is in force until it is signed.**
+
+> **Support opens an account only with your permission, recorded on the case.** A support seat, human or agent, answers from what you send in the case. It opens your account, usage or stored data only after you give permission for that case.
+> - **Who, where.** The account holder, in the case's own channel (the chat, or a reply from the account's address on the case thread), in plain words and by a clear act. Silence, an earlier case or a box ticked at sign-up is not permission.
+> - **Scope, time.** The request says what will be opened and why. Permission covers that case, for a seat of Kolwen's, and ends when the case closes, after [N] idle days, or when withdrawn. A new case needs new permission.
+> - **Record.** On the case: who asked, what was opened, when, your words, the case id. Kept as the retention table's row says.
+> - **Withdrawal.** Any time, in the same channel and as easily as it was given. Access stops at once. We tell you what withdrawing means for the case. The record of what was opened stays.
+> - **Without permission.** Support sees only the case's own messages and answers from them. If that is not enough it says what it needs and why. You decide.
+
+Exceptions a law forces, a lawful order or legal duty and a danger to life, body or health, are counsel's open questions (LWK3-041, section 2) and are not covered by this rule; a fraud or abuse investigation runs through the abuse process in `TERMS.md`, not the support seat.
+
 ## Account enforcement, appeals and the person behind the AI
 
 **The principle: an AI agent never works alone.** A support agent that refuses a refund "due to a violation"
@@ -56,7 +69,7 @@ The enforcement process itself is in `TERMS.md` ("Acceptable use and how it is e
 rather than termination, a window to answer, a written decision, one appeal to a human, and a register of
 cases. The requirements below are how the support surface behaves around that process; none replaces a step.
 
-1. **An AI first line, with a person always behind it.** The agent hands off to a person when the user asks for
+1. **An AI first line, with a person always behind it.** The agent hands off to a person (the case's keeper, once staff exists) when the user asks for
    one, on any account action, on anything about money, when the same issue is raised a second time, and when
    its own confidence in an answer is low. **The AI never closes a thread that holds an open account action or
    dispute.**
@@ -64,8 +77,7 @@ cases. The requirements below are how the support surface behaves around that pr
    the process, in the customer's hands. Whether the law or a live security investigation can justify delaying
    that notice is an open question for counsel, with its timing and content; the process in `TERMS.md` has no such
    exception, so until counsel decides, notice comes first.
-3. **Every customer contact gets a case ID, in one numbering.** An appeal is a case with its type prefix, never a
-   second scheme. The customer sees the case's state and the deadline of its current step, which Kolwen sets and
+3. **One matter, one record, one case ID.** A matter has one record across every door and every mail. A contact from a customer with an open matter attaches to that matter's case and never opens a second one; a new case ID is issued only for a new matter. An appeal is a case with its type prefix on the same matter record, never a second scheme. A split found later is merged into the one record, and the merge is recorded on both IDs. The customer sees the case's state and the deadline of its current step, which Kolwen sets and
    publishes. The steps are `TERMS.md` steps 3 to 5: **14 business days** for the customer to answer a notice,
    **7 business days** for Kolwen's written decision, **30 business days** for the customer to file an appeal, and
    **14 business days** for Kolwen to answer it. If one of Kolwen's own deadlines passes (the 7 business days for
@@ -73,7 +85,7 @@ cases. The requirements below are how the support surface behaves around that pr
    Kolwen's own time), the suspension is lifted and the key comes back into use, as `TERMS.md` states under its
    ceiling paragraph. The ID rules
    are in "Case IDs and the case status page", below.
-4. **One case across support, safety and billing.** Every door sees the same case and its ID, and no door sends the
+4. **One case across support, safety and billing, with one keeper.** Every door sees the same case and its ID. Every case names its keeper, and every door and every mail lands with that keeper, never in a shared pool. No door sends the
    customer back to a door already tried.
 5. **Money waits for the decision.** No refund is refused while an appeal is open, and a reversed suspension
    restores the time, or refunds pro rata, without a second request. This is the "refund follows the outcome"
@@ -86,7 +98,9 @@ their dispute or appeal is open. A suspension never removes the person.
 **Phase 1.** The AI support is the maintainer's assistant, and the maintainer is the person behind it. The AI
 triages, keeps the case and its deadline, and drafts every reply; the maintainer reads, decides and sends
 anything that touches an account, money or an appeal. The published appeal deadline is sized to one person. A
-second person joins that lane when Kolwen hires.
+second person joins that lane when Kolwen hires. In this phase the keeper of every case is the owner, and the per-keeper rooms come with the first hire.
+
+**Handover of a case's keeper.** When a case's keeper changes, a written handover note is written on the case: its state, the open promises, the next deadline and any consent held. The customer is told who now keeps the case. The case moves keeper to keeper and is never returned to a pool. The permission recorded on the case travels with it inside Kolwen, and a handover never renews it: an idle lapse still stops an old permission. A handover to anyone outside Kolwen, such as a processor or a lawyer, is a new disclosure and needs new permission. Nothing here runs today: there is no keeper field and no handover note.
 
 **Checks still open** (counsel's, not answered here): whether a decision about an account taken solely by
 automated processing needs a right to human intervention, to express a view and to contest it (GDPR Art. 22);
@@ -134,7 +148,7 @@ clause 5.4, approved 17 October 2017, read 2026-11-02.
 `Message-ID` header, and every reply carries `In-Reply-To` and `References`. This is a house requirement. RFC 5322
 section 3.6.4 says that a message SHOULD have a Message-ID field, and that reply messages SHOULD have In-Reply-To and
 References fields as appropriate (https://www.rfc-editor.org/rfc/rfc5322.txt, read 2026-11-02). The References field
-holds the parent's References, then the parent's Message-ID. The subject ID is the fallback for routing and search.
+holds the parent's References, then the parent's Message-ID. The subject ID is the fallback for routing and search. An inbound mail without that thread, from a verified contact with an open case, attaches to the open case rather than opening one.
 
 **The page.** It is called "Case status" and sits at `kolwen.com/support/case`. It is not called "tracking", and it
 does not sit at `/status`, which is the site's service-health page.
@@ -145,4 +159,4 @@ to the customer in the app as well as in mail.
 ## What does not exist yet
 
 No endpoint, no account with any provider, no conversation storage, no deletion job, no case ID generator, no case
-status page and no mail threading. Every paragraph above is a requirement on a thing that has not been built.
+status page, no mail threading, no keeper field, no attach-to-open-case rule, no handover note, and no retention row for the support-access record (its period is the owner's to set). Every paragraph above is a requirement on a thing that has not been built.
