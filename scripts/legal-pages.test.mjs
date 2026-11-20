@@ -33,6 +33,8 @@ test('K-169: inserting a section leaves every other section id unchanged', () =>
   const before = '<main><h2>Alpha</h2><p>a</p><h2>Beta</h2><p>b</p></main>';
   const after = '<main><h2>New section</h2><p>n</p><h2>Alpha</h2><p>a</p><h2>Beta</h2><p>b</p></main>';
   const b = sectionIds(before, {}), a = sectionIds(after, {});
+  assert.equal(k169IdOf(b, 'Alpha'), 'alpha');
+  assert.equal(k169IdOf(b, 'Beta'), 'beta');
   assert.equal(k169IdOf(a, 'Alpha'), k169IdOf(b, 'Alpha'), 'Alpha keeps its id');
   assert.equal(k169IdOf(a, 'Beta'), k169IdOf(b, 'Beta'), 'Beta keeps its id');
 });
