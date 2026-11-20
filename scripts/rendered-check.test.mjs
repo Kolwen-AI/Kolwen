@@ -400,15 +400,15 @@ function cutPageScript(h) {
 }
 // CodeQL #65: a heading id read from the page is code only through the closed pattern; any other id is a finding, and no measurement runs on it
 test('RED m5 id: a section heading id read from the page that is not s-N is a finding, not a measurement', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace(/<h2 id="s-(\d+)"/g, '<h2 id="s-$1&quot;x"')));
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace(/<h2 id="([a-z0-9-]+)"/g, '<h2 id="$1&quot;x"')));
   const { failures } = await run(web, ['m5']);
   assert.ok(where(failures, 'terms.html', 'm5').some(f => /is not a section id/.test(f.detail)), JSON.stringify(failures));
 });
 
 
-// CodeQL #65, round 2: section numbers start at 1, so s-0 is not a section id: a finding, and no measurement
-test('RED m5 section number: an id of s-0 is a finding, not a measurement', { skip: SKIP }, async () => {
-  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace(/<h2 id="s-(\d+)"/g, '<h2 id="s-0"')));
+// CodeQL #65, round 2 (K-169): a section id is a heading slug, which starts with a letter or digit: an id that starts with a dash is not one, so a finding, and no measurement
+test('RED m5 section id shape: an id that starts with a dash is a finding, not a measurement', { skip: SKIP }, async () => {
+  const web = copyWeb(w => editPage(w, 'terms.html', h => h.replace(/<h2 id="([a-z0-9-]+)"/g, '<h2 id="-leading"')));
   const { failures } = await run(web, ['m5']);
   assert.ok(where(failures, 'terms.html', 'm5').some(f => /is not a section id/.test(f.detail)), JSON.stringify(failures));
 });

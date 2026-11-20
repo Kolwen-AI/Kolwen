@@ -10,6 +10,64 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { reEscape } from './lib/re-escape.mjs';
 import { READING } from './lib/layout-tokens.mjs';
+import { sectionIds, headingText } from './lib/legal-render.mjs';
+
+// CodeRabbit 4638814826: a slug collision fails the render. A positional suffix would give a later heading a new fragment, and a heading inserted above would move an existing one.
+test('CodeRabbit 4638814826: two headings that slug alike fail the render, and a heading inserted above them is refused, so no fragment moves', () => {
+  const two = '<main><h2>Alpha</h2><p>a</p><h2>Alpha!</h2><p>b</p></main>';
+  const inserted = '<main><h2>Alpha</h2><p>n</p><h2>Alpha</h2><p>a</p><h2>Alpha!</h2><p>b</p></main>';
+  assert.throws(() => sectionIds(two, {}), /Alpha/, 'two headings that slug alike are an error');
+  assert.throws(() => sectionIds(inserted, {}), /Alpha/, 'a heading inserted above them is refused, not numbered');
+});
+
+// CodeQL #75: an entity is decoded once. `&amp;lt;` is the text `&lt;` (an escaped less-than sign), never `<`.
+test('CodeQL #75: headingText decodes each entity once, so &amp;lt; is the text &lt;, and &amp;amp; is &amp;', () => {
+  assert.equal(headingText('A &amp;lt; B'), 'A &lt; B');
+  assert.equal(headingText('A &amp;amp; B'), 'A &amp; B');
+  assert.equal(headingText('A &lt; B'), 'A < B');
+});
+
+// K-169: section ids come from each section's heading (not its position), the English and Thai pages of one document share them, and the old s-N fragments
+// still reach the section they reached (their frozen map is scripts/lib/legal-section-legacy.mjs, keyed by page path and language).
+const K169_WEB = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
+const K169_LEGACY = (await import(new URL('./lib/legal-section-legacy.mjs', import.meta.url))).LEGACY_SECTIONS;
+// Strips tags until the text stops changing (CodeQL #76, #77): a removal can join two halves into a new tag, so one pass is not enough to leave no tag.
+const stripTags = text => { let prev; do { prev = text; text = text.replace(/<[^>]*>/g, ''); } while (text !== prev); return text; };
+const k169H2 = html => [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)].map(m => ({ id: m[1], text: stripTags(m[2]).trim() }));
+const k169IdOf = (html, text) => k169H2(html).find(h => h.text === text)?.id;
+const k169File = (path, lang) => (lang === 'th' ? 'th/' : '') + (path === '/' ? 'index' : path.slice(1)) + '.html';
+
+test('K-169: inserting a section leaves every other section id unchanged', () => {
+  const before = '<main><h2>Alpha</h2><p>a</p><h2>Beta</h2><p>b</p></main>';
+  const after = '<main><h2>New section</h2><p>n</p><h2>Alpha</h2><p>a</p><h2>Beta</h2><p>b</p></main>';
+  const b = sectionIds(before, {}), a = sectionIds(after, {});
+  assert.equal(k169IdOf(b, 'Alpha'), 'alpha');
+  assert.equal(k169IdOf(b, 'Beta'), 'beta');
+  assert.equal(k169IdOf(a, 'Alpha'), k169IdOf(b, 'Alpha'), 'Alpha keeps its id');
+  assert.equal(k169IdOf(a, 'Beta'), k169IdOf(b, 'Beta'), 'Beta keeps its id');
+});
+
+test('K-169: the English and Thai page of one document give each section the same id', () => {
+  for (const path of Object.keys(K169_LEGACY)) {
+    const en = k169H2(readFileSync(join(K169_WEB, k169File(path, 'en')), 'utf8')).map(h => h.id);
+    const th = k169H2(readFileSync(join(K169_WEB, k169File(path, 'th')), 'utf8')).map(h => h.id);
+    assert.deepEqual(th, en, `${path}: the Thai section ids are the English ones`);
+  }
+});
+
+test('K-169: each legacy s-N fragment still reaches the section it reached, on both pages', () => {
+  for (const [path, langs] of Object.entries(K169_LEGACY)) {
+    for (const lang of ['en', 'th']) {
+      const file = k169File(path, lang);
+      const html = readFileSync(join(K169_WEB, file), 'utf8');
+      for (const [sN, text] of Object.entries(langs[lang])) {
+        const piece = html.split('</h2>').find(p => p.includes('id="' + sN + '"'));
+        assert.ok(piece, `${file}: #${sN} is on the page`);
+        assert.equal(stripTags(piece.replace(/^[\s\S]*?<h2[^>]*>/, '')).trim(), text, `${file}: #${sN} is the section it was`);
+      }
+    }
+  }
+});
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const lib = await import(new URL('./lib/legal-render.mjs', import.meta.url));
@@ -226,7 +284,7 @@ test('the same inputs give the same pages', () => {
 });
 
 // ── the CLI, against a throwaway copy of the tree ──────────────────────────────────────────────
-const FILES = ['web/band-404.svg', 'web/band-home.svg', 'web/accessibility.html', 'web/legal.html', 'scripts/legal-pages.mjs','scripts/lib/legal-render.mjs', 'scripts/lib/layout-tokens.mjs', 'scripts/lib/legal-page-text.mjs', 'scripts/lib/legal-state.mjs', 'scripts/lib/legal-holds.json', 'TERMS.md', 'PRIVACY.md', 'legal/thai-7day-clause.md', 'legal/legal-state.json', 'web/terms.html', 'web/privacy.html', 'web/refund.html', 'web/pricing.html', 'CHANGELOG.md', 'web/changelog.html', 'web/index.html', 'web/404.html', 'web/status.html', 'web/subprocessors.html', 'web/_headers', 'scripts/lib/headers-file.mjs', 'scripts/lib/page-sync.mjs', 'scripts/lib/csp-hashes.mjs', 'scripts/lib/page-claims.mjs',
+const FILES = ['web/band-404.svg', 'web/band-home.svg', 'web/accessibility.html', 'web/legal.html', 'scripts/legal-pages.mjs','scripts/lib/legal-render.mjs', 'scripts/lib/legal-section-legacy.mjs', 'scripts/lib/layout-tokens.mjs', 'scripts/lib/legal-page-text.mjs', 'scripts/lib/legal-state.mjs', 'scripts/lib/legal-holds.json', 'TERMS.md', 'PRIVACY.md', 'legal/thai-7day-clause.md', 'legal/legal-state.json', 'web/terms.html', 'web/privacy.html', 'web/refund.html', 'web/pricing.html', 'CHANGELOG.md', 'web/changelog.html', 'web/index.html', 'web/404.html', 'web/status.html', 'web/subprocessors.html', 'web/_headers', 'scripts/lib/headers-file.mjs', 'scripts/lib/page-sync.mjs', 'scripts/lib/csp-hashes.mjs', 'scripts/lib/page-claims.mjs',
   'scripts/lib/i18n-catalogue.mjs', 'scripts/lib/page-template.mjs', 'scripts/lib/html-tokens.mjs', 'scripts/lib/rendered-text.mjs', 'scripts/lib/contained-read.mjs', 'scripts/lib/web-files.mjs', 'scripts/lib/html-entities.json', 'web-src/i18n/en.json', 'web-src/i18n/th.json', 'web-src/pages/home.html', 'web-src/pages/accessibility.html', 'web-src/pages/legal.html', 'web-src/pages/pricing.html', 'web-src/pages/notfound.html', 'web-src/pages/status.html', 'web-src/pages/subprocessors.html', 'scripts/lib/controller-slot.mjs', 'legal/controller.json',
   // the Thai pages: each in its own file, the same sources and the same shared blocks (ORDER 1017j)
   'web/th/index.html', 'web/th/pricing.html', 'web/th/404.html', 'web/th/status.html', 'web/th/subprocessors.html', 'web/th/legal.html', 'web/th/accessibility.html', 'web/th/terms.html', 'web/th/privacy.html', 'web/th/refund.html', 'web/th/changelog.html'];
