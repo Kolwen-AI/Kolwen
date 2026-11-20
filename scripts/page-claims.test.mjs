@@ -347,74 +347,86 @@ test('RED PROOF at the gate: surface-check finishes on a page of 4,000 untermina
 });
 
 // ── CLASS B: an opener with no closer costs a bounded scan ─────────────────────────────────────────────
-// Each gate row appends BULK_N openers with no closer to a page and runs surface-check in a child under a heap cap (512 MB) and a kill timer (60 s). The row asserts that the child
-// FINISHED: not killed and no signal, and that it exits with a finding. No time is asserted, so the row cannot pass on a fast box and fail on a slow one, and a quadratic rule is killed.
-// The rows that cannot be isolated are not here: rule 17's visible-text strip (rule 17a) and rule 5 read the same openers and are not changed here (a follow-up gives them the same reader).
-const BULK_N = 200000;
-const bulkGate = (dir, unit) => {
-  edit(dir, 'web/index.html', s => s.replace('</body>', unit.repeat(BULK_N) + '</body>'));
-  return spawnSync(process.execPath, ['--max-old-space-size=512', join(dir, 'scripts/surface-check.mjs')], { encoding: 'utf8', timeout: 60000, killSignal: 'SIGKILL', cwd: dir, env: childEnv(dir), maxBuffer: 64 << 20 });
-};
 const finishedNamed = (r, label, msgs) => {
   assert.equal(r.error, undefined, label + ': surface-check was killed by the 60 s timer, so it did not finish: ' + (r.error && r.error.code));
   assert.equal(r.signal, null, label + ': killed by ' + r.signal);
   assert.equal(r.status, 1, label + ': finished, and it must name the page: ' + (r.stdout + r.stderr).slice(0, 400));
   for (const m of msgs) assert.match(r.stdout + r.stderr, m, label + ': the finding of its own rule is missing');
 };
-// K-172: observe character reads in the planted link region in the real gate's child.
-// Instrument only this child's String prototype; the production reader and its API stay unchanged.
-const bulkLinkWork = (dir, n) => {
-  const unit = '<link ';
+// K-178: the growth row counts scan work as the characters the string primitives charCodeAt, indexOf and slice read or copy inside the planted region (a count, never a
+// clock), counted in the child, which keeps the production reader unchanged. A quadratic reader grows that count 16 times for 4 times the openers, a linear one 4 times.
+// The sizes are 5,000 and 20,000, so a quadratic mutant finishes inside the 60 s clock and is refused by its count; the timer stays a kill ceiling.
+// LIMIT, measured: RegExp exec is not counted. The page-wide rules of the real pipeline run regexes over the planted region that examine far more characters than the
+// reader's loop does (8.5 billion against 0.4 billion for charCodeAt at 20,000 openers) and V8 runs them fast, so counting them would fail the real reader. A regex-only
+// mutant that reads the page through exec is caught by the clock alone; a regex per tag that copies the page through slice is caught by its count.
+const GROWTH_SMALL = 5000, GROWTH_LARGE = 20000;
+const bulkWork = (dir, unit, n) => {
   const after = edit(dir, 'web/index.html', s => s.replace('</body>', unit.repeat(n) + '</body>'));
-  const start = after.indexOf(unit.repeat(n)), end = start + unit.length * n;
+  const start = after.indexOf(unit.repeat(n)), end = start + unit.length * n, len = after.length;
   const child = `
-    const charCodeAt = String.prototype.charCodeAt;
-    let work = 0;
-    String.prototype.charCodeAt = function (i) {
-      if (i >= ${start} && i < ${end} && this.length === ${after.length}) work++;
-      return charCodeAt.call(this, i);
-    };
-    process.on('exit', () => process.stderr.write('LINK_SCAN_WORK ' + work + '\\n'));
+    const orig = { charCodeAt: String.prototype.charCodeAt, indexOf: String.prototype.indexOf, slice: String.prototype.slice };
+    const START = ${start}, END = ${end}, LEN = ${len};
+    const kinds = { charCodeAt: 0, indexOf: 0, slice: 0 };
+    const charge = (kind, lo, hi) => { const a = Math.max(lo, START), b = Math.min(hi, END); if (b > a) kinds[kind] += b - a; };
+    String.prototype.charCodeAt = function (i) { if (this.length === LEN) charge('charCodeAt', i, i + 1); return orig.charCodeAt.call(this, i); };
+    String.prototype.indexOf = function (search, from) { const r = orig.indexOf.call(this, search, from); if (this.length === LEN) charge('indexOf', Number(from) || 0,r < 0 ? LEN : r + String(search).length); return r; };
+    String.prototype.slice = function (a, b) { const s = orig.slice.call(this, a, b); if (this.length === LEN) { const a0 = a === undefined ? 0 : a < 0 ? Math.max(LEN + a, 0) : a; charge('slice', a0, a0 + s.length); } return s; };
+    process.on('exit', () => process.stderr.write('LINK_SCAN_WORK ' + JSON.stringify(kinds) + '\\n'));
     await import('./scripts/surface-check.mjs');
   `;
+  const t0 = Date.now();
   const r = spawnSync(process.execPath, ['--max-old-space-size=512', '--input-type=module', '-e', child], { encoding: 'utf8', timeout: 60000, killSignal: 'SIGKILL', cwd: dir, env: childEnv(dir), maxBuffer: 64 << 20 });
-  const measured = /^LINK_SCAN_WORK (\d+)$/m.exec(r.stderr || '');
-  return { r, work: measured ? Number(measured[1]) : NaN };
+  const measured = /^LINK_SCAN_WORK (\{.*\})$/m.exec(r.stderr || '');
+  const kinds = measured ? JSON.parse(measured[1]) : null;
+  return { r, kinds, work: kinds ? Object.values(kinds).reduce((x, y) => x + y, 0) : NaN, ms: Date.now() - t0 };
 };
-// Four times the openers must do less than eight times the character reads.
+// Four times the openers must do less than eight times the work.
 const growthOk = (small, large) => Number.isSafeInteger(small) && small > 0 && Number.isSafeInteger(large) && large >= small && large < 8 * small;
-test('CLASS B gate row, rules 13 and 16: 200,000 unterminated <meta " openers finish, and rule 13 names its own unread tags', () => {
-  const dir = surfaceCopy();
-  try { finishedNamed(bulkGate(dir, '<meta "'), '<meta "', [/web\/index\.html: has \d+ <meta> tag\(s\) the reader cannot read to its end/]); } finally { rmSync(dir, { recursive: true, force: true }); }
-});
-// Both sizes must finish with their finding named. Scan work is deterministic; the 60 s timer stays a kill ceiling.
-test('K-172: <link openers finish at 25,000 and at 100,000, and scan work grows linearly', () => {
+// The two sizes of one unit. `mutate`, when given, edits the copies' reader first (the K-178 mutants).
+const growthRun = (unit, mutate) => {
   const small = surfaceCopy(), large = surfaceCopy();
-  const finding = [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/];
   try {
-    const a = bulkLinkWork(small, 25000), b = bulkLinkWork(large, 100000);
-    finishedNamed(a.r, '<link , 25,000 openers', finding);
-    finishedNamed(b.r, '<link , 100,000 openers', finding);
-    assert.ok(growthOk(a.work, b.work), `link scan character reads grew from ${a.work} to ${b.work} for 4 times the openers`);
+    if (mutate) { mutate(small); mutate(large); }
+    return { a: bulkWork(small, unit, GROWTH_SMALL), b: bulkWork(large, unit, GROWTH_LARGE) };
   } finally { rmSync(small, { recursive: true, force: true }); rmSync(large, { recursive: true, force: true }); }
+};
+const growthRow = (unit, finding, label) => {
+  const m = growthRun(unit);
+  finishedNamed(m.a.r, `${label}, ${GROWTH_SMALL} openers`, finding);
+  finishedNamed(m.b.r, `${label}, ${GROWTH_LARGE} openers`, finding);
+  assert.ok(growthOk(m.a.work, m.b.work), `${label}: scan work grew from ${m.a.work} to ${m.b.work} for 4 times the openers`);
+};
+// K-178 mutants: one unbounded search per start tag (indexOf), and one copy and search of the rest of the page per start tag (slice). Both must fail by their count.
+const mutateIndexOf = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('export function scanStartTag(s, nameEnd, max = META_MAX, collect = false) {', m => m + '\n  s.indexOf(String.fromCharCode(62), nameEnd); // mutant'));
+const mutateSlice = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('export function scanStartTag(s, nameEnd, max = META_MAX, collect = false) {', m => m + '\n  s.slice(nameEnd).search(/>/); // mutant'));
+test('CLASS B gate row, rules 13 and 16: <meta " openers finish at two sizes, and their scan work grows linearly (K-176)', () => {
+  growthRow('<meta "', [/web\/index\.html: has \d+ <meta> tag\(s\) the reader cannot read to its end/], '<meta "');
+});
+test('K-172: <link openers finish at two sizes, and their scan work grows linearly', () => {
+  growthRow('<link ', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/], '<link ');
+});
+test('CLASS B gate row, rules 13 and 17: <a openers finish at two sizes, and their scan work grows linearly (K-176)', () => {
+  growthRow('<a ', [
+    /web\/index\.html: has \d+ start tag\(s\) the reader cannot read to its end \(first at line \d+\), so rule 13 cannot check it/,
+    /web\/index\.html: has \d+ start tag\(s\) the reader cannot read to their end \(first at line \d+\), so the buy-control and payment checks cannot read them/,
+  ], '<a ');
+});
+test('CLASS B gate row, rule 17: <a> elements finish at two sizes, and their scan work grows linearly (K-176)', () => {
+  growthRow('<a>', [/web\/index\.html: has \d+ <a> element\(s\) with no closer/], '<a>');
+});
+test('K-178: the growth check refuses an indexOf mutant and a slice mutant by their own count, with both sizes finishing inside the clock', t => {
+  for (const [name, mutate] of [['indexOf', mutateIndexOf], ['slice', mutateSlice]]) {
+    const m = growthRun('<link ', mutate);
+    t.diagnostic(`${name} mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
+    assert.equal(m.a.r.error, undefined, `${name} mutant: the small size finished inside the clock`);
+    assert.equal(m.b.r.error, undefined, `${name} mutant: the large size finished inside the clock`);
+    assert.equal(growthOk(m.a.work, m.b.work), false, `${name} mutant: the count must refuse the growth`);
+  }
 });
 test('K-172: the growth check accepts linear work and refuses quadratic or missing measurements', () => {
   assert.equal(growthOk(1000, 4000), true);
   assert.equal(growthOk(1000, 16000), false);
   for (const [small, large] of [[0, 0], [NaN, 4000], [1000, NaN], [1000, 0]]) assert.equal(growthOk(small, large), false);
-});
-test('CLASS B gate row, rules 13 and 17: 200,000 unterminated <a openers finish, and each rule names its own unread tags', () => {
-  const dir = surfaceCopy();
-  try {
-    finishedNamed(bulkGate(dir, '<a '), '<a ', [
-      /web\/index\.html: has \d+ start tag\(s\) the reader cannot read to its end \(first at line \d+\), so rule 13 cannot check it/,
-      /web\/index\.html: has \d+ start tag\(s\) the reader cannot read to their end \(first at line \d+\), so the buy-control and payment checks cannot read them/,
-    ]);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
-});
-test('CLASS B gate row, rule 17: 200,000 unclosed <a> elements finish, and rule 17 names its own unclosed anchors', () => {
-  const dir = surfaceCopy();
-  try { finishedNamed(bulkGate(dir, '<a>'), '<a>', [/web\/index\.html: has \d+ <a> element\(s\) with no closer/]); } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 // ── the tag name and the end tag are read as the tokenizer reads them ─────────────────────────────────────
@@ -621,3 +633,4 @@ test('the floor check refuses a _headers rule that removes any floor header with
   }
   assert.deepEqual(misses, [], 'floor headers whose detach line the floor check did not refuse');
 });
+
