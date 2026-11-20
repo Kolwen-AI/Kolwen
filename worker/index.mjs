@@ -1,5 +1,6 @@
+import { MTA_STS_HOST, MTA_STS_PATH, MTA_STS_POLICY } from './mta-sts.mjs';
 // Kolwen's Worker. fetch hands every request to the ASSETS binding unchanged, with two exceptions: GET /status.json answers from the stored state (binding STATUS,
-// when it exists), and /subscribe answers 404 unless SUBSCRIBE is "on" (binding SUBSCRIBERS). The two are WORKER_ROUTES; wrangler.jsonc's assets.run_worker_first
+// when it exists), and /subscribe answers 404 unless SUBSCRIBE is "on" (binding SUBSCRIBERS). The routes are WORKER_ROUTES (the policy path too); wrangler.jsonc's assets.run_worker_first
 // lists the same paths, so a browser's navigation to them reaches this function too (scripts/worker-routes.test.mjs holds the two lists equal).
 // scheduled runs every 15 minutes (triggers.crons in wrangler.jsonc): it probes the sitemap pages on kolwen.com, writes ONE state object to STATUS (96 a day
 // against Free's 1,000 writes), and mails an alert only when the result changes: all-OK to failing, and one recovery note from failing back to all-OK.
@@ -158,9 +159,6 @@ export async function handleSubscription(request, env) {
 
 // The paths the Worker answers itself. Every other path goes to the assets; a navigation to one of these reaches the Worker only through run_worker_first (wrangler.jsonc).
 // RFC 8461 policy for mta-sts.kolwen.com: testing mode, served on that host only (LWK-220 item 1; dark until its DNS record exists). The body is the design's, CRLF line endings.
-export const MTA_STS_HOST = 'mta-sts.kolwen.com';
-export const MTA_STS_PATH = '/.well-known/mta-sts.txt';
-export const MTA_STS_POLICY = 'version: STSv1\r\nmode: testing\r\nmx: *.mx.cloudflare.net\r\nmax_age: 86400\r\n';
 const mtaStsResponse = method => secured(new Response(method === 'HEAD' ? null : MTA_STS_POLICY, { headers: { 'content-type': 'text/plain; charset=utf-8', 'content-length': String(new TextEncoder().encode(MTA_STS_POLICY).length), 'cache-control': 'no-store' } }));
 export const WORKER_ROUTES = ['/status.json', '/subscribe', MTA_STS_PATH];
 

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { jsoncWithoutComments } from './lib/wrangler-jsonc.mjs';
 import * as worker from '../worker/index.mjs';
+import { MTA_STS_HOST, MTA_STS_PATH } from '../worker/mta-sts.mjs';
 
 const config = (() => {
   const text = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
@@ -27,7 +28,7 @@ test('wrangler.jsonc lists the Worker\'s own routes in assets.run_worker_first, 
 test('every path in WORKER_ROUTES gets the Worker\'s own answer from fetch, never the assets stub', async () => {
   for (const path of worker.WORKER_ROUTES) {
     // The MTA-STS path answers on its own host only (the policy host), so it is asked there; every other route on kolwen.com.
-    const host = path === worker.MTA_STS_PATH ? worker.MTA_STS_HOST : 'kolwen.com';
+    const host = path === MTA_STS_PATH ? MTA_STS_HOST : 'kolwen.com';
     const res = await worker.default.fetch(new Request('https://' + host + path, { headers: { 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document', accept: 'text/html' } }), { ASSETS, STATUS: kv(), SUBSCRIBE: 'off', SUBSCRIBERS: kv() });
     assert.equal(res.headers.get('x-answered-by'), null, path + ' was answered by the assets, not by the Worker');
   }
@@ -60,4 +61,13 @@ test('MTA-STS: the same path on any other host, and any other method on the poli
   }
   const post = await worker.default.fetch(new Request(MTA_STS, { method: 'POST' }), { ASSETS, STATUS: kv() });
   assert.equal(post.headers.get('x-answered-by'), 'assets', 'POST on the policy host');
+});
+
+// workerd starts the main module with every named export as an entrypoint, and rejects a primitive one ("Incorrect type for map entry", Verify on #200). So each named
+// export other than the default must be a function or an object (an array, as WORKER_ROUTES is, is an object).
+test('workerd starts the main module: every named export other than default is a function or an object, never a primitive (Verify on #200)', () => {
+  for (const [name, value] of Object.entries(worker)) {
+    if (name === 'default') continue;
+    assert.ok(typeof value === 'function' || (typeof value === 'object' && value !== null), `${name} is a ${typeof value}: workerd rejects a primitive named export of the main module`);
+  }
 });
