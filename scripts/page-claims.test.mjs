@@ -370,14 +370,17 @@ const bulkWork = (dir, unit, n) => {
     const kinds = { charCodeAt: 0, indexOf: 0, slice: 0, exec: 0 };
     const SPAN_STACK = 64;
     const execOrig = RegExp.prototype.exec;
-    Error.stackTraceLimit = 10; // the frame chain of the call, read to its depth: a search by exec, test, search, match or replace, directly or through a helper, has scanStartTag in it
+    Error.stackTraceLimit = 10; // the frame chain of the call, read to its depth: a search by exec, test, search, match, matchAll, replace or split (each calls exec), on the page or a derived string, directly or through a helper, has scanStartTag in its chain
     RegExp.prototype.exec = function (s) {
       const from = (this.global || this.sticky) ? this.lastIndex : 0;
       const m = execOrig.call(this, s);
-      if (typeof s === 'string' && s.length === LEN) {
-        const to = m ? m.index + m[0].length : (this.sticky ? from + 1 : LEN);
+      if (typeof s === 'string') {
+        const to = m ? m.index + m[0].length : (this.sticky ? from + 1 : s.length);
         // A search scanning at most SPAN_STACK characters costs a constant per start tag, so it is charged without the chain check (the stack capture is the slow part).
-        if (to - from <= SPAN_STACK || new Error().stack.includes('scanStartTag')) charge('exec', from, to);
+        // A longer one is charged when its chain holds scanStartTag, on the page (by the page's characters) or on a derived string (by the characters it scans).
+        if (to - from <= SPAN_STACK || new Error().stack.includes('scanStartTag')) {
+          if (s.length === LEN) charge('exec', from, to); else kinds.exec += Math.max(0, to - from);
+        }
       }
       return m;
     };
@@ -448,6 +451,13 @@ test('K-180: the growth check refuses a regex-exec mutant of the start-tag scan 
   const m = growthRun('<link ', mutateRegexExec);
   t.diagnostic(`regex-exec mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
   refusedByCount(m, 'regex-exec mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+});
+// K-188: the same search on a derived subject (a suffix copy from nameEnd), which the page-subject charge never sees.
+const mutateSuffix = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  />/.exec(s.substring(nameEnd)); // mutant"));
+test('K-188: the count refuses a regex search on a derived subject (s.substring) inside scanStartTag, by its own count', t => {
+  const m = growthRun('<link ', mutateSuffix);
+  t.diagnostic(`suffix mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
+  refusedByCount(m, 'suffix mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
 });
 // C180-1: the same search made by a method other than exec (test), and by exec moved into a helper that scanStartTag calls. Both must be charged.
 const mutateRegexTest = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = new RegExp('>', 'g'); re.lastIndex = nameEnd; re.test(s); } // mutant"));
