@@ -10,6 +10,45 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { reEscape } from './lib/re-escape.mjs';
 import { READING } from './lib/layout-tokens.mjs';
+import { sectionIds } from './lib/legal-render.mjs';
+
+// K-169: section ids come from each section's heading (not its position), the English and Thai pages of one document share them, and the old s-N fragments
+// still reach the section they reached (their frozen map is scripts/lib/legal-section-legacy.json, keyed by page path and language).
+const K169_WEB = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
+const K169_LEGACY = JSON.parse(readFileSync(new URL('./lib/legal-section-legacy.json', import.meta.url), 'utf8'));
+const k169H2 = html => [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)].map(m => ({ id: m[1], text: m[2].replace(/<[^>]*>/g, '').trim() }));
+const k169IdOf = (html, text) => k169H2(html).find(h => h.text === text)?.id;
+const k169File = (path, lang) => (lang === 'th' ? 'th/' : '') + (path === '/' ? 'index' : path.slice(1)) + '.html';
+
+test('K-169: inserting a section leaves every other section id unchanged', () => {
+  const before = '<main><h2>Alpha</h2><p>a</p><h2>Beta</h2><p>b</p></main>';
+  const after = '<main><h2>New section</h2><p>n</p><h2>Alpha</h2><p>a</p><h2>Beta</h2><p>b</p></main>';
+  const b = sectionIds(before, {}), a = sectionIds(after, {});
+  assert.equal(k169IdOf(a, 'Alpha'), k169IdOf(b, 'Alpha'), 'Alpha keeps its id');
+  assert.equal(k169IdOf(a, 'Beta'), k169IdOf(b, 'Beta'), 'Beta keeps its id');
+});
+
+test('K-169: the English and Thai page of one document give each section the same id', () => {
+  for (const path of Object.keys(K169_LEGACY)) {
+    const en = k169H2(readFileSync(join(K169_WEB, k169File(path, 'en')), 'utf8')).map(h => h.id);
+    const th = k169H2(readFileSync(join(K169_WEB, k169File(path, 'th')), 'utf8')).map(h => h.id);
+    assert.deepEqual(th, en, `${path}: the Thai section ids are the English ones`);
+  }
+});
+
+test('K-169: each legacy s-N fragment still reaches the section it reached, on both pages', () => {
+  for (const [path, langs] of Object.entries(K169_LEGACY)) {
+    for (const lang of ['en', 'th']) {
+      const file = k169File(path, lang);
+      const html = readFileSync(join(K169_WEB, file), 'utf8');
+      for (const [sN, text] of Object.entries(langs[lang])) {
+        const piece = html.split('</h2>').find(p => p.includes('id="' + sN + '"'));
+        assert.ok(piece, `${file}: #${sN} is on the page`);
+        assert.equal(piece.replace(/^[\s\S]*?<h2[^>]*>/, '').replace(/<[^>]*>/g, '').trim(), text, `${file}: #${sN} is the section it was`);
+      }
+    }
+  }
+});
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const lib = await import(new URL('./lib/legal-render.mjs', import.meta.url));

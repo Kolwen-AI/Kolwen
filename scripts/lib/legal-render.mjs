@@ -557,18 +557,37 @@ ${pageScriptHtml()}
 </body>
 </html>
 `;
-  return localizeLinks(sectionIds(html), lang);
+  return localizeLinks(sectionIdsFor(path, lang, html), lang);
 }
 
-// Each h2 of a page carries an id, s-1, s-2 ... in its order on the page. The two languages of a page have the same sections in the same order, so the same id names the same section
-// in both files (the switch's fragment, M5). An h2 that already has an id keeps it.
-export function sectionIds(html) {
-  let n = 0;
-  return html.replace(/<h2(\s[^>]*)?>/g, (m, attrs) => {
-    n++;
-    if (attrs && /\sid=/.test(attrs)) return m;
-    return `<h2 id="s-${n}"${attrs || ''}>`;
+// K-169: each h2 takes its id from its own heading text, not from its place on the page, so inserting a section moves no other id. A legal page's Thai file renders
+// the same English heading text, so one section has one id in both files (the switch's fragment, M5). A template page whose Thai headings differ carries its ids in
+// the template. The old positional fragments, s-1, s-2 ..., are kept by a frozen map (legal-section-legacy.json, by path and language): each is an empty span before
+// its heading, so `#s-N` still reaches the section it reached. The span is not an h2, so the language switch does not read it.
+export function headingText(inner) {
+  return inner.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+}
+import { readFileSync as readLegacyMap } from 'node:fs';
+const slugOf = text => text.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
+export function sectionIds(html, legacy = {}) {
+  const aliasOf = new Map(Object.entries(legacy).map(([id, text]) => [text, id]));
+  const used = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
+  return html.replace(/<h2(\s[^>]*)?>([\s\S]*?)<\/h2>/g, (m, attrs, inner) => {
+    const text = headingText(inner);
+    const alias = aliasOf.get(text);
+    if (alias) aliasOf.delete(text);
+    const span = alias ? `<span id="${alias}"></span>` : '';
+    if (attrs && /\sid=/.test(attrs)) return `<h2${attrs}>${span}${inner}</h2>`;
+    const base = slugOf(text);
+    let id = base;
+    for (let k = 2; used.has(id); k++) id = `${base}-${k}`;
+    used.add(id);
+    return `<h2 id="${id}"${attrs || ''}>${span}${inner}</h2>`;
   });
+}
+const K_LEGACY = JSON.parse(readLegacyMap(new URL('./legal-section-legacy.json', import.meta.url), 'utf8'));
+export function sectionIdsFor(path, lang, html) {
+  return sectionIds(html, (K_LEGACY[path] || {})[lang] || {});
 }
 
 
@@ -615,7 +634,7 @@ export function renderSitePages({ templates, messages }) {
         const ctx = { lang, path: p.path };
         const file = fileOf(p.file, lang);
         try {
-          pages[file] = localizeLinks(sectionIds(setHtmlLang(renderTemplate(templates[p.group], { lang, messages, blocks: blocksAt(ctx), raw: { style: STYLE, script: pageScriptHtml(), reading: readingMeta() } }), lang)), lang);
+          pages[file] = localizeLinks(sectionIdsFor(p.path, lang, setHtmlLang(renderTemplate(templates[p.group], { lang, messages, blocks: blocksAt(ctx), raw: { style: STYLE, script: pageScriptHtml(), reading: readingMeta() } }), lang)), lang);
           contexts[file] = ctx;
         } catch (e) { problems.push(`${p.template} (${lang}): ${e.message}`); }
       }
