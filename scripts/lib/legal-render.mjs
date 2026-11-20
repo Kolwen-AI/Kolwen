@@ -562,13 +562,13 @@ ${pageScriptHtml()}
 
 // K-169: each h2 takes its id from its own heading text, not from its place on the page, so inserting a section moves no other id. A legal page's Thai file renders
 // the same English heading text, so one section has one id in both files (the switch's fragment, M5). A template page whose Thai headings differ carries its ids in
-// the template. The old positional fragments, s-1, s-2 ..., are kept by a frozen map (legal-section-legacy.json, by path and language): each is an empty span before
+// the template. The old positional fragments, s-1, s-2 ..., are kept by a frozen map (legal-section-legacy.mjs, by path and language): each is an empty span before
 // its heading, so `#s-N` still reaches the section it reached. The span is not an h2, so the language switch does not read it.
 export function headingText(inner) {
   return inner.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 }
-import { readFileSync as readLegacyMap } from 'node:fs';
-const slugOf = text => text.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
+import { LEGACY_SECTIONS } from './legal-section-legacy.mjs';
+const slugOf = text => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
 export function sectionIds(html, legacy = {}) {
   const aliasOf = new Map(Object.entries(legacy).map(([id, text]) => [text, id]));
   const used = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
@@ -585,7 +585,7 @@ export function sectionIds(html, legacy = {}) {
     return `<h2 id="${id}"${attrs || ''}>${span}${inner}</h2>`;
   });
 }
-const K_LEGACY = JSON.parse(readLegacyMap(new URL('./legal-section-legacy.json', import.meta.url), 'utf8'));
+const K_LEGACY = LEGACY_SECTIONS;
 export function sectionIdsFor(path, lang, html) {
   return sectionIds(html, (K_LEGACY[path] || {})[lang] || {});
 }

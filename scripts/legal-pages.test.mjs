@@ -13,9 +13,9 @@ import { READING } from './lib/layout-tokens.mjs';
 import { sectionIds } from './lib/legal-render.mjs';
 
 // K-169: section ids come from each section's heading (not its position), the English and Thai pages of one document share them, and the old s-N fragments
-// still reach the section they reached (their frozen map is scripts/lib/legal-section-legacy.json, keyed by page path and language).
+// still reach the section they reached (their frozen map is scripts/lib/legal-section-legacy.mjs, keyed by page path and language).
 const K169_WEB = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
-const K169_LEGACY = JSON.parse(readFileSync(new URL('./lib/legal-section-legacy.json', import.meta.url), 'utf8'));
+const K169_LEGACY = (await import(new URL('./lib/legal-section-legacy.mjs', import.meta.url))).LEGACY_SECTIONS;
 const k169H2 = html => [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)].map(m => ({ id: m[1], text: m[2].replace(/<[^>]*>/g, '').trim() }));
 const k169IdOf = (html, text) => k169H2(html).find(h => h.text === text)?.id;
 const k169File = (path, lang) => (lang === 'th' ? 'th/' : '') + (path === '/' ? 'index' : path.slice(1)) + '.html';

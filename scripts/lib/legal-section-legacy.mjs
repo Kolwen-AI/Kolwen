@@ -1,4 +1,5 @@
-{
+// K-169: the frozen map of each page path and language to the heading each old positional fragment (s-N) reached. Read by legal-render.mjs; never edited by hand.
+export const LEGACY_SECTIONS = {
   "/accessibility": {
     "en": {
       "s-1": "What this site is",
@@ -137,4 +138,4 @@
       "s-18": "Status of this document"
     }
   }
-}
+};
