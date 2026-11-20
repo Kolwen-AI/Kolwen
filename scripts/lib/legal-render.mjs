@@ -568,6 +568,7 @@ export function headingText(inner) {
   return inner.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 }
 import { LEGACY_SECTIONS } from './legal-section-legacy.mjs';
+// A heading must slug to a non-empty ASCII id (a Thai-only heading needs an explicit id in its source), and editing a heading's text changes its id: give it an explicit id before renaming it.
 const slugOf = text => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
 export function sectionIds(html, legacy = {}) {
   const aliasOf = new Map(Object.entries(legacy).map(([id, text]) => [text, id]));
