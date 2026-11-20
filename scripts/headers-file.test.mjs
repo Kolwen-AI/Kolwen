@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { parseHeadersFile, declarations, parsePolicy, patternMatches } from './lib/headers-file.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const WEB = join(ROOT, 'web');
+// KOLWEN_WEB_DIR, when set, is the web/ folder the shipped list is read from: a test-only way to hold a scratch copy to the same assertions.
+const WEB = process.env.KOLWEN_WEB_DIR || join(ROOT, 'web');
 // K-175: the shipped list is read from web/ (every image and font file there), never written by hand.
 const shippedFiles = readdirSync(WEB, { recursive: true }).map(p => '/' + String(p).split('\\').join('/')).filter(p => /\.(png|jpe?g|svg|ico|woff2)$/i.test(p));
 
@@ -64,7 +65,8 @@ test('a missing .jpg, .png or .svg path matches no one-day Cache-Control rule, a
     assert.deepEqual(hits, [], `${file}: ${missing} matches a one-day rule`);
   }
   assert.deepEqual(oneDay.filter(r => r.pattern.includes('*')).map(r => r.pattern), [], `${file}: no one-day rule is a wildcard`);
-  for (const shipped of ['/og.jpg', '/favicon.svg', '/favicon-32.png', '/apple-touch-icon.png', '/band-404.svg', '/band-home.svg']) {
+  // C177b-1: the shipped images are read from web/, not written by hand, so a seventh image added later fails here until its rule exists.
+  for (const shipped of shippedFiles.filter(p => !p.startsWith('/fonts/'))) {
     assert.ok(oneDay.some(r => r.pattern === shipped), `${file}: ${shipped} has its own named one-day rule`);
   }
 });
