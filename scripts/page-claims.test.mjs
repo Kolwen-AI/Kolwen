@@ -406,6 +406,13 @@ const growthRow = (unit, finding, label) => {
   finishedNamed(m.b.r, `${label}, ${GROWTH_LARGE} openers`, finding);
   assert.ok(growthOk(m.a.work, m.b.work), `${label}: scan work grew from ${m.a.work} to ${m.b.work} for 4 times the openers`);
 };
+// K-183: a refusal by count counts only when both children finished normally and named the finding, and both printed a positive safe-integer count; then the ratio decides.
+const refusedByCount = (m, label, finding) => {
+  finishedNamed(m.a.r, `${label}, ${GROWTH_SMALL} openers`, finding);
+  finishedNamed(m.b.r, `${label}, ${GROWTH_LARGE} openers`, finding);
+  assert.ok(Number.isSafeInteger(m.a.work) && m.a.work > 0 && Number.isSafeInteger(m.b.work) && m.b.work > 0, `${label}: a child did not print its scan count, so nothing is refused`);
+  assert.equal(growthOk(m.a.work, m.b.work), false, `${label}: the count must refuse the growth (ratio ${(m.b.work / m.a.work).toFixed(2)})`);
+};
 // K-178 mutants: one unbounded search per start tag (indexOf), and one copy and search of the rest of the page per start tag (slice). Both must fail by their count.
 const mutateIndexOf = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('export function scanStartTag(s, nameEnd, max = META_MAX, collect = false) {', m => m + '\n  s.indexOf(String.fromCharCode(62), nameEnd); // mutant'));
 const mutateSlice = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('export function scanStartTag(s, nameEnd, max = META_MAX, collect = false) {', m => m + '\n  s.slice(nameEnd).search(/>/); // mutant'));
@@ -428,9 +435,7 @@ test('K-178: the growth check refuses an indexOf mutant and a slice mutant by th
   for (const [name, mutate] of [['indexOf', mutateIndexOf], ['slice', mutateSlice]]) {
     const m = growthRun('<link ', mutate);
     t.diagnostic(`${name} mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
-    assert.equal(m.a.r.error, undefined, `${name} mutant: the small size finished inside the clock`);
-    assert.equal(m.b.r.error, undefined, `${name} mutant: the large size finished inside the clock`);
-    assert.equal(growthOk(m.a.work, m.b.work), false, `${name} mutant: the count must refuse the growth`);
+    refusedByCount(m, `${name} mutant`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
   }
 });
 // K-180: a regex mutant, one unbounded exec per start tag from its name to the next '>' (the planted openers hold no '>', so each search runs to the page's end).
@@ -438,9 +443,13 @@ const mutateRegexExec = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.r
 test('K-180: the growth check refuses a regex-exec mutant of the start-tag scan by its own count, with both sizes finishing', t => {
   const m = growthRun('<link ', mutateRegexExec);
   t.diagnostic(`regex-exec mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
-  assert.equal(m.a.r.error, undefined, 'regex-exec mutant: the small size finished inside the clock');
-  assert.equal(m.b.r.error, undefined, 'regex-exec mutant: the large size finished inside the clock');
-  assert.equal(growthOk(m.a.work, m.b.work), false, 'regex-exec mutant: the count must refuse the growth');
+  refusedByCount(m, 'regex-exec mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+});
+// K-183: a mutant child that exits before the reader finishes prints no count (or a zero one), so growthOk is false and the refusal assertion would pass vacuously.
+const mutateEarlyExit = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + '\n  process.exit(0); // mutant'));
+test('K-183: an early-exit mutant is not a refusal: both children must finish and name the finding, so the old count assertion cannot pass on it', () => {
+  const m = growthRun('<link ', mutateEarlyExit);
+  assert.throws(() => refusedByCount(m, 'early exit', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]), /finished, and it must name the page/);
 });
 // C178-1: one 200,000-opener finish row is the clock ceiling for the work the count does not see; the real reader finishes it inside the clock.
 const BULK_N = 200000;
