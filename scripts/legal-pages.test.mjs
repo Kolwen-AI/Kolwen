@@ -10,13 +10,22 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { reEscape } from './lib/re-escape.mjs';
 import { READING } from './lib/layout-tokens.mjs';
-import { sectionIds } from './lib/legal-render.mjs';
+import { sectionIds, headingText } from './lib/legal-render.mjs';
+
+// CodeQL #75: an entity is decoded once. `&amp;lt;` is the text `&lt;` (an escaped less-than sign), never `<`.
+test('CodeQL #75: headingText decodes each entity once, so &amp;lt; is the text &lt;, and &amp;amp; is &amp;', () => {
+  assert.equal(headingText('A &amp;lt; B'), 'A &lt; B');
+  assert.equal(headingText('A &amp;amp; B'), 'A &amp; B');
+  assert.equal(headingText('A &lt; B'), 'A < B');
+});
 
 // K-169: section ids come from each section's heading (not its position), the English and Thai pages of one document share them, and the old s-N fragments
 // still reach the section they reached (their frozen map is scripts/lib/legal-section-legacy.mjs, keyed by page path and language).
 const K169_WEB = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
 const K169_LEGACY = (await import(new URL('./lib/legal-section-legacy.mjs', import.meta.url))).LEGACY_SECTIONS;
-const k169H2 = html => [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)].map(m => ({ id: m[1], text: m[2].replace(/<[^>]*>/g, '').trim() }));
+// Strips tags until the text stops changing (CodeQL #76, #77): a removal can join two halves into a new tag, so one pass is not enough to leave no tag.
+const stripTags = text => { let prev; do { prev = text; text = text.replace(/<[^>]*>/g, ''); } while (text !== prev); return text; };
+const k169H2 = html => [...html.matchAll(/<h2 id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)].map(m => ({ id: m[1], text: stripTags(m[2]).trim() }));
 const k169IdOf = (html, text) => k169H2(html).find(h => h.text === text)?.id;
 const k169File = (path, lang) => (lang === 'th' ? 'th/' : '') + (path === '/' ? 'index' : path.slice(1)) + '.html';
 
@@ -44,7 +53,7 @@ test('K-169: each legacy s-N fragment still reaches the section it reached, on b
       for (const [sN, text] of Object.entries(langs[lang])) {
         const piece = html.split('</h2>').find(p => p.includes('id="' + sN + '"'));
         assert.ok(piece, `${file}: #${sN} is on the page`);
-        assert.equal(piece.replace(/^[\s\S]*?<h2[^>]*>/, '').replace(/<[^>]*>/g, '').trim(), text, `${file}: #${sN} is the section it was`);
+        assert.equal(stripTags(piece.replace(/^[\s\S]*?<h2[^>]*>/, '')).trim(), text, `${file}: #${sN} is the section it was`);
       }
     }
   }

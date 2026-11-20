@@ -564,8 +564,10 @@ ${pageScriptHtml()}
 // the same English heading text, so one section has one id in both files (the switch's fragment, M5). A template page whose Thai headings differ carries its ids in
 // the template. The old positional fragments, s-1, s-2 ..., are kept by a frozen map (legal-section-legacy.mjs, by path and language): each is an empty span before
 // its heading, so `#s-N` still reaches the section it reached. The span is not an h2, so the language switch does not read it.
+// One pass over the entities: each is decoded once, so an escaped entity (`&amp;lt;`) stays text (`&lt;`) and is never decoded again (CodeQL #75).
+const HEADING_ENTITY = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", nbsp: ' ' };
 export function headingText(inner) {
-  return inner.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  return inner.replace(/<[^>]*>/g, ' ').replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (m, name) => HEADING_ENTITY[name]).replace(/\s+/g, ' ').trim();
 }
 import { LEGACY_SECTIONS } from './legal-section-legacy.mjs';
 // A heading must slug to a non-empty ASCII id (a Thai-only heading needs an explicit id in its source), and editing a heading's text changes its id: give it an explicit id before renaming it.
