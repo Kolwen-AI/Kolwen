@@ -56,7 +56,7 @@ import { READING } from './lib/layout-tokens.mjs';
 import { parseColor } from './lib/contrast.mjs';
 import { reportField } from './lib/report-field.mjs';
 
-export const ALL_CHECKS = ['reflow', 'zoom', 'csp', 'theme', 'contrast', 'lineheight', 'measure', 'glyphs', 'skip', 'header', 'keys', 'lang-url', 'm5'];
+export const ALL_CHECKS = ['reflow', 'zoom', 'csp', 'theme', 'contrast', 'lineheight', 'measure', 'glyphs', 'skip', 'header', 'keys', 'lang-url', 'm5', 'fragment'];
 const READING_CHECKS = ['theme', 'contrast', 'lineheight', 'measure'];
 export const MAX_LATIN_CHARS = 80; // SC 1.4.8 (AAA), the target the reading theme holds itself to
 export const urlPathOf = file => (file === 'index.html' ? '/' : '/' + file.replace(/\.html$/, '').replace(/\/index$/, '/'));
@@ -397,7 +397,7 @@ export async function headerChecks(page, origin, path, lang, tag, checks, failur
 async function skipCheck(page, origin, path, lang, tag, fail, measured) {
   const label = JSON.parse(readFileSync(join(CATALOGUE_DIR, lang + '.json'), 'utf8')).shared.skip;
   await freshLoad(page, origin, path, lang);
-  const rest = await page.evaluate(`(${skipRest})(${JSON.stringify(lang)})`);
+  const rest = await page.evaluate(`(${skipRest})(String.fromCharCode(${charCodesOf(lang)}))`);
   measured.push({ ...tag, check: 'skip', rest: rest.shown, clip: rest.clip });
   if (!rest.shown) fail('skip', `no skip link in ${lang}`);
   else if (rest.clip === 'none' || rest.restHit) fail('skip', 'at rest the skip link is not clipped away, so it is visible before it is focused');
@@ -512,6 +512,8 @@ const sectionId = id => {
   if (typeof id !== 'string' || !SECTION_ID.test(id)) return null;
   return id;
 };
+// CodeQL #78: a string reaches page code only as the character codes it is built from (String.fromCharCode of numbers), never as a literal, so no string sanitizer is in the flow.
+export const charCodesOf = s => [...s].map(c => c.charCodeAt(0)).join(',');
 // The finding a read that throws becomes: the same words the header checks' boundary uses (CodeRabbit 4601272476).
 const threwDetail = e => 'the check threw, so its readings are missing: ' + reportField(String(e && e.message ? e.message : e)).slice(0, 160);
 async function measureFragmentSwitch(page, origin, path, width) {
@@ -521,7 +523,7 @@ async function measureFragmentSwitch(page, origin, path, width) {
   if (before.id !== null && sectionId(before.id) === null) return { id: null, error: `the heading id ${reportField(before.id)} is not a section id (the slug of a heading), so no measurement is taken on it` };
   if (!before.id) return { id: null, error: `no section heading is above the top of the window at ${width} px, scrolled to the middle of a ${before.max} px page, so the measurement has no section to follow` };
   const id = sectionId(before.id); // not null: the checks above returned for any other id, and for no heading
-  const codes = [...id].map(c => c.charCodeAt(0)).join(',');
+  const codes = charCodesOf(id);
   await page.evaluate(`document.querySelector('a.lang-link').click()`);
   // the switch goes to the other language: from the English file to Thai, from the Thai file to English (M5, both directions)
   const otherLang = /^\/th(\/|$)/.test(path) ? 'en' : 'th';
@@ -533,6 +535,22 @@ async function measureFragmentSwitch(page, origin, path, width) {
   await pause(200);
   const after = await page.evaluate(`(() => { const h = document.getElementById(String.fromCharCode(${codes})); return h ? h.getBoundingClientRect().top : null; })()`);
   return { id: before.id, after, vh: before.vh };
+}
+// K-179: a fragment landing, then the switch, in the browser. From `path#fragment` the language link is focused (the keyboard path) and activated (Enter is a click). The
+// other address must carry the same fragment. The numbers say why it does not: where the target sits, and how far the page can scroll.
+async function measureFragmentLanding(page, origin, path, width, fragment) {
+  await page.setViewport(width, 800);
+  // Leave the document first: a fragment jump within the same document fires no load event, so goto would wait for one that never comes.
+  await page.goto('about:blank');
+  await page.goto(origin + path + '#' + fragment);
+  const before = await page.evaluate(`(() => { const h = document.getElementById(String.fromCharCode(${charCodesOf(fragment)})); const max = document.documentElement.scrollHeight - window.innerHeight; return { scrollY: window.scrollY, max, target: h ? h.getBoundingClientRect().top : null, vh: window.innerHeight }; })()`);
+  await page.evaluate(`(() => { const a = document.querySelector('a.lang-link'); a.focus(); a.click(); })()`);
+  const want = langPath(englishOf(path), /^\/th(\/|$)/.test(path) ? 'en' : 'th');
+  let now = null;
+  for (let i = 0; i < 60 && now !== want; i++) { await pause(150); now = await page.evaluate('location.pathname'); }
+  if (now !== want) return { before, error: `the other-language link did not open ${reportField(want)} (the address is ${reportField(String(now))})` };
+  await pause(200);
+  return { before, hash: await page.evaluate('location.hash') };
 }
 export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, headers = true }) {
   const failures = [], measured = [], notes = [], languageFailed = new Set(), resourceSeen = new Set();
@@ -597,6 +615,16 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
             for (const p of langUrlProblems(head, path, lang, file)) failures.push({ ...tag, check: 'lang-url', detail: p });
           }
         }
+        if (checks.includes('fragment') && (file === 'pricing.html' || file === 'th/pricing.html')) {
+          for (const width of [1280, 390]) {
+            let r;
+            try { r = await measureFragmentLanding(page, server.origin, path, width, 'compare-title'); }
+            catch (e) { r = { error: threwDetail(e) }; }
+            measured.push({ ...tag, check: 'fragment', width, ...r });
+            if (r.error) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px: ${r.error}` });
+            else if (r.hash !== '#compare-title') failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, from ${path}#compare-title, the language switch (focus, then Enter) opens ${reportField(r.hash || 'no fragment')}, not #compare-title; before the switch the page was at ${Math.round(r.before.scrollY)} of ${Math.round(r.before.max)} px, and the target sat ${Math.round(r.before.target)} px from the top of the ${r.before.vh} px window` });
+          }
+        }
         if (checks.includes('m5') && (file === 'terms.html' || file === 'th/terms.html')) {
           for (const width of [1280, 390]) {
             let r;
@@ -636,13 +664,13 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
                 for (const x of m.fails) failures.push({ ...stag, check: 'contrast', detail: `under the floor in the ${scheme} scheme: ${reportField(x)}${m.failCount > m.fails.length ? ` (and ${m.failCount - m.fails.length} more)` : ''}` });
               }
               if (checks.includes('measure') && scheme === 'light') {
-                const m = await page.evaluate(`(${measureLines})(${JSON.stringify('main')}, ${JSON.stringify(lang)})`);
+                const m = await page.evaluate(`(${measureLines})(String.fromCharCode(${charCodesOf('main')}), String.fromCharCode(${charCodesOf(lang)}))`);
                 measured.push({ ...tag, check: 'measure', ...m });
                 if (m.lines < (lang === 'th' ? 2 : 5)) failures.push({ ...tag, check: 'measure', detail: `only ${m.lines} lines were read` });
                 if (lang === 'en' && m.max > MAX_LATIN_CHARS) failures.push({ ...tag, check: 'measure', detail: `a rendered line holds ${m.max} characters; the reading measure is at most ${MAX_LATIN_CHARS} (SC 1.4.8, as a target)` });
               }
               if (checks.includes('lineheight') && scheme === 'light') {
-                const rows = await page.evaluate(`(${measureLineHeights})(${JSON.stringify('main')})`);
+                const rows = await page.evaluate(`(${measureLineHeights})(String.fromCharCode(${charCodesOf('main')}))`);
                 const want = lang === 'th' ? [1.65, 1.65] : [1.5, Infinity];
                 const off = rows.filter(r => r.ratio === null || r.ratio < want[0] - 0.005 || r.ratio > want[1] + 0.005);
                 const ratios = rows.map(r => r.ratio).filter(x => x !== null);
@@ -726,6 +754,7 @@ async function main() {
     const { failures, measured, notes } = await renderedChecks({ webDir, browser, checks, headers: !args.includes('--no-headers') });
     for (const f of failures) console.log(failLine(f));
     if (notes.length) console.log(noteLine(notes));
+    for (const m of measured.filter(x => x.check === 'fragment')) console.log('FRAGMENT ' + JSON.stringify({ page: m.page, width: m.width, hash: m.hash ?? null, error: m.error ?? null, before: m.before && { scrollY: Math.round(m.before.scrollY), max: Math.round(m.before.max), target: m.before.target === null ? null : Math.round(m.before.target) } }));
     for (const m of measured.filter(x => x.check === 'm5')) console.log('M5 ' + JSON.stringify({ page: m.page, width: m.width, section: m.id, after_top_px: m.after === undefined ? null : Math.round(m.after * 10) / 10, window_height: m.vh, error: m.error ?? null }));
     const pages = new Set(measured.map(m => m.page)).size;
     if (failures.length) { console.error(`rendered-check FAILED: ${failures.length} finding(s) over ${pages} page(s)`); process.exitCode = 1; return; }

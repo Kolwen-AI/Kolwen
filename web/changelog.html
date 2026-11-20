@@ -269,10 +269,16 @@
     for (var i = 0; i < hs.length; i++) { if (hs[i].getBoundingClientRect().top < 1) found = hs[i].id; else break; }
     return found;
   }
-  var links = document.querySelectorAll('a.lang-link');
+  // K-179: focusing the language link (Tab) scrolls the page to the top, where no section is above, so the last section read while nothing had the link's focus is kept. A
+  // keyboard activation (detail 0) uses it when the live read is empty; a mouse click reads the live section only, as before.
+  // The section the page opened at, when its fragment names one, is known before any scroll event (K-179), so it starts the remembered value.
+  function hashSection() { var h = location.hash.slice(1), el = h && document.getElementById(h); return el && el.tagName === 'H2' && el.closest('main') ? h : null; }
+  var links = document.querySelectorAll('a.lang-link'), kept = hashSection();
+  function languageFocused() { var a = document.activeElement; return !!a && a.classList.contains('lang-link'); }
+  window.addEventListener('scroll', function () { var s = sectionAbove(); if (s || !languageFocused()) kept = s; }, { passive: true });
   for (var i = 0; i < links.length; i++) {
-    links[i].addEventListener('click', function () {
-      var id = sectionAbove();
+    links[i].addEventListener('click', function (e) {
+      var id = sectionAbove() || (e.detail === 0 ? kept : null);
       if (id) this.href = this.href.split('#')[0] + '#' + id;
     });
   }

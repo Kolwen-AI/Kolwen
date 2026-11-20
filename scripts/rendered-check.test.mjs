@@ -1568,3 +1568,12 @@ test('a header whose nav is a column stacks its items on more than two rows, and
   const hit = where(failures, 'terms.html', 'header').filter(f => /sit on \d+ rows/.test(f.detail));
   assert.ok(hit.length >= 1, JSON.stringify(failures));
 });
+
+// CodeQL #78 witness: a string reaches page code only as the character codes it is built from, and the codes read back unchanged, quotes, backslashes and template characters included.
+import { charCodesOf } from './rendered-check.mjs';
+test('CodeQL #78: an id or language holding a quote, a backslash, a backquote or a dollar sign reaches page code as character codes, and reads back unchanged', () => {
+  for (const s of ['compare-title', 'a"b', 'a\b', "a'b`c${d}", 'th', 'main', '']) {
+    const back = String.fromCharCode(...(charCodesOf(s) === '' ? [] : charCodesOf(s).split(',').map(Number)));
+    assert.equal(back, s, JSON.stringify(s));
+  }
+});

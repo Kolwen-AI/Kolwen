@@ -77,7 +77,7 @@ cases. The requirements below are how the support surface behaves around that pr
    the process, in the customer's hands. Whether the law or a live security investigation can justify delaying
    that notice is an open question for counsel, with its timing and content; the process in `TERMS.md` has no such
    exception, so until counsel decides, notice comes first.
-3. **One matter, one record, one case ID per case.** A matter has one record across every door and every mail. A contact from a customer with an open matter attaches to that matter's case and never opens a second one; a new case ID is issued only for a new matter or for an appeal, which takes its `KWA-` ID on the same matter record. An appeal is a case with its type prefix on the same matter record, never a second scheme. A split found later is merged into the one record, and the merge is recorded on both IDs. The customer sees the case's state and the deadline of its current step, which Kolwen sets and
+3. **One matter, one record, one case ID per case.** A matter has one record across every door and every mail. A contact about an open matter attaches to that matter's case and never opens a second one; a new case ID is issued only for a new matter or for an appeal, which takes its `KWA-` ID on the same matter record. An appeal is a case with its type prefix on the same matter record, never a second scheme. A split found later is merged into the one record, and the merge is recorded on both IDs. The customer sees the case's state and the deadline of its current step, which Kolwen sets and
    publishes. The steps are `TERMS.md` steps 3 to 5: **14 business days** for the customer to answer a notice,
    **7 business days** for Kolwen's written decision, **30 business days** for the customer to file an appeal, and
    **14 business days** for Kolwen to answer it. If one of Kolwen's own deadlines passes (the 7 business days for
@@ -148,7 +148,7 @@ clause 5.4, approved 17 October 2017, read 2026-11-02.
 `Message-ID` header, and every reply carries `In-Reply-To` and `References`. This is a house requirement. RFC 5322
 section 3.6.4 says that a message SHOULD have a Message-ID field, and that reply messages SHOULD have In-Reply-To and
 References fields as appropriate (https://www.rfc-editor.org/rfc/rfc5322.txt, read 2026-11-02). The References field
-holds the parent's References, then the parent's Message-ID. The subject ID is the fallback for routing and search. An inbound mail without that thread, from a verified contact with an open case, attaches to the open case rather than opening one. When that contact has more than one open case and the mail does not say which, Kolwen asks the contact which matter it is about instead of guessing.
+holds the parent's References, then the parent's Message-ID. The subject ID is the fallback for routing and search. An inbound mail without that thread, from a verified contact with an open case, attaches to the open case only when it is about that matter; a mail about a different matter opens its own case under item 3's new-matter rule. When the mail's matter is unclear, or that contact has more than one open case and the mail does not say which, Kolwen asks the contact which matter it is about instead of guessing.
 
 **The page.** It is called "Case status" and sits at `kolwen.com/support/case`. It is not called "tracking", and it
 does not sit at `/status`, which is the site's service-health page.

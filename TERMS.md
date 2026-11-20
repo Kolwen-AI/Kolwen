@@ -96,11 +96,12 @@ model's chat format are not billed.
 [pending legal review] **Launch rule.** At launch, input that Kolwen serves from a cache is billed at
 the same rate as ordinary input. A separate rate for such input applies only if Kolwen announces it by
 notice under "Changes to these Terms", and only to requests made after that notice. That rate is never
-above the ordinary input rate for the same model. It is a ceiling, not a price: it moves only when the
-ordinary input rate moves, and that changes only as "Price changes" says. The ceiling covers input
-served from a cache. It does not cover a charge for writing to a cache or for keeping one, should Kolwen
-ever offer either; any such charge is announced by notice first. Adding a separate rate for input served
-from a cache is not a price rise.
+above the ordinary input rate for the same model. That limit is a ceiling, not a price: the ceiling, not
+the separate rate, moves with the ordinary input rate, and only when that rate changes under "Price
+changes"; the separate rate may sit anywhere at or below it. The ceiling covers input served from a
+cache. It does not cover a charge for writing to a cache or for keeping one, should Kolwen ever offer
+either; any such charge is announced by notice first. Adding a separate rate for input served from a
+cache is not a price rise.
 
 **GAP 14—[pending legal review]: counsel confirms the clause.**
 
