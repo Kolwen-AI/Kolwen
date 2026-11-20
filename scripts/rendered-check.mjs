@@ -545,7 +545,8 @@ async function measureFragmentLanding(page, origin, path, width, fragment) {
   await page.goto('about:blank');
   await page.goto(origin + path + '#' + fragment);
   const before = await page.evaluate(`(() => { const h = document.getElementById(String.fromCharCode(${charCodesOf(fragment)})); const max = document.documentElement.scrollHeight - window.innerHeight; return { scrollY: window.scrollY, max, target: h ? h.getBoundingClientRect().top : null, vh: window.innerHeight }; })()`);
-  await page.evaluate(`(() => { const a = document.querySelector('a.lang-link'); a.focus(); a.click(); })()`);
+  await page.evaluate(`document.querySelector('a.lang-link').focus()`);
+  await pressKey(page, 'Enter');
   const want = langPath(englishOf(path), /^\/th(\/|$)/.test(path) ? 'en' : 'th');
   let now = null;
   for (let i = 0; i < 60 && now !== want; i++) { await pause(150); now = await page.evaluate('location.pathname'); }
