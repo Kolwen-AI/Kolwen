@@ -80,14 +80,14 @@ alone.
 
 [pending legal review] This section applies to metered use, billed against credits at the prices per
 million tokens Kolwen publishes; a key or subscription is paid for by its own price and carries no
-per-request charge. Kolwen counts the tokens of each request at Kolwen's own gateway, as the request
-passes through it. Your usage page lists each request and the charge for it, and the charge on that page
-is the charge we take. The records we count from are available to you on request.
+per-request charge. Kolwen counts the tokens of each request it accepts at Kolwen's own gateway, as the
+request passes through it. Your usage page lists each request we counted and the charge for it, and the
+charge on that page is the charge we take. The records we count from are available to you on request.
 
-Each model has two published prices per million tokens, listed separately: one for input and one for
-output. Input is the tokens of your request. Output is the tokens the model sends back. Each is billed
-at its own price. Any tokens Kolwen adds around your message to put it in the model's chat format are
-not billed.
+[pending legal review] Each model has two published prices per million tokens, listed separately: one
+for input and one for output. Input is the tokens of your request. Output is the tokens the model sends
+back. Each is billed at its own price. Any tokens Kolwen adds around your message to put it in the
+model's chat format are not billed.
 
 **GAP 12—[pending legal review]: counsel confirms the clause.**
 
@@ -95,8 +95,12 @@ not billed.
 
 [pending legal review] **Launch rule.** At launch, input that Kolwen serves from a cache is billed at
 the same rate as ordinary input. A separate rate for such input applies only if Kolwen announces it by
-notice under "Changes to these Terms", and only to requests made after that notice. Adding a lower rate
-is not a price rise.
+notice under "Changes to these Terms", and only to requests made after that notice. That rate is never
+above the ordinary input rate for the same model. It is a ceiling, not a price: it moves only when the
+ordinary input rate moves, and that changes only as "Price changes" says. The ceiling covers input
+served from a cache. It does not cover a charge for writing to a cache or for keeping one, should Kolwen
+ever offer either; any such charge is announced by notice first. Adding a separate rate for input served
+from a cache is not a price rise.
 
 **GAP 14—[pending legal review]: counsel confirms the clause.**
 
