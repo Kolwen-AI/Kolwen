@@ -157,12 +157,21 @@ export async function handleSubscription(request, env) {
 }
 
 // The paths the Worker answers itself. Every other path goes to the assets; a navigation to one of these reaches the Worker only through run_worker_first (wrangler.jsonc).
-export const WORKER_ROUTES = ['/status.json', '/subscribe'];
+// RFC 8461 policy for mta-sts.kolwen.com: testing mode, served on that host only (LWK-220 item 1; dark until its DNS record exists). The body is the design's, CRLF line endings.
+export const MTA_STS_HOST = 'mta-sts.kolwen.com';
+export const MTA_STS_PATH = '/.well-known/mta-sts.txt';
+export const MTA_STS_POLICY = 'version: STSv1\r\nmode: testing\r\nmx: *.mx.cloudflare.net\r\nmax_age: 86400\r\n';
+const mtaStsResponse = method => secured(new Response(method === 'HEAD' ? null : MTA_STS_POLICY, { headers: { 'content-type': 'text/plain; charset=utf-8', 'content-length': String(new TextEncoder().encode(MTA_STS_POLICY).length), 'cache-control': 'no-store' } }));
+export const WORKER_ROUTES = ['/status.json', '/subscribe', MTA_STS_PATH];
 
 export default {
   fetch: async (request, env) => {
-    const { pathname } = new URL(request.url);
+    const { pathname, hostname } = new URL(request.url);
     if (!WORKER_ROUTES.includes(pathname)) return env.ASSETS.fetch(request);
+    if (pathname === MTA_STS_PATH) {
+      if (hostname !== MTA_STS_HOST || (request.method !== 'GET' && request.method !== 'HEAD')) return env.ASSETS.fetch(request);
+      return mtaStsResponse(request.method);
+    }
     // RFC 9110 §9.3.2: HEAD answers as GET does, with the same status and headers and no body (K-168).
     if ((request.method === 'GET' || request.method === 'HEAD') && pathname === '/status.json') {
       const res = await statusResponse(env);

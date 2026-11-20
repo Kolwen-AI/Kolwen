@@ -26,7 +26,9 @@ test('wrangler.jsonc lists the Worker\'s own routes in assets.run_worker_first, 
 
 test('every path in WORKER_ROUTES gets the Worker\'s own answer from fetch, never the assets stub', async () => {
   for (const path of worker.WORKER_ROUTES) {
-    const res = await worker.default.fetch(new Request('https://kolwen.com' + path, { headers: { 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document', accept: 'text/html' } }), { ASSETS, STATUS: kv(), SUBSCRIBE: 'off', SUBSCRIBERS: kv() });
+    // The MTA-STS path answers on its own host only (the policy host), so it is asked there; every other route on kolwen.com.
+    const host = path === worker.MTA_STS_PATH ? worker.MTA_STS_HOST : 'kolwen.com';
+    const res = await worker.default.fetch(new Request('https://' + host + path, { headers: { 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document', accept: 'text/html' } }), { ASSETS, STATUS: kv(), SUBSCRIBE: 'off', SUBSCRIBERS: kv() });
     assert.equal(res.headers.get('x-answered-by'), null, path + ' was answered by the assets, not by the Worker');
   }
 });
@@ -34,4 +36,28 @@ test('every path in WORKER_ROUTES gets the Worker\'s own answer from fetch, neve
 test('a path outside WORKER_ROUTES still goes to the assets, so the 404 page and the static files are unchanged', async () => {
   const res = await worker.default.fetch(new Request('https://kolwen.com/no-such-page'), { ASSETS, STATUS: kv() });
   assert.equal(res.headers.get('x-answered-by'), 'assets');
+});
+
+// MTA-STS (RFC 8461): the policy is served on its own host only. The body is the one in the design (testing mode, CRLF line endings, each line ended).
+const MTA_STS = 'https://mta-sts.kolwen.com/.well-known/mta-sts.txt';
+const POLICY = 'version: STSv1\r\nmode: testing\r\nmx: *.mx.cloudflare.net\r\nmax_age: 86400\r\n';
+test('MTA-STS: the policy host answers the policy, byte for byte, as text/plain through secured(), and HEAD answers as GET without a body', async () => {
+  const get = await worker.default.fetch(new Request(MTA_STS), { ASSETS, STATUS: kv() });
+  assert.equal(get.headers.get('x-answered-by'), null, 'answered by the Worker, not the assets');
+  assert.equal(get.status, 200);
+  assert.equal(get.headers.get('content-type'), 'text/plain; charset=utf-8');
+  assert.ok(get.headers.get('content-security-policy'), 'through secured(): the global headers are on the answer');
+  assert.equal(await get.text(), POLICY, 'the policy body, byte for byte, CRLF line endings');
+  const head = await worker.default.fetch(new Request(MTA_STS, { method: 'HEAD' }), { ASSETS, STATUS: kv() });
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), '', 'HEAD has no body');
+  assert.equal(head.headers.get('content-length'), String(new TextEncoder().encode(POLICY).length));
+});
+test('MTA-STS: the same path on any other host, and any other method on the policy host, answers as it does today, from the assets', async () => {
+  for (const url of ['https://kolwen.com/.well-known/mta-sts.txt', 'https://www.kolwen.com/.well-known/mta-sts.txt', 'https://example.org/.well-known/mta-sts.txt']) {
+    const res = await worker.default.fetch(new Request(url), { ASSETS, STATUS: kv() });
+    assert.equal(res.headers.get('x-answered-by'), 'assets', url);
+  }
+  const post = await worker.default.fetch(new Request(MTA_STS, { method: 'POST' }), { ASSETS, STATUS: kv() });
+  assert.equal(post.headers.get('x-answered-by'), 'assets', 'POST on the policy host');
 });
