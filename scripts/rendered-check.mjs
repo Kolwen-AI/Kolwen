@@ -552,6 +552,33 @@ async function measureFragmentLanding(page, origin, path, width, fragment) {
   await pause(200);
   return { before, hash: await page.evaluate('location.hash') };
 }
+// K-181: a keyboard switch from `path#compare-title` writes the section into the link; Back restores that page, and a POINTER switch at the top (a real mouse press, detail 1)
+// must open the other language at its top. A stale href from the first switch would open the section instead: the check reads the address the pointer switch opens.
+const waitPathname = async (page, want) => { let now = null; for (let i = 0; i < 60 && now !== want; i++) { await pause(150); now = await page.evaluate('location.pathname'); } return now === want; };
+async function measureBackAfterSwitch(page, origin, path, width) {
+  await page.setViewport(width, 800);
+  await page.goto('about:blank');
+  await page.goto(origin + path + '#compare-title');
+  const other = langPath(englishOf(path), /^\/th(\/|$)/.test(path) ? 'en' : 'th');
+  await page.evaluate(`window.__k181 = 'before'; document.querySelector('a.lang-link').focus()`);
+  await pressKey(page, 'Enter');
+  if (!(await waitPathname(page, other))) return { error: `the keyboard switch did not open ${reportField(other)}` };
+  await page.evaluate('history.back()');
+  if (!(await waitPathname(page, path))) return { error: `Back did not return to ${reportField(path)}` };
+  // The page's own JavaScript state survived the Back only if the browser restored the page from its back-forward cache (a reload starts it afresh).
+  const restored = (await page.evaluate('window.__k181')) === 'before';
+  // Not restored (measured on this browser: the reload starts the page afresh), so the DOM a cache restore would have shown is set by hand: the link carries the href the keyboard switch wrote.
+  if (!restored) await page.evaluate(`document.querySelector('a.lang-link').setAttribute('href', String.fromCharCode(${charCodesOf(other + '#compare-title')}))`);
+  await pause(200);
+  await page.evaluate('window.scrollTo(0, 0)');
+  await pause(200);
+  const at = await page.evaluate(`(() => { const r = document.querySelector('a.lang-link').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+  if (!(await waitPathname(page, other))) return { error: `the pointer switch at the top did not open ${reportField(other)}` };
+  await pause(200);
+  return { hash: await page.evaluate('location.hash'), restored };
+}
 export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, headers = true }) {
   const failures = [], measured = [], notes = [], languageFailed = new Set(), resourceSeen = new Set();
   const server = await browser.serve(webDir, { headers }); // a real server on 127.0.0.1, or the DevTools channel, whichever the browser can reach
@@ -623,6 +650,16 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
             measured.push({ ...tag, check: 'fragment', width, ...r });
             if (r.error) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px: ${r.error}` });
             else if (r.hash !== '#compare-title') failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, from ${path}#compare-title, the language switch (focus, then Enter) opens ${reportField(r.hash || 'no fragment')}, not #compare-title; before the switch the page was at ${Math.round(r.before.scrollY)} of ${Math.round(r.before.max)} px, and the target sat ${Math.round(r.before.target)} px from the top of the ${r.before.vh} px window` });
+          }
+        }
+        if (checks.includes('fragment') && (file === 'pricing.html' || file === 'th/pricing.html')) {
+          for (const width of [1280, 390]) {
+            let r;
+            try { r = await measureBackAfterSwitch(page, server.origin, path, width); }
+            catch (e) { r = { error: threwDetail(e) }; }
+            measured.push({ ...tag, check: 'fragment', step: 'back', width, ...r });
+            if (r.error) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, after Back: ${r.error}` });
+            else if (r.hash !== '') failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, a keyboard switch from ${path}#compare-title, Back, then a pointer switch at the top opens ${reportField(r.hash)} (the section the first switch remembered), not the top of the page` });
           }
         }
         if (checks.includes('m5') && (file === 'terms.html' || file === 'th/terms.html')) {
@@ -754,7 +791,7 @@ async function main() {
     const { failures, measured, notes } = await renderedChecks({ webDir, browser, checks, headers: !args.includes('--no-headers') });
     for (const f of failures) console.log(failLine(f));
     if (notes.length) console.log(noteLine(notes));
-    for (const m of measured.filter(x => x.check === 'fragment')) console.log('FRAGMENT ' + JSON.stringify({ page: m.page, width: m.width, hash: m.hash ?? null, error: m.error ?? null, before: m.before && { scrollY: Math.round(m.before.scrollY), max: Math.round(m.before.max), target: m.before.target === null ? null : Math.round(m.before.target) } }));
+    for (const m of measured.filter(x => x.check === 'fragment')) console.log('FRAGMENT ' + JSON.stringify({ page: m.page, width: m.width, hash: m.hash ?? null, error: m.error ?? null, step: m.step ?? 'landing', restored: m.restored ?? null, before: m.before && { scrollY: Math.round(m.before.scrollY), max: Math.round(m.before.max), target: m.before.target === null ? null : Math.round(m.before.target) } }));
     for (const m of measured.filter(x => x.check === 'm5')) console.log('M5 ' + JSON.stringify({ page: m.page, width: m.width, section: m.id, after_top_px: m.after === undefined ? null : Math.round(m.after * 10) / 10, window_height: m.vh, error: m.error ?? null }));
     const pages = new Set(measured.map(m => m.page)).size;
     if (failures.length) { console.error(`rendered-check FAILED: ${failures.length} finding(s) over ${pages} page(s)`); process.exitCode = 1; return; }

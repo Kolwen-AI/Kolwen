@@ -203,12 +203,19 @@ a{color:var(--amber)}
   var links = document.querySelectorAll('a.lang-link'), kept = hashSection();
   function languageFocused() { var a = document.activeElement; return !!a && a.classList.contains('lang-link'); }
   window.addEventListener('scroll', function () { var s = sectionAbove(); if (s || !languageFocused()) kept = s; }, { passive: true });
+  // K-181: every activation writes the href, so an address a keyboard switch left behind is never reused: no fragment when no section applies. A page the browser restores from
+  // its back-forward cache (persisted) keeps the last href and the remembered section of the earlier visit, so both are reset to the page's own address.
   for (var i = 0; i < links.length; i++) {
     links[i].addEventListener('click', function (e) {
       var id = sectionAbove() || (e.detail === 0 ? kept : null);
-      if (id) this.href = this.href.split('#')[0] + '#' + id;
+      this.href = this.href.split('#')[0] + (id ? '#' + id : '');
     });
   }
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    kept = hashSection();
+    for (var j = 0; j < links.length; j++) links[j].href = links[j].href.split('#')[0];
+  });
   // The status page is the one page with a [data-status] element. It reads /status.json, the last health check the Worker stored, and writes the state, the time and one row per
   // probed page as text: the numbers, paths and times come from the data, and every word on the page comes from the catalogue. Without the fetch the page keeps its unavailable line.
   if (document.querySelector('[data-status]')) {
