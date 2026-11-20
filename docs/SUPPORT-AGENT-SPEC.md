@@ -148,7 +148,7 @@ clause 5.4, approved 17 October 2017, read 2026-11-02.
 `Message-ID` header, and every reply carries `In-Reply-To` and `References`. This is a house requirement. RFC 5322
 section 3.6.4 says that a message SHOULD have a Message-ID field, and that reply messages SHOULD have In-Reply-To and
 References fields as appropriate (https://www.rfc-editor.org/rfc/rfc5322.txt, read 2026-11-02). The References field
-holds the parent's References, then the parent's Message-ID. The subject ID is the fallback for routing and search. An inbound mail without that thread, from a verified contact with an open case, attaches to the open case only when it is about that matter; a mail about a different matter opens its own case under item 3's new-matter rule. When the mail's matter is unclear, or that contact has more than one open case and the mail does not say which, Kolwen asks the contact which matter it is about instead of guessing.
+holds the parent's References, then the parent's Message-ID. The subject ID is the fallback for routing and search. An inbound mail without that thread, from a verified contact with an open case, attaches to the open case only when it is about that matter; a mail about a different matter opens its own case under item 3's new-matter rule. When the mail's matter or its case is unclear, Kolwen asks the contact which matter it is about instead of guessing.
 
 **The page.** It is called "Case status" and sits at `kolwen.com/support/case`. It is not called "tracking", and it
 does not sit at `/status`, which is the site's service-health page.
