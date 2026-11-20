@@ -513,7 +513,8 @@ const sectionId = id => {
   return id;
 };
 // CodeQL #78: a string reaches page code only as the character codes it is built from (String.fromCharCode of numbers), never as a literal, so no string sanitizer is in the flow.
-export const charCodesOf = s => [...s].map(c => c.charCodeAt(0)).join(',');
+// The UTF-16 code units, so an astral character (a surrogate pair) reads back whole; [...s] would keep only its high surrogate.
+export const charCodesOf = s => s.split('').map(c => c.charCodeAt(0)).join(',');
 // The finding a read that throws becomes: the same words the header checks' boundary uses (CodeRabbit 4601272476).
 const threwDetail = e => 'the check threw, so its readings are missing: ' + reportField(String(e && e.message ? e.message : e)).slice(0, 160);
 async function measureFragmentSwitch(page, origin, path, width) {

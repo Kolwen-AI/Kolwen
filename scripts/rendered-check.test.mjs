@@ -1571,8 +1571,14 @@ test('a header whose nav is a column stacks its items on more than two rows, and
 
 // CodeQL #78 witness: a string reaches page code only as the character codes it is built from, and the codes read back unchanged, quotes, backslashes and template characters included.
 import { charCodesOf } from './rendered-check.mjs';
+// K-184: the witnesses hold a real backslash (the source 'a\b' is a backspace) and an astral character (a surrogate pair, which must read back whole).
+const WITNESSES = ['compare-title', 'a"b', 'a\\b', "a'b`c${d}", 'th', 'main', '', 'x😀y'];
+test('K-184: the witnesses hold a backslash and an astral character', () => {
+  assert.ok(WITNESSES.some(s => s.includes(String.fromCharCode(92))), 'the witness list has no backslash');
+  assert.ok(WITNESSES.some(s => /[\uD800-\uDFFF]/.test(s)), 'the witness list has no astral character');
+});
 test('CodeQL #78: an id or language holding a quote, a backslash, a backquote or a dollar sign reaches page code as character codes, and reads back unchanged', () => {
-  for (const s of ['compare-title', 'a"b', 'a\b', "a'b`c${d}", 'th', 'main', '']) {
+  for (const s of WITNESSES) {
     const back = String.fromCharCode(...(charCodesOf(s) === '' ? [] : charCodesOf(s).split(',').map(Number)));
     assert.equal(back, s, JSON.stringify(s));
   }
