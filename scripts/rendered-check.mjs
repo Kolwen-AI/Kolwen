@@ -513,7 +513,8 @@ const sectionId = id => {
   return id;
 };
 // CodeQL #78: a string reaches page code only as the character codes it is built from (String.fromCharCode of numbers), never as a literal, so no string sanitizer is in the flow.
-export const charCodesOf = s => [...s].map(c => c.charCodeAt(0)).join(',');
+// The UTF-16 code units, so an astral character (a surrogate pair) reads back whole; [...s] would keep only its high surrogate.
+export const charCodesOf = s => s.split('').map(c => c.charCodeAt(0)).join(',');
 // The finding a read that throws becomes: the same words the header checks' boundary uses (CodeRabbit 4601272476).
 const threwDetail = e => 'the check threw, so its readings are missing: ' + reportField(String(e && e.message ? e.message : e)).slice(0, 160);
 async function measureFragmentSwitch(page, origin, path, width) {
@@ -544,13 +545,62 @@ async function measureFragmentLanding(page, origin, path, width, fragment) {
   await page.goto('about:blank');
   await page.goto(origin + path + '#' + fragment);
   const before = await page.evaluate(`(() => { const h = document.getElementById(String.fromCharCode(${charCodesOf(fragment)})); const max = document.documentElement.scrollHeight - window.innerHeight; return { scrollY: window.scrollY, max, target: h ? h.getBoundingClientRect().top : null, vh: window.innerHeight }; })()`);
-  await page.evaluate(`(() => { const a = document.querySelector('a.lang-link'); a.focus(); a.click(); })()`);
+  await page.evaluate(`document.querySelector('a.lang-link').focus()`);
+  await pressKey(page, 'Enter');
   const want = langPath(englishOf(path), /^\/th(\/|$)/.test(path) ? 'en' : 'th');
   let now = null;
   for (let i = 0; i < 60 && now !== want; i++) { await pause(150); now = await page.evaluate('location.pathname'); }
   if (now !== want) return { before, error: `the other-language link did not open ${reportField(want)} (the address is ${reportField(String(now))})` };
   await pause(200);
   return { before, hash: await page.evaluate('location.hash') };
+}
+// K-181: a keyboard switch from `path#compare-title` writes the section into the link; Back restores that page, and a POINTER switch at the top (a real mouse press, detail 1)
+// must open the other language at its top. A stale href from the first switch would open the section instead: the check reads the address the pointer switch opens.
+const waitPathname = async (page, want) => { let now = null; for (let i = 0; i < 60 && now !== want; i++) { await pause(150); now = await page.evaluate('location.pathname'); } return now === want; };
+async function measureBackAfterSwitch(page, origin, path, width) {
+  await page.setViewport(width, 800);
+  await page.goto('about:blank');
+  await page.goto(origin + path + '#compare-title');
+  const other = langPath(englishOf(path), /^\/th(\/|$)/.test(path) ? 'en' : 'th');
+  await page.evaluate(`window.__k181 = 'before'; document.querySelector('a.lang-link').focus()`);
+  await pressKey(page, 'Enter');
+  if (!(await waitPathname(page, other))) return { error: `the keyboard switch did not open ${reportField(other)}` };
+  await page.evaluate('history.back()');
+  if (!(await waitPathname(page, path))) return { error: `Back did not return to ${reportField(path)}` };
+  // The page's own JavaScript state survived the Back only if the browser restored the page from its back-forward cache (a reload starts it afresh).
+  const restored = (await page.evaluate('window.__k181')) === 'before';
+  // Not restored (measured on this browser: the reload starts the page afresh), so the DOM a cache restore would have shown is set by hand: the link carries the href the keyboard switch wrote.
+  if (!restored) await page.evaluate(`document.querySelector('a.lang-link').setAttribute('href', String.fromCharCode(${charCodesOf(other + '#compare-title')}))`);
+  await pause(200);
+  await page.evaluate('window.scrollTo(0, 0)');
+  await pause(200);
+  const at = await page.evaluate(`(() => { const r = document.querySelector('a.lang-link').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: at.x, y: at.y, button: 'left', clickCount: 1 });
+  if (!(await waitPathname(page, other))) return { error: `the pointer switch at the top did not open ${reportField(other)}` };
+  await pause(200);
+  return { hash: await page.evaluate('location.hash'), restored };
+}
+// C180-2 (K-181): the pageshow reset. A persisted pageshow must strip the links' fragments, and the remembered section must become the page's own hash (none here), so a
+// keyboard activation at the top adds no fragment. Both are read from the link itself. Red: the reset removed in a scratch copy of web/ (its persisted test disabled).
+async function measurePageshowReset(page, origin, path, width) {
+  await page.setViewport(width, 800);
+  await page.goto('about:blank');
+  await page.goto(origin + path);
+  const other = langPath(englishOf(path), /^\/th(\/|$)/.test(path) ? 'en' : 'th');
+  await page.evaluate(`document.querySelector('a.lang-link').setAttribute('href', String.fromCharCode(${charCodesOf(other + '#compare-title')}))`);
+  await page.evaluate(`window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))`);
+  const afterPageshow = await page.evaluate(`document.querySelector('a.lang-link').getAttribute('href')`);
+  // The remembered section: scroll so a section is above (the scroll keeps it), focus the link (the focus scrolls to the top, which keeps it), then a persisted pageshow.
+  await page.goto('about:blank');
+  await page.goto(origin + path);
+  await page.evaluate(`window.scrollTo(0, Math.floor((document.documentElement.scrollHeight - window.innerHeight) / 2))`);
+  await pause(200);
+  await page.evaluate(`document.querySelector('a.lang-link').focus()`);
+  await pause(200);
+  await page.evaluate(`window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))`);
+  const keptHref = await page.evaluate(`(() => { const a = document.querySelector('a.lang-link'); a.click(); return a.getAttribute('href'); })()`);
+  return { afterPageshow, keptHref };
 }
 export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, headers = true }) {
   const failures = [], measured = [], notes = [], languageFailed = new Set(), resourceSeen = new Set();
@@ -623,6 +673,27 @@ export async function renderedChecks({ webDir, browser, checks = ALL_CHECKS, hea
             measured.push({ ...tag, check: 'fragment', width, ...r });
             if (r.error) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px: ${r.error}` });
             else if (r.hash !== '#compare-title') failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, from ${path}#compare-title, the language switch (focus, then Enter) opens ${reportField(r.hash || 'no fragment')}, not #compare-title; before the switch the page was at ${Math.round(r.before.scrollY)} of ${Math.round(r.before.max)} px, and the target sat ${Math.round(r.before.target)} px from the top of the ${r.before.vh} px window` });
+          }
+        }
+        if (checks.includes('fragment') && (file === 'pricing.html' || file === 'th/pricing.html')) {
+          for (const width of [1280, 390]) {
+            let r;
+            try { r = await measureBackAfterSwitch(page, server.origin, path, width); }
+            catch (e) { r = { error: threwDetail(e) }; }
+            measured.push({ ...tag, check: 'fragment', step: 'back', width, ...r });
+            if (r.error) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, after Back: ${r.error}` });
+            else if (r.hash !== '') failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, a keyboard switch from ${path}#compare-title, Back, then a pointer switch at the top opens ${reportField(r.hash)} (the section the first switch remembered), not the top of the page` });
+          }
+        }
+        if (checks.includes('fragment') && (file === 'pricing.html' || file === 'th/pricing.html')) {
+          for (const width of [1280, 390]) {
+            let r;
+            try { r = await measurePageshowReset(page, server.origin, path, width); }
+            catch (e) { r = { error: threwDetail(e) }; }
+            measured.push({ ...tag, check: 'fragment', step: 'pageshow', width, ...r });
+            if (r.error) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, pageshow: ${r.error}` });
+            else if (typeof r.afterPageshow !== 'string' || r.afterPageshow.includes('#')) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, a persisted pageshow left the fragment in the language link: ${reportField(String(r.afterPageshow))}` });
+            else if (typeof r.keptHref !== 'string' || r.keptHref.includes('#')) failures.push({ ...tag, check: 'fragment', detail: `at ${width} px, after a persisted pageshow a keyboard activation at the top still carries the remembered section: ${reportField(String(r.keptHref))}` });
           }
         }
         if (checks.includes('m5') && (file === 'terms.html' || file === 'th/terms.html')) {
@@ -754,7 +825,7 @@ async function main() {
     const { failures, measured, notes } = await renderedChecks({ webDir, browser, checks, headers: !args.includes('--no-headers') });
     for (const f of failures) console.log(failLine(f));
     if (notes.length) console.log(noteLine(notes));
-    for (const m of measured.filter(x => x.check === 'fragment')) console.log('FRAGMENT ' + JSON.stringify({ page: m.page, width: m.width, hash: m.hash ?? null, error: m.error ?? null, before: m.before && { scrollY: Math.round(m.before.scrollY), max: Math.round(m.before.max), target: m.before.target === null ? null : Math.round(m.before.target) } }));
+    for (const m of measured.filter(x => x.check === 'fragment')) console.log('FRAGMENT ' + JSON.stringify({ page: m.page, width: m.width, hash: m.hash ?? null, error: m.error ?? null, step: m.step ?? 'landing', restored: m.restored ?? null, afterPageshow: m.afterPageshow ?? null, keptHref: m.keptHref ?? null, before: m.before && { scrollY: Math.round(m.before.scrollY), max: Math.round(m.before.max), target: m.before.target === null ? null : Math.round(m.before.target) } }));
     for (const m of measured.filter(x => x.check === 'm5')) console.log('M5 ' + JSON.stringify({ page: m.page, width: m.width, section: m.id, after_top_px: m.after === undefined ? null : Math.round(m.after * 10) / 10, window_height: m.vh, error: m.error ?? null }));
     const pages = new Set(measured.map(m => m.page)).size;
     if (failures.length) { console.error(`rendered-check FAILED: ${failures.length} finding(s) over ${pages} page(s)`); process.exitCode = 1; return; }
