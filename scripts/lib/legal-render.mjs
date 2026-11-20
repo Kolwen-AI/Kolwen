@@ -574,17 +574,17 @@ import { LEGACY_SECTIONS } from './legal-section-legacy.mjs';
 const slugOf = text => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
 export function sectionIds(html, legacy = {}) {
   const aliasOf = new Map(Object.entries(legacy).map(([id, text]) => [text, id]));
-  const used = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
+  const used = new Map([...html.matchAll(/\sid="([^"]+)"/g)].map(m => [m[1], 'an id already on the page']));
   return html.replace(/<h2(\s[^>]*)?>([\s\S]*?)<\/h2>/g, (m, attrs, inner) => {
     const text = headingText(inner);
     const alias = aliasOf.get(text);
     if (alias) aliasOf.delete(text);
     const span = alias ? `<span id="${alias}"></span>` : '';
     if (attrs && /\sid=/.test(attrs)) return `<h2${attrs}>${span}${inner}</h2>`;
-    const base = slugOf(text);
-    let id = base;
-    for (let k = 2; used.has(id); k++) id = `${base}-${k}`;
-    used.add(id);
+    // A collision is an error, never a positional suffix: a suffix would give the later heading a new fragment and move every section after it.
+    const id = slugOf(text);
+    if (used.has(id)) throw new Error(`two headings slug to the id "${id}": "${used.get(id)}" and "${text}". Give one of them an explicit id in its source.`);
+    used.set(id, text);
     return `<h2 id="${id}"${attrs || ''}>${span}${inner}</h2>`;
   });
 }

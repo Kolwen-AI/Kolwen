@@ -12,6 +12,14 @@ import { reEscape } from './lib/re-escape.mjs';
 import { READING } from './lib/layout-tokens.mjs';
 import { sectionIds, headingText } from './lib/legal-render.mjs';
 
+// CodeRabbit 4638814826: a slug collision fails the render. A positional suffix would give a later heading a new fragment, and a heading inserted above would move an existing one.
+test('CodeRabbit 4638814826: two headings that slug alike fail the render, and a heading inserted above them is refused, so no fragment moves', () => {
+  const two = '<main><h2>Alpha</h2><p>a</p><h2>Alpha!</h2><p>b</p></main>';
+  const inserted = '<main><h2>Alpha</h2><p>n</p><h2>Alpha</h2><p>a</p><h2>Alpha!</h2><p>b</p></main>';
+  assert.throws(() => sectionIds(two, {}), /Alpha/, 'two headings that slug alike are an error');
+  assert.throws(() => sectionIds(inserted, {}), /Alpha/, 'a heading inserted above them is refused, not numbered');
+});
+
 // CodeQL #75: an entity is decoded once. `&amp;lt;` is the text `&lt;` (an escaped less-than sign), never `<`.
 test('CodeQL #75: headingText decodes each entity once, so &amp;lt; is the text &lt;, and &amp;amp; is &amp;', () => {
   assert.equal(headingText('A &amp;lt; B'), 'A &lt; B');
