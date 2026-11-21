@@ -140,7 +140,7 @@ export function servedHeaderMisses(hostname, headers, declared) {
   return out;
 }
 
-// The rail, for EVERY response from a production host, not only HTML: production never says noindex, except `/status.json` (K-194: a machine-read status record, kept out of search on purpose; `worker/index.mjs`, `statusResponse`).
+// The rail, for EVERY response from a production host, not only HTML: production never says noindex. The `/status.json` record is exempt by design (K-194: a machine-read status record, kept out of search on purpose; `worker/index.mjs`, `statusResponse`), but this helper takes no path, so it reports that response as a miss: a caller that reads `/status.json` leaves it out before calling.
 export function robotsRailMisses(hostname, headers) {
   const v = headers.get('X-Robots-Tag');
   return PRODUCTION_HOSTS.has(hostname.toLowerCase()) && v !== null ? [`X-Robots-Tag is "${v}" on a production host; noindex belongs to preview hosts only`] : [];
