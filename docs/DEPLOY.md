@@ -71,7 +71,7 @@ after it is audited.
 
 ### noindex applies to the preview host only
 
-`web/_headers` carries one rule keyed on the host, not the path:
+`web/_headers` carries one rule keyed on the host, not the path, and it reaches only the static assets:
 
 ```
 https://:preview.previews.kolwen.com/*
@@ -85,14 +85,16 @@ and nothing else. `kolwen.com` does not end in `.previews.kolwen.com`, and the b
 semantics (the preview host matches; `kolwen.com` and `www.kolwen.com` do not). That matcher is not
 Cloudflare's engine, so a live read of a preview's headers is the check that decides it.
 
+The Worker's own responses on a preview host (its status and subscribe answers and its 404) carry the same header from `secured()` in `worker/index.mjs` (K-192), because `web/_headers` does not reach them. `secured()` adds it only when the host ends in `.previews.kolwen.com`, so production hosts get neither.
+
 - **The workers.dev rule is gone.** It was `https://:version.:subdomain.workers.dev/*`, which also
   matched production's own `workers.dev` alias. With the workers.dev previews off, no rule of this file
   names a workers.dev host.
 - **Cloudflare adds `noindex` only on workers.dev.** The Custom domains page: "Cloudflare adds this header automatically to `workers.dev` Preview URLs, but not to custom domain Preview URLs." So on `previews.kolwen.com` this rule is what sends it. A Preview URL is `<preview-name>.previews.kolwen.com` and a deployment URL `<deployment>-<preview-name>.previews.kolwen.com` (the Previews page, "URLs"); both are one label before the host, so the rule covers both.
 - **The repo-side gate.** `scripts/surface-check.mjs` (rule 16) holds the other half of "production
   never says noindex": it fails a production page that carries a robots `noindex` (or `none`) meta tag,
-  and any `web/_headers` rule that sets `X-Robots-Tag` noindex on a pattern that is not an absolute
-  `*.previews.kolwen.com` URL. It is the list of record for what it checks.
+  and any `web/_headers` rule that sets `X-Robots-Tag` noindex on a pattern that is not an absolute URL
+  whose host is one label, or one placeholder, before `.previews.kolwen.com` (K-191). It is the list of record for what it checks.
 
 ## Security headers
 
@@ -132,12 +134,17 @@ serve two policies instead of one.
     `.svg` came back with the `Cache-Control` that `/*.svg` sets. So the `/*` rule covers the
     404 page there, and `deploy-check` requires `kolwen.com` to serve the committed `web/404.html`
     with the declared headers, when it reads `kolwen.com`, its default origin.
-  - **A Workers Preview.** An unmatched path got a 9-byte platform "Not found" instead of
-    `web/404.html`, with no `_headers` rule applied, not the path rules and not the host rule. Its
-    `X-Robots-Tag: noindex` is Cloudflare's own. So a preview's 404 carries none of the policy.
-    Cloudflare's headers page says rules apply to assets served from the assets pipeline, not to
-    Worker-generated responses; it does not name this case. Why a preview does not serve the
-    `not_found_handling` fallback is not known and was not tested further. `deploy-check` run
+  - **A Workers Preview (retired).** On a workers.dev preview an unmatched path got a 9-byte platform
+    "Not found", with no `_headers` rule applied, and its `X-Robots-Tag: noindex` was Cloudflare's own
+    (Cloudflare adds it only on workers.dev previews). workers.dev previews are off now. On the
+    custom-domain preview `previews.kolwen.com`, measured 2026-11-21 on `fix-k191-k192.previews.kolwen.com`,
+    an unmatched path (`/no-such-page-xyz`) answered `HTTP/1.1 404`, `Content-Type: text/html`,
+    `x-robots-tag: noindex`, `X-Content-Type-Options: nosniff` and a 15,913-byte body, the byte length of
+    `web/404.html` (title "Not found — Kolwen"): the site's own page, with the preview host's `_headers`
+    rules. `/subscribe` (switched off) answered 404 `text/plain` with `x-robots-tag: noindex`, from
+    `secured()` (K-192). The measurement is two paths on one preview (`/no-such-page-xyz` and `/subscribe`), read live by the department head on 2026-11-21. Cloudflare's headers page says rules
+    apply to assets served from the assets pipeline, not to Worker-generated responses; it does not name
+    this case. `deploy-check` run
     with `--origin` on a preview prints a note and skips the 404 headers rather than failing.
   - No host-scoped copy of the policy was added: no rule of ours reaches that response, and a second
     policy line would break the one-policy rule above.
