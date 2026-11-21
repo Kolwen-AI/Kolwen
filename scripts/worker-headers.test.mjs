@@ -91,12 +91,12 @@ test('K-192: a preview-host /status.json keeps noindex on GET and on HEAD', asyn
   assert.equal(head.headers.get('x-robots-tag'), 'noindex');
 });
 
-test('K-192: on kolwen.com and www.kolwen.com the Worker adds no X-Robots-Tag, and a host that only contains the suffix is not a preview host', async () => {
+test('K-192: on kolwen.com and www.kolwen.com the Worker adds no X-Robots-Tag, and a host that only ends with the word previews is not a preview host', async () => {
   for (const origin of ['https://kolwen.com', 'https://www.kolwen.com']) {
     const off = await worker.fetch(new Request(origin + '/subscribe'), { SUBSCRIBE: 'off', SUBSCRIBERS: kv() });
     assert.equal(off.status, 404);
     assert.equal(off.headers.get('x-robots-tag'), null, origin);
   }
-  const lookalike = await worker.fetch(new Request('https://previews.kolwen.com.example.net/subscribe'), { SUBSCRIBE: 'off', SUBSCRIBERS: kv() });
+  const lookalike = await worker.fetch(new Request('https://notpreviews.kolwen.com/subscribe'), { SUBSCRIBE: 'off', SUBSCRIBERS: kv() });
   assert.equal(lookalike.headers.get('x-robots-tag'), null);
 });
