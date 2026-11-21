@@ -92,7 +92,7 @@ The Worker's own responses on a preview host (its status and subscribe answers a
   names a workers.dev host.
 - **Cloudflare adds `noindex` only on workers.dev.** The Custom domains page: "Cloudflare adds this header automatically to `workers.dev` Preview URLs, but not to custom domain Preview URLs." So on `previews.kolwen.com` this rule is what sends it. A Preview URL is `<preview-name>.previews.kolwen.com` and a deployment URL `<deployment>-<preview-name>.previews.kolwen.com` (the Previews page, "URLs"); both are one label before the host, so the rule covers both.
 - **The repo-side gate.** `scripts/surface-check.mjs` (rule 16) holds the other half of "production
-  never says noindex" (one named exception, the `/status.json` record, K-194): it fails a production page that carries a robots `noindex` (or `none`) meta tag,
+  never says noindex" (its named exceptions: the six pages in `NOINDEX_META_OK`, the 404, subprocessors and legal pages in English and Thai, and the `/status.json` record, K-194): it fails a production page outside that list that carries a robots `noindex` (or `none`) meta tag,
   and any `web/_headers` rule that sets `X-Robots-Tag` noindex on a pattern that is not an absolute URL
   whose host is one label, or one placeholder, before `.previews.kolwen.com` (K-191). It is the list of record for what it checks.
 
