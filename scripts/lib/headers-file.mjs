@@ -140,7 +140,7 @@ export function servedHeaderMisses(hostname, headers, declared) {
   return out;
 }
 
-// The rail, for EVERY response from a production host, not only HTML: production never says noindex.
+// The rail, for EVERY response from a production host, not only HTML: production never says noindex, except `/status.json` (K-194: a machine-read status record, kept out of search on purpose; `worker/index.mjs`, `statusResponse`).
 export function robotsRailMisses(hostname, headers) {
   const v = headers.get('X-Robots-Tag');
   return PRODUCTION_HOSTS.has(hostname.toLowerCase()) && v !== null ? [`X-Robots-Tag is "${v}" on a production host; noindex belongs to preview hosts only`] : [];
