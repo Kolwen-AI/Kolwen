@@ -376,11 +376,12 @@ const bulkWork = (dir, unit, n) => {
       if (typeof s === 'string') {
         const to = m ? m.index + m[0].length : (this.sticky ? from + 1 : s.length);
         // A search scanning at most SPAN_STACK characters costs a constant per start tag, so it is charged without the chain check (the stack capture is the slow part).
-        // A longer one is charged when its chain holds scanStartTag, on the page (by the page's characters) or on a derived string (by the characters it scans).
+        // A search on a derived string is charged in full by the characters it scans, with no chain check: the stack capture on those calls is what
+        // timed the matchAll mutant out of the clock (K-190, measured 2026-11-21: over 120 s with the capture, 6.5 s without the wrapper).
+        // A search on the page that scans more than SPAN_STACK characters is charged when its chain holds scanStartTag, by the page's characters.
         // Many short searches per start tag are charged one unit each (a failed sticky attempt), so their number, not their length, carries a quadratic; this count may not refuse it at 5,000 and 20,000 (K-189).
-        if (to - from <= SPAN_STACK || new Error().stack.includes('scanStartTag')) {
-          if (s.length === LEN) charge('exec', from, to); else kinds.exec += Math.max(0, to - from);
-        }
+        if (s.length !== LEN) kinds.exec += Math.max(0, to - from);
+        else if (to - from <= SPAN_STACK || new Error().stack.includes('scanStartTag')) charge('exec', from, to);
       }
       return m;
     };
@@ -458,6 +459,42 @@ test('K-188: the count refuses a regex search on a derived subject (s.substring)
   const m = growthRun('<link ', mutateSuffix);
   t.diagnostic(`suffix mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
   refusedByCount(m, 'suffix mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+});
+// K-189, the stated limit: a sticky attempt is charged one unit however far it walks, so one sticky walk per start tag (`/[^>]*x/y`) is quadratic in
+// time and linear in count. The count passes this shape today, and only the clock stops it (measured 2026-11-21: 4.3 s and 23 s at 5,000 and 20,000
+// openers, stickyFail units 51,831 and 231,831). This row records that fact; a count that later charges the walk flips it, by design.
+const mutateStickyWalk = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = /[^>]*x/y; re.lastIndex = nameEnd; re.exec(s); } // mutant"));
+test('K-189: the count passes a single sticky walk per start tag, the stated limit: linear in count, so the clock is its only guard', t => {
+  const m = growthRun('<link ', mutateStickyWalk);
+  finishedNamed(m.a.r, `sticky walk, ${GROWTH_SMALL} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  finishedNamed(m.b.r, `sticky walk, ${GROWTH_LARGE} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`sticky walk: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
+  assert.ok(measuredSpan(m.a.work) && measuredSpan(m.b.work), 'sticky walk: no count printed');
+  assert.equal(growthOk(m.a.work, m.b.work), true, 'sticky walk: the count passes it today (the stated limit)');
+});
+// K-189, the reviewer's shape: a sticky attempt every 256 characters from nameEnd to the end, each a page-subject search, each one unit. The count PASSES it
+// today: the mutant's charge grows 4.7 times for 4 times the openers (6.07 M and 28.6 M, the reviewer's own figures), and its time 2.1 times on this run, so
+// the count and the clock both see a linear shape here. This row is the stated limit with its witness; a count that later charges these attempts flips it.
+const mutateStickyShort = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = /x/y; for (let i = nameEnd; i < s.length; i += 256) { re.lastIndex = i; re.exec(s); } } // mutant"));
+test('K-189: the reviewer\'s sticky-attempt shape passes the count today, the stated limit (the total count grows under 8 times for 4 times the openers)', t => {
+  const m = growthRun('<link ', mutateStickyShort);
+  finishedNamed(m.a.r, `sticky attempts, ${GROWTH_SMALL} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  finishedNamed(m.b.r, `sticky attempts, ${GROWTH_LARGE} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`sticky attempts: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
+  assert.ok(measuredSpan(m.a.work) && measuredSpan(m.b.work), 'sticky attempts: no count printed');
+  assert.equal(growthOk(m.a.work, m.b.work), true, 'sticky attempts: the count passes it today (the stated limit)');
+});
+// K-190: a matchAll over a derived subject inside scanStartTag. Its stack capture (10 frames on each derived call) timed it out at 60 s on this box;
+// a derived call is now charged in full with no chain check, so the shape finishes inside the clock. Its count and its time both stay linear (measured
+// 2026-11-21: count ratio 4.53, 14.4 s and 17.0 s), so this row records the stated limit: the count does not refuse this shape, and it does not need to.
+const mutateMatchAll = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { [...s.substring(nameEnd).matchAll(/>/g)]; } // mutant"));
+test('K-190: a matchAll over a derived subject inside scanStartTag finishes inside the clock at both sizes; its count and its time stay linear', t => {
+  const m = growthRun('<link ', mutateMatchAll);
+  finishedNamed(m.a.r, `matchAll mutant, ${GROWTH_SMALL} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  finishedNamed(m.b.r, `matchAll mutant, ${GROWTH_LARGE} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`matchAll mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
+  assert.ok(measuredSpan(m.a.work) && measuredSpan(m.b.work), 'matchAll mutant: no count printed');
+  assert.equal(growthOk(m.a.work, m.b.work), true, 'matchAll mutant: the count passes it today (the stated limit); its time is linear as well');
 });
 // C180-1: the same search made by a method other than exec (test), and by exec moved into a helper that scanStartTag calls. Both must be charged.
 const mutateRegexTest = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = new RegExp('>', 'g'); re.lastIndex = nameEnd; re.test(s); } // mutant"));
