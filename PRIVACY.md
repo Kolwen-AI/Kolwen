@@ -90,6 +90,10 @@ number.
 > บันทึกไว้ และบังคับใช้ด้วยกลไกการลบ มาตรา 23(3) มาตรา 37(3) และมาตรา 39(4) กำหนดให้ต้องระบุ
 > บันทึก และบังคับใช้ระยะเวลาการเก็บ และไม่มีกฎหมายฉบับใดกำหนดตัวเลขไว้
 
+[pending legal review] **Held answers.** If your connection breaks while an answer is being produced, we keep your place in the answer, in memory only, so that you can pick it up where you left off. We keep it for no longer than 10 minutes from the break. It is deleted when you pick it up, when you cancel, when the 10 minutes pass, and when you ask us to erase your data. Only the API key that made the request can pick it up. It is not written to disk, copied anywhere else, logged, or used for training or testing. Nothing is kept for a request that finishes normally.
+
+> [รอที่ปรึกษากฎหมาย] **คำตอบที่ถือรอไว้** หากการเชื่อมต่อของคุณหลุดระหว่างที่คำตอบกำลังถูกสร้าง เราจะเก็บตำแหน่งของคุณในคำตอบไว้ในหน่วยความจำเท่านั้น เพื่อให้คุณรับต่อได้จากจุดที่หลุด เราเก็บไว้ไม่เกิน 10 นาทีนับจากที่สายหลุด และจะลบเมื่อคุณรับคำตอบ เมื่อคุณยกเลิก เมื่อครบ 10 นาที และเมื่อคุณขอให้ลบข้อมูลของคุณ เฉพาะ API key ที่สร้างคำขอนั้นเท่านั้นที่รับต่อได้ เราไม่เขียนลงดิสก์ ไม่คัดลอกไปที่อื่น ไม่บันทึกใน log และไม่นำไปเทรนหรือทดสอบ คำขอที่จบตามปกติจะไม่มีการเก็บอะไรไว้
+
 **Worker logs.** Today the Worker logs the result of each of its own page checks (the path, status, timing and error class) and, when the result of the checks changes, one line saying whether an alert was sent, not sent because no alert address is set, or failed (with the error's class only), and one line when the status record cannot be saved (again the error's class only); never a visitor's request (see "What this site is"). Invocation logs are switched off in `wrangler.jsonc`. When the
 Worker first answers visitors' requests with code of ours (an API, a payment-provider webhook or a chat endpoint) with invocation logs switched on, Cloudflare Workers
 Logs will record each such request. Switching it on is Cloudflare's setting, and the page says "All newly created Workers
