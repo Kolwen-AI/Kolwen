@@ -29,6 +29,8 @@ A change reaches the public site through a fixed path, every step of which is ma
 scanning and push protection stay the other wall. **Nothing enforces that a clone runs that command** —
 stated because it is the honest limit of the control.
 
+**Mail-policy settings:** moving kolwen.com's MTA-STS policy from `testing` to `enforce` is the owner's decision on the evidence named in `inventory.md`, never a seat's. It takes a new policy id and `max_age`, and the four tests run again.
+
 ## Planned
 
 A second reviewer, once there is a second person.
