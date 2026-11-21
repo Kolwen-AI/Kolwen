@@ -501,6 +501,8 @@ const ruleSpanWork = (dir, unit, n, mode, mutate) => {
   const measured = /^K186_SPAN (\{.*\})$/m.exec(r.stderr || '');
   return { r, work: measured ? JSON.parse(measured[1]).exec : NaN, ms: Date.now() - t0 };
 };
+// A span the child printed: a positive safe integer. A child that ends without its line gives NaN, and NaN must never pass for a measured count (CodeRabbit #203).
+const measuredSpan = x => Number.isSafeInteger(x) && x > 0;
 const ruleSpanRun = (n, mode, mutate) => { const dir = surfaceCopy(); try { return ruleSpanWork(dir, '<link ', n, mode, mutate); } finally { rmSync(dir, { recursive: true, force: true }); } };
 // K-186: the sticky rules' span, counted as the engine walks it, grows linearly; the ticket's measure (a failed sticky search charged to the string's end) read 15 times for
 // 4 times the openers, and that was the instrument: a sticky search attempts one position (0.5 ms at both sizes, probe 2026-11-21), so the rules never walked the page.
@@ -512,13 +514,18 @@ test('K-186: the page-wide element rules\' exec span grows linearly on the real 
   finishedNamed(b.r, `rule span, ${GROWTH_LARGE} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
   const ta = ruleSpanRun(GROWTH_SMALL, 'ticket'), tb = ruleSpanRun(GROWTH_LARGE, 'ticket');
   t.diagnostic(`sticky span: ${a.work} at ${GROWTH_SMALL} openers, ${b.work} at ${GROWTH_LARGE} (ratio ${(b.work / a.work).toFixed(2)}); ${a.ms} ms and ${b.ms} ms. Ticket measure, for the record: ${ta.work} and ${tb.work} (ratio ${(tb.work / ta.work).toFixed(2)})`);
+  // A child that ends without printing its span gives NaN, which growthOk already refuses; say so by the measurement, not by the comparison.
+  assert.ok(measuredSpan(a.work), `K-186 rule span: no span printed at ${GROWTH_SMALL} openers, so nothing is measured`);
+  assert.ok(measuredSpan(b.work), `K-186 rule span: no span printed at ${GROWTH_LARGE} openers, so nothing is measured`);
   assert.ok(growthOk(a.work, b.work), `rule span grew from ${a.work} to ${b.work} for 4 times the openers`);
 });
 test('K-186: the span count refuses a page-wide rule that drops the sticky flag and searches from each opener, by its own count', t => {
   const a = ruleSpanRun(GROWTH_SMALL, 'sticky', mutateStickyDropped), b = ruleSpanRun(GROWTH_LARGE, 'sticky', mutateStickyDropped);
   t.diagnostic(`no-sticky mutant: span ${a.work} at ${GROWTH_SMALL} openers, ${b.work} at ${GROWTH_LARGE} (ratio ${(b.work / a.work).toFixed(2)}); ${a.ms} ms and ${b.ms} ms`);
-  assert.equal(a.r.error, undefined, 'no-sticky mutant: the small size finished inside the clock');
-  assert.equal(b.r.error, undefined, 'no-sticky mutant: the large size finished inside the clock');
+  finishedNamed(a.r, `no-sticky mutant, ${GROWTH_SMALL} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  finishedNamed(b.r, `no-sticky mutant, ${GROWTH_LARGE} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  assert.ok(measuredSpan(a.work), `no-sticky mutant: no span printed at ${GROWTH_SMALL} openers, so nothing is refused by count`);
+  assert.ok(measuredSpan(b.work), `no-sticky mutant: no span printed at ${GROWTH_LARGE} openers, so nothing is refused by count`);
   assert.equal(growthOk(a.work, b.work), false, 'no-sticky mutant: the count must refuse the growth');
 });
 
