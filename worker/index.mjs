@@ -121,6 +121,7 @@ export async function statusResponse(env, host = '') {
   const body = JSON.stringify(state);
   // The byte length of THIS body, computed here, never a constant: HEAD copies these headers and sends no body (K-173).
   const length = String(new TextEncoder().encode(body).length);
+  // K-194: the machine-read status record is kept out of search indexes on purpose, on every host: a named exception to the production-never-noindex rail.
   return secured(new Response(body, { headers: { 'content-type': 'application/json; charset=utf-8', 'content-length': length, 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } }), host);
 }
 
