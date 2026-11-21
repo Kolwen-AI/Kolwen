@@ -82,6 +82,20 @@ test('K-192: a preview-host /subscribe answer and a preview-host malformed-token
   const bad = await worker.fetch(new Request(PREVIEW + '/subscribe?token=x', { method: 'DELETE' }), { SUBSCRIBE: 'on', SUBSCRIBERS: kv() });
   assert.equal(bad.status, 400);
   assert.equal(bad.headers.get('x-robots-tag'), 'noindex');
+  // C185b-1: the three other Worker answers on a preview host, each with the switch on.
+  const post = email => new Request(PREVIEW + '/subscribe', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ email }) });
+  const on = { SUBSCRIBE: 'on', SUBSCRIBERS: kv() };
+  const subscribed = await worker.fetch(post('reader@example.com'), on);
+  assert.equal(subscribed.status, 200);
+  assert.equal(await subscribed.text(), 'subscribed; no confirmation mail is sent in this build');
+  assert.equal(subscribed.headers.get('x-robots-tag'), 'noindex');
+  const shape = await worker.fetch(post('not-an-email'), on);
+  assert.equal(shape.status, 400);
+  assert.equal(shape.headers.get('x-robots-tag'), 'noindex');
+  const removed = await worker.fetch(new Request(PREVIEW + '/subscribe?token=' + TOKEN, { method: 'DELETE' }), { SUBSCRIBE: 'on', SUBSCRIBERS: kv({ [TOKEN]: '{}' }) });
+  assert.equal(removed.status, 200);
+  assert.equal(await removed.text(), 'removed');
+  assert.equal(removed.headers.get('x-robots-tag'), 'noindex');
 });
 
 test('K-192: a preview-host /status.json keeps noindex on GET and on HEAD', async () => {
