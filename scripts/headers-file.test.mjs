@@ -70,3 +70,23 @@ test('a missing .jpg, .png or .svg path matches no one-day Cache-Control rule, a
     assert.ok(oneDay.some(r => r.pattern === shipped), `${file}: ${shipped} has its own named one-day rule`);
   }
 });
+
+// AW-35 (1), BB-535: previews are served on previews.kolwen.com. The host is the scope of the noindex, never a path, and kolwen.com never carries it.
+// A host pattern is matched here by a local matcher over the documented placeholder semantics (one dot-delimited label per placeholder, * greedy to the end).
+const hostMatches = (pattern, url) => new RegExp('^' + pattern.split(/(\*|:[A-Za-z]\w*)/).filter(p => p !== '').map(p => p === '*' ? '.*' : /^:[A-Za-z]/.test(p) ? '[^./]+' : p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('') + '$').test(url);
+const noindexRules = () => parseHeadersFile(readFileSync(join(WEB, '_headers'), 'utf8')).filter(r => r.headers.some(h => h.name.toLowerCase() === 'x-robots-tag' && /\bnoindex\b/i.test(h.value)));
+
+test('AW-35 (1): the preview host previews.kolwen.com carries X-Robots-Tag noindex from web/_headers', () => {
+  assert.ok(noindexRules().some(r => r.pattern === 'https://:preview.previews.kolwen.com/*'), 'web/_headers has no noindex rule on https://:preview.previews.kolwen.com/*');
+});
+
+test('AW-35 (1): no noindex rule matches kolwen.com, www.kolwen.com, or sets noindex on a production path', () => {
+  for (const r of noindexRules()) {
+    assert.ok(!r.pattern.startsWith('/'), `${r.pattern} sets noindex on a path, which is a production path`);
+    for (const host of ['https://kolwen.com/', 'https://www.kolwen.com/', 'https://kolwen.com/index.html']) assert.ok(!hostMatches(r.pattern, host), `${r.pattern} matches ${host}`);
+  }
+});
+
+test('AW-35 (1): the workers.dev preview rule is gone with the workers.dev previews, so no noindex rule names a workers.dev host', () => {
+  assert.deepEqual(noindexRules().map(r => r.pattern).filter(p => /workers\.dev/.test(p)), []);
+});

@@ -189,7 +189,7 @@ test('seam 3: a host-keyed CSP rule is seen: on a host of the zone it joins with
   const preview = cspZoneProblems(seams, 'company', headersOf(REAL) + rule(':version.:subdomain.workers.dev'), zonePaths);
   assert.ok(has(preview, /declares a Content-Security-Policy on https:\/\/:version\.:subdomain\.workers\.dev\/\*, which no zone claims/), JSON.stringify(preview));
   assert.ok(!has(preview, /matched by 2 CSP rules/), 'it joins nothing on the zone host');
-  // a host rule with another header (the real preview rule sets only X-Robots-Tag) carries no CSP and is not a CSP rule
+  // a host rule with another header (the preview rule sets only X-Robots-Tag) carries no CSP and is not a CSP rule
   assert.deepEqual(msgs(cspZoneProblems(seams, 'company', headersOf(REAL) + rule('kolwen.com', 'X-Robots-Tag: noindex'), zonePaths)), []);
 });
 
