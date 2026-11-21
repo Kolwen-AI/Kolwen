@@ -45,12 +45,12 @@ A push is not finished until both have answered. Read the verdict; do not assume
 
 ## Previews: a pull request can get a URL
 
-Previews are served on `previews.kolwen.com`, the preview hostname the owner attached to this Worker
-through the Cloudflare API on 2026-11-21 (AW-35 (1), BB-535). A preview is a copy of the site built
+Previews are served on `previews.kolwen.com`, the preview hostname attached to this Worker
+through the Cloudflare API on 2026-11-21 (the owner signed card BB-535; main pressed it). A preview is a copy of the site built
 from the branch, and its URL is a name under that host. A pull request gets a preview URL only when
 its Workers Builds build runs with that host attached; the build's comment on the pull request names
 the exact URL. Until the host was attached, a pull request had no preview URL. The workers.dev
-preview URLs are off: `wrangler.jsonc` sets `preview_urls: false`, and the Worker's `workers_dev`
+preview URLs, and Version URLs with their aliases, are off: `wrangler.jsonc` sets `preview_urls: false`, which Cloudflare's Version URLs page says also disables routing to Version URLs and aliased Version URLs; the Worker's `workers_dev`
 alias is off too (see the comment there). That setting and the build credential live in Cloudflare,
 not in this repository.
 
@@ -85,9 +85,7 @@ Cloudflare's engine, so a live read of a preview's headers is the check that dec
 - **The workers.dev rule is gone.** It was `https://:version.:subdomain.workers.dev/*`, which also
   matched production's own `workers.dev` alias. With the workers.dev previews off, no rule of this file
   names a workers.dev host.
-- **Cloudflare's Previews page is silent** on whether previews send `X-Robots-Tag` (read 2026-09-23).
-  The rule is written anyway; the deployment-URL shape of a preview is not named in the rule, because
-  the Previews page was not read for it in this change.
+- **Cloudflare adds `noindex` only on workers.dev.** The Custom domains page: "Cloudflare adds this header automatically to `workers.dev` Preview URLs, but not to custom domain Preview URLs." So on `previews.kolwen.com` this rule is what sends it. A Preview URL is `<preview-name>.previews.kolwen.com` and a deployment URL `<deployment>-<preview-name>.previews.kolwen.com` (the Previews page, "URLs"); both are one label before the host, so the rule covers both.
 - **The repo-side gate.** `scripts/surface-check.mjs` (rule 16) holds the other half of "production
   never says noindex": it fails a production page that carries a robots `noindex` (or `none`) meta tag,
   and any `web/_headers` rule that sets `X-Robots-Tag` noindex on a pattern that is not an absolute

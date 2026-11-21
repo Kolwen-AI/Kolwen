@@ -78,6 +78,8 @@ const noindexRules = () => parseHeadersFile(readFileSync(join(WEB, '_headers'), 
 
 test('AW-35 (1): the preview host previews.kolwen.com carries X-Robots-Tag noindex from web/_headers', () => {
   assert.ok(noindexRules().some(r => r.pattern === 'https://:preview.previews.kolwen.com/*'), 'web/_headers has no noindex rule on https://:preview.previews.kolwen.com/*');
+  for (const u of ['https://pr-12.previews.kolwen.com/', 'https://abc123-pr-12.previews.kolwen.com/pricing']) assert.ok(hostMatches('https://:preview.previews.kolwen.com/*', u), u);
+  assert.ok(!hostMatches('https://:preview.previews.kolwen.com/*', 'https://previews.kolwen.com/'));
 });
 
 test('AW-35 (1): no noindex rule matches kolwen.com, www.kolwen.com, or sets noindex on a production path', () => {

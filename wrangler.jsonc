@@ -8,8 +8,8 @@
 	// zone and accepted TLS 1.0 and 1.1 when measured on 2026-09-26. kolwen.com is the one production origin.
 	// Set here rather than only in the dashboard: Cloudflare says a dashboard-only switch is re-enabled by the next deploy.
 	"workers_dev": false,
-	// workers.dev Preview URLs are OFF (AW-35 (1), BB-535): a pull request's preview is served on previews.kolwen.com, the preview hostname the owner
-	// attached to this Worker through the API on 2026-11-21. Stated explicitly because the default of preview_urls follows workers_dev: Cloudflare's
+	// workers.dev Preview URLs, and Version URLs with their aliases, are OFF (Cloudflare's Version URLs page: "Disabling Version URLs disables routing to Version URLs and aliased Version URLs"); a pull request's preview is served on previews.kolwen.com, the preview hostname
+	// attached to this Worker through the Cloudflare API on 2026-11-21 (the owner signed card BB-535; main pressed it). Stated explicitly because the default of preview_urls follows workers_dev: Cloudflare's
 	// Preview URLs setting says "If omitted, Wrangler does not change an existing setting. If no setting exists, its initial value depends on workers_dev",
 	// so omitting it could switch previews on or off by accident on a fresh state.
 	"preview_urls": false,
