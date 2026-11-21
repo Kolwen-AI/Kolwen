@@ -376,11 +376,13 @@ const bulkWork = (dir, unit, n) => {
       if (typeof s === 'string') {
         const to = m ? m.index + m[0].length : (this.sticky ? from + 1 : s.length);
         // A search scanning at most SPAN_STACK characters costs a constant per start tag, so it is charged without the chain check (the stack capture is the slow part).
-        // A longer one is charged when its chain holds scanStartTag, on the page (by the page's characters) or on a derived string (by the characters it scans).
+        // A search on a derived string is charged in full by the characters it scans, with no chain check: the stack capture on those calls is what
+        // timed the matchAll mutant out of the clock (K-190, measured 2026-11-21: over 120 s with the capture, 6.5 s without the wrapper).
+        // This charges every regex search on any string other than the page, in every rule and file (about 72 M on the real reader, nearly constant in n), so a growth check must read increments, not one ratio (C183-3).
+        // A search on the page that scans more than SPAN_STACK characters is charged when its chain holds scanStartTag, by the page's characters.
         // Many short searches per start tag are charged one unit each (a failed sticky attempt), so their number, not their length, carries a quadratic; this count may not refuse it at 5,000 and 20,000 (K-189).
-        if (to - from <= SPAN_STACK || new Error().stack.includes('scanStartTag')) {
-          if (s.length === LEN) charge('exec', from, to); else kinds.exec += Math.max(0, to - from);
-        }
+        if (s.length !== LEN) kinds.exec += Math.max(0, to - from);
+        else if (to - from <= SPAN_STACK || new Error().stack.includes('scanStartTag')) charge('exec', from, to);
       }
       return m;
     };
@@ -399,83 +401,131 @@ const bulkWork = (dir, unit, n) => {
 };
 // Four times the openers must do less than eight times the work.
 const growthOk = (small, large) => Number.isSafeInteger(small) && small > 0 && Number.isSafeInteger(large) && large >= small && large < 8 * small;
-// The two sizes of one unit. `mutate`, when given, edits the copies' reader first (the K-178 mutants).
+// C183-1: a single ratio at 5,000 and 20,000 is diluted by a charge that does not grow with the openers (the mutant's own work on unplanted tags, and the
+// derived base the count charges on the whole pipeline), so the increments over three sizes decide: linear work gives an increment ratio near 2, a quadratic
+// one near 4, and the threshold 3 sits between them.
+// Its floor: the increments include the real reader's own linear work (about 103.5 M per 5,000 openers), so a quadratic is refused only when its own charge at 5,000 openers exceeds about 35 M (one third of that increment); a sparser quadratic (measured: an unbounded search from about 1 tag in 21, 17 M at 5,000) passes. A mutant row can subtract the real reader measured in the same run and test the difference, which has no floor of this kind.
+const growthLinear = (w1, w2, w4) => [w1, w2, w4].every(x => Number.isSafeInteger(x) && x > 0) && w2 >= w1 && w4 >= w2 && (w4 - w2) < 3 * Math.max(1, w2 - w1);
+const GROWTH_MID = 10000;
+// The three sizes of one unit, each child in its own copy. `mutate`, when given, edits the copies' reader first (the K-178 mutants).
 const growthRun = (unit, mutate) => {
-  const small = surfaceCopy(), large = surfaceCopy();
-  try {
-    if (mutate) { mutate(small); mutate(large); }
-    return { a: bulkWork(small, unit, GROWTH_SMALL), b: bulkWork(large, unit, GROWTH_LARGE) };
-  } finally { rmSync(small, { recursive: true, force: true }); rmSync(large, { recursive: true, force: true }); }
+  const out = {};
+  for (const [key, n] of [['a', GROWTH_SMALL], ['m', GROWTH_MID], ['b', GROWTH_LARGE]]) {
+    const dir = surfaceCopy();
+    try { if (mutate) mutate(dir); out[key] = bulkWork(dir, unit, n); } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
+  return out;
 };
-const growthRow = (unit, finding, label) => {
+const incrementsOf = m => `work ${m.a.work} → ${m.m.work} → ${m.b.work}: increments ${m.m.work - m.a.work} then ${m.b.work - m.m.work} (increment ratio ${((m.b.work - m.m.work) / Math.max(1, m.m.work - m.a.work)).toFixed(2)})`;
+const sizesFinished = (m, label, finding) => {
+  finishedNamed(m.a.r, `${label}, ${GROWTH_SMALL} openers`, finding);
+  finishedNamed(m.m.r, `${label}, ${GROWTH_MID} openers`, finding);
+  finishedNamed(m.b.r, `${label}, ${GROWTH_LARGE} openers`, finding);
+};
+const growthRow = (t, unit, finding, label) => {
   const m = growthRun(unit);
-  finishedNamed(m.a.r, `${label}, ${GROWTH_SMALL} openers`, finding);
-  finishedNamed(m.b.r, `${label}, ${GROWTH_LARGE} openers`, finding);
-  assert.ok(growthOk(m.a.work, m.b.work), `${label}: scan work grew from ${m.a.work} to ${m.b.work} for 4 times the openers`);
+  sizesFinished(m, label, finding);
+  t.diagnostic(`GROWTH ${label}: ${incrementsOf(m)}; largest child ${Math.max(m.a.ms, m.m.ms, m.b.ms)} ms`);
+  assert.ok(growthLinear(m.a.work, m.m.work, m.b.work), `${label}: scan work is not linear (${incrementsOf(m)})`);
 };
-// K-183: a refusal by count counts only when both children finished normally and named the finding, and both printed a positive safe-integer count; then the ratio decides.
-const refusedByCount = (m, label, finding) => {
-  finishedNamed(m.a.r, `${label}, ${GROWTH_SMALL} openers`, finding);
-  finishedNamed(m.b.r, `${label}, ${GROWTH_LARGE} openers`, finding);
-  assert.ok(Number.isSafeInteger(m.a.work) && m.a.work > 0 && Number.isSafeInteger(m.b.work) && m.b.work > 0, `${label}: a child did not print its scan count, so nothing is refused`);
-  assert.equal(growthOk(m.a.work, m.b.work), false, `${label}: the count must refuse the growth (ratio ${(m.b.work / m.a.work).toFixed(2)})`);
+// K-183: a refusal by count counts only when all three children finished normally and named the finding, and each printed a positive safe-integer count; then the
+// increments decide (C183-1: the three-size check, not the single ratio).
+const refusedByCount = (t, m, label, finding) => {
+  sizesFinished(m, label, finding);
+  t.diagnostic(`GROWTH ${label}: ${incrementsOf(m)}; largest child ${Math.max(m.a.ms, m.m.ms, m.b.ms)} ms`);
+  assert.ok(measuredSpan(m.a.work) && measuredSpan(m.m.work) && measuredSpan(m.b.work), `${label}: a child did not print its scan count, so nothing is refused`);
+  assert.equal(growthLinear(m.a.work, m.m.work, m.b.work), false, `${label}: the count must refuse the growth (${incrementsOf(m)})`);
 };
 // K-178 mutants: one unbounded search per start tag (indexOf), and one copy and search of the rest of the page per start tag (slice). Both must fail by their count.
 const mutateIndexOf = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('export function scanStartTag(s, nameEnd, max = META_MAX, collect = false) {', m => m + '\n  s.indexOf(String.fromCharCode(62), nameEnd); // mutant'));
 const mutateSlice = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('export function scanStartTag(s, nameEnd, max = META_MAX, collect = false) {', m => m + '\n  s.slice(nameEnd).search(/>/); // mutant'));
-test('CLASS B gate row, rules 13 and 16: <meta " openers finish at two sizes, and their scan work grows linearly (K-176)', () => {
-  growthRow('<meta "', [/web\/index\.html: has \d+ <meta> tag\(s\) the reader cannot read to its end/], '<meta "');
+test('CLASS B gate row, rules 13 and 16: <meta " openers finish at three sizes, and their scan work grows linearly (K-176)', t => {
+  growthRow(t, '<meta "', [/web\/index\.html: has \d+ <meta> tag\(s\) the reader cannot read to its end/], '<meta "');
 });
-test('K-172: <link openers finish at two sizes, and their scan work grows linearly', () => {
-  growthRow('<link ', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/], '<link ');
+test('K-172: <link openers finish at three sizes, and their scan work grows linearly', t => {
+  growthRow(t, '<link ', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/], '<link ');
 });
-test('CLASS B gate row, rules 13 and 17: <a openers finish at two sizes, and their scan work grows linearly (K-176)', () => {
-  growthRow('<a ', [
+test('CLASS B gate row, rules 13 and 17: <a openers finish at three sizes, and their scan work grows linearly (K-176)', t => {
+  growthRow(t, '<a ', [
     /web\/index\.html: has \d+ start tag\(s\) the reader cannot read to its end \(first at line \d+\), so rule 13 cannot check it/,
     /web\/index\.html: has \d+ start tag\(s\) the reader cannot read to their end \(first at line \d+\), so the buy-control and payment checks cannot read them/,
   ], '<a ');
 });
-test('CLASS B gate row, rule 17: <a> elements finish at two sizes, and their scan work grows linearly (K-176)', () => {
-  growthRow('<a>', [/web\/index\.html: has \d+ <a> element\(s\) with no closer/], '<a>');
+test('CLASS B gate row, rule 17: <a> elements finish at three sizes, and their scan work grows linearly (K-176)', t => {
+  growthRow(t, '<a>', [/web\/index\.html: has \d+ <a> element\(s\) with no closer/], '<a>');
 });
-test('K-178: the growth check refuses an indexOf mutant and a slice mutant by their own count, with both sizes finishing inside the clock', t => {
+test('K-178: the growth check refuses an indexOf mutant and a slice mutant by their own count, with all three sizes finishing inside the clock', t => {
   for (const [name, mutate] of [['indexOf', mutateIndexOf], ['slice', mutateSlice]]) {
     const m = growthRun('<link ', mutate);
-    t.diagnostic(`${name} mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
-    refusedByCount(m, `${name} mutant`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+    t.diagnostic(`${name} mutant: ${incrementsOf(m)}; ${m.a.ms}, ${m.m.ms} and ${m.b.ms} ms`);
+    refusedByCount(t, m, `${name} mutant`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
   }
 });
 // K-180: a regex mutant, one unbounded exec per start tag from its name to the next '>' (the planted openers hold no '>', so each search runs to the page's end).
 const mutateRegexExec = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = new RegExp('>', 'g'); re.lastIndex = nameEnd; re.exec(s); } // mutant"));
-test('K-180: the growth check refuses a regex-exec mutant of the start-tag scan by its own count, with both sizes finishing', t => {
+test('K-180: the growth check refuses a regex-exec mutant of the start-tag scan by its own count, with all three sizes finishing', t => {
   const m = growthRun('<link ', mutateRegexExec);
-  t.diagnostic(`regex-exec mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
-  refusedByCount(m, 'regex-exec mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`regex-exec mutant: ${incrementsOf(m)}; ${m.a.ms}, ${m.m.ms} and ${m.b.ms} ms`);
+  refusedByCount(t, m, 'regex-exec mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
 });
 // K-188: the same search on a derived subject (a suffix copy from nameEnd), which the page-subject charge never sees.
 const mutateSuffix = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  />/.exec(s.substring(nameEnd)); // mutant"));
 test('K-188: the count refuses a regex search on a derived subject (s.substring) inside scanStartTag, by its own count', t => {
   const m = growthRun('<link ', mutateSuffix);
-  t.diagnostic(`suffix mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
-  refusedByCount(m, 'suffix mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`suffix mutant: ${incrementsOf(m)}; ${m.a.ms}, ${m.m.ms} and ${m.b.ms} ms`);
+  refusedByCount(t, m, 'suffix mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+});
+// K-189, the stated limit: a sticky attempt is charged one unit however far it walks, so one sticky walk per start tag (`/[^>]*x/y`) grows superlinearly in
+// time (4.3 s and 23 s at 5,000 and 20,000 openers, 5.3 times for 4 times) while its count stays the real reader's (each attempt one unit; a probe counted
+// 51,831 and 231,831 such attempts). This row records that fact; a count that later charges the walk flips it, by design.
+const mutateStickyWalk = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = /[^>]*x/y; re.lastIndex = nameEnd; re.exec(s); } // mutant"));
+test('K-189: the count passes a single sticky walk per start tag, the stated limit: linear in count, so the clock is its only guard', t => {
+  const m = growthRun('<link ', mutateStickyWalk);
+  sizesFinished(m, 'sticky walk', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`sticky walk: ${incrementsOf(m)}; ${m.a.ms}, ${m.m.ms} and ${m.b.ms} ms`);
+  assert.ok(measuredSpan(m.a.work) && measuredSpan(m.m.work) && measuredSpan(m.b.work), 'sticky walk: no count printed');
+  assert.equal(growthLinear(m.a.work, m.m.work, m.b.work), true, 'sticky walk: the count passes it today (the stated limit)');
+});
+// K-189, the reviewer's shape: a sticky attempt every 256 characters from nameEnd to the end, each a page-subject search, each one unit. The count PASSES it
+// today: the mutant's charge grows 4.7 times for 4 times the openers (6.07 M and 28.6 M, the reviewer's own figures), and its time 2.1 times on this run, so
+// the count and the clock both see a linear shape here. This row is the stated limit with its witness; a count that later charges these attempts flips it.
+const mutateStickyShort = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = /x/y; for (let i = nameEnd; i < s.length; i += 256) { re.lastIndex = i; re.exec(s); } } // mutant"));
+test('K-189: the reviewer\'s sticky-attempt shape passes the count today, the stated limit (the total count grows under 8 times for 4 times the openers)', t => {
+  const m = growthRun('<link ', mutateStickyShort);
+  sizesFinished(m, 'sticky attempts', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`sticky attempts: ${incrementsOf(m)}; ${m.a.ms}, ${m.m.ms} and ${m.b.ms} ms; the old single ratio ${(m.b.work / m.a.work).toFixed(2)}`);
+  assert.ok(measuredSpan(m.a.work) && measuredSpan(m.m.work) && measuredSpan(m.b.work), 'sticky attempts: no count printed');
+  assert.equal(growthLinear(m.a.work, m.m.work, m.b.work), true, 'sticky attempts: the count passes it today (the stated limit)');
+});
+// K-190: a matchAll over a derived subject inside scanStartTag. Its stack capture (10 frames on each derived call) timed it out at 60 s on this box, so a derived
+// call is charged in full with no chain check and the shape finishes inside the clock. Its work is quadratic: the single ratio at 5,000 and 20,000 read 4.53 and
+// passed the old check, because a constant base dilutes it; over three sizes the increments grow about 3.8 times, so the count refuses it (C183-1).
+const mutateMatchAll = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { [...s.substring(nameEnd).matchAll(/>/g)]; } // mutant"));
+test('K-190: the count refuses a matchAll over a derived subject inside scanStartTag by its increments over three sizes', t => {
+  const m = growthRun('<link ', mutateMatchAll);
+  sizesFinished(m, 'matchAll mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`matchAll mutant: the old single ratio ${(m.b.work / m.a.work).toFixed(2)} (the old check ${growthOk(m.a.work, m.b.work) ? 'passes' : 'refuses'}); the three sizes: ${incrementsOf(m)}; ${m.a.ms}, ${m.m.ms} and ${m.b.ms} ms`);
+  assert.ok(measuredSpan(m.a.work) && measuredSpan(m.m.work) && measuredSpan(m.b.work), 'matchAll mutant: no count printed');
+  assert.equal(growthLinear(m.a.work, m.m.work, m.b.work), false, `matchAll mutant: the count must refuse the growth (${incrementsOf(m)})`);
 });
 // C180-1: the same search made by a method other than exec (test), and by exec moved into a helper that scanStartTag calls. Both must be charged.
 const mutateRegexTest = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = new RegExp('>', 'g'); re.lastIndex = nameEnd; re.test(s); } // mutant"));
 const mutateRegexHelper = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('export function scanStartTag(s, nameEnd, max = META_MAX, collect = false) {', m => "function findGt(s, from) { const re = new RegExp('>', 'g'); re.lastIndex = from; return re.exec(s); }\n" + m).replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + '\n  findGt(s, nameEnd); // mutant'));
-test('C180-1: the count refuses a regex test() mutant of the start-tag scan by its own count, with both sizes finishing', t => {
+test('C180-1: the count refuses a regex test() mutant of the start-tag scan by its own count, with all three sizes finishing', t => {
   const m = growthRun('<link ', mutateRegexTest);
-  t.diagnostic(`test mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)})`);
-  refusedByCount(m, 'test mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`test mutant: ${incrementsOf(m)}; ${m.a.ms}, ${m.m.ms} and ${m.b.ms} ms`);
+  refusedByCount(t, m, 'test mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
 });
-test('C180-1: the count refuses a regex exec-in-helper mutant (findGt, called by scanStartTag) by its own count, with both sizes finishing', t => {
+test('C180-1: the count refuses a regex exec-in-helper mutant (findGt, called by scanStartTag) by its own count, with all three sizes finishing', t => {
   const m = growthRun('<link ', mutateRegexHelper);
-  t.diagnostic(`helper mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)})`);
-  refusedByCount(m, 'helper mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`helper mutant: ${incrementsOf(m)}; ${m.a.ms}, ${m.m.ms} and ${m.b.ms} ms`);
+  refusedByCount(t, m, 'helper mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
 });
 test('C180-1: the real reader stays linear under the deeper frame chain, and its ratio is shown', t => {
   const m = growthRun('<link ');
-  t.diagnostic(`real reader: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)})`);
-  assert.ok(growthOk(m.a.work, m.b.work), 'real reader: scan work must grow linearly');
+  sizesFinished(m, 'real reader', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  t.diagnostic(`real reader: ${incrementsOf(m)}`);
+  assert.ok(growthLinear(m.a.work, m.m.work, m.b.work), 'real reader: scan work must grow linearly');
 });
 // K-186: the exec span of every regex the page's rules run over the page (the ticket's measure), counted on the real reader. MODE 'ticket' charges a failed search to the
 // end of the string; MODE 'sticky' charges a sticky (y) search only the characters its one attempt examines. `mutate`, when given, edits the copy first.
@@ -531,9 +581,9 @@ test('K-186: the span count refuses a page-wide rule that drops the sticky flag 
 
 // K-183: a mutant child that exits before the reader finishes prints no count (or a zero one), so growthOk is false and the refusal assertion would pass vacuously.
 const mutateEarlyExit = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + '\n  process.exit(0); // mutant'));
-test('K-183: an early-exit mutant is not a refusal: both children must finish and name the finding, so the old count assertion cannot pass on it', () => {
+test('K-183: an early-exit mutant is not a refusal: all three children must finish and name the finding, so the old count assertion cannot pass on it', t => {
   const m = growthRun('<link ', mutateEarlyExit);
-  assert.throws(() => refusedByCount(m, 'early exit', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]), /finished, and it must name the page/);
+  assert.throws(() => refusedByCount(t, m, 'early exit', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]), /finished, and it must name the page/);
 });
 // C178-1: one 200,000-opener finish row is the clock ceiling for the work the count does not see; the real reader finishes it inside the clock.
 const BULK_N = 200000;
@@ -551,6 +601,8 @@ test('K-178: the 200,000-opener <link finish row finishes on the real reader, in
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 test('K-172: the growth check accepts linear work and refuses quadratic or missing measurements', () => {
+  assert.equal(growthLinear(1000, 2000, 4000), true);
+  assert.equal(growthLinear(1000, 4000, 16000), false);
   assert.equal(growthOk(1000, 4000), true);
   assert.equal(growthOk(1000, 16000), false);
   for (const [small, large] of [[0, 0], [NaN, 4000], [1000, NaN], [1000, 0]]) assert.equal(growthOk(small, large), false);
