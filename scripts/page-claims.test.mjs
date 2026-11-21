@@ -356,11 +356,9 @@ const finishedNamed = (r, label, msgs) => {
 // K-178: the growth row counts scan work as the characters the string primitives charCodeAt, indexOf and slice read or copy inside the planted region (a count, never a
 // clock), counted in the child, which keeps the production reader unchanged. A quadratic reader grows that count 16 times for 4 times the openers, a linear one 4 times.
 // The sizes are 5,000 and 20,000, so a quadratic mutant finishes inside the 60 s clock and is refused by its count; the timer stays a kill ceiling.
-// K-180: RegExp exec is counted only when its caller is scanStartTag, the reader's start-tag search (the child reads the caller's frame name, so a regex in that function is
-// charged by the characters it scans). The page-wide element rules are not charged: on the real reader they grow 15 times for 4 times the openers (exec 0.56 billion at 5,000
-// openers, 8.53 billion at 20,000; `<(script)\b`, `<(meta)\b`, `<(style)\b` and `<(a)\b` are 99.8% of it, the charCodeAt count grows 4.5 times), so counting them would fail the
-// real reader. That growth is a named finding, not a pass: the rules' cost grows quadratically with unrelated openers, and no row here reads it. A regex search the start-tag
-// scan makes by any method, directly or through a helper, is charged, because the frame chain is read to its depth; a search outside that chain is not.
+// Not counted: includes, lastIndexOf, startsWith, endsWith, substring, and split with a string; a search made with them is unseen.
+// K-180: RegExp exec is counted only when its caller's frame chain holds scanStartTag, the reader's start-tag search (the child reads the chain to its depth), and then by the
+// characters the search scans. A sticky (y) search is charged only the characters its one attempt examines (K-186). A failed sticky (y) search is charged the one position it attempts, which holds for the rules' fixed-prefix patterns (`<(name)\b`), not for a sticky pattern whose start can walk (`[^>]*…`). The page-wide rules' short attempts (at most SPAN_STACK characters) are charged without the chain check (K-187) and grow linearly; their longer searches are not charged, because no chain holds scanStartTag, and their whole span is K-186's row.
 const GROWTH_SMALL = 5000, GROWTH_LARGE = 20000;
 const bulkWork = (dir, unit, n) => {
   const after = edit(dir, 'web/index.html', s => s.replace('</body>', unit.repeat(n) + '</body>'));
@@ -369,12 +367,21 @@ const bulkWork = (dir, unit, n) => {
     const orig = { charCodeAt: String.prototype.charCodeAt, indexOf: String.prototype.indexOf, slice: String.prototype.slice };
     const START = ${start}, END = ${end}, LEN = ${len};
     const kinds = { charCodeAt: 0, indexOf: 0, slice: 0, exec: 0 };
+    const SPAN_STACK = 64;
     const execOrig = RegExp.prototype.exec;
-    Error.stackTraceLimit = 10; // the frame chain of the call, read to its depth: a search by exec, test, search, match or replace, directly or through a helper, has scanStartTag in it
+    Error.stackTraceLimit = 10; // the frame chain of the call, read to its depth: a search by exec, test, search, match, matchAll, replace, replaceAll or split with a RegExp (each calls exec; replace, replaceAll and split with a string do not), on the page or a derived string, directly or through a helper, has scanStartTag in its chain
     RegExp.prototype.exec = function (s) {
       const from = (this.global || this.sticky) ? this.lastIndex : 0;
       const m = execOrig.call(this, s);
-      if (typeof s === 'string' && s.length === LEN && new Error().stack.includes('scanStartTag')) charge('exec', from, m ? m.index + m[0].length : LEN);
+      if (typeof s === 'string') {
+        const to = m ? m.index + m[0].length : (this.sticky ? from + 1 : s.length);
+        // A search scanning at most SPAN_STACK characters costs a constant per start tag, so it is charged without the chain check (the stack capture is the slow part).
+        // A longer one is charged when its chain holds scanStartTag, on the page (by the page's characters) or on a derived string (by the characters it scans).
+        // Many short searches per start tag are charged one unit each (a failed sticky attempt), so their number, not their length, carries a quadratic; this count may not refuse it at 5,000 and 20,000 (K-189).
+        if (to - from <= SPAN_STACK || new Error().stack.includes('scanStartTag')) {
+          if (s.length === LEN) charge('exec', from, to); else kinds.exec += Math.max(0, to - from);
+        }
+      }
       return m;
     };
     const charge = (kind, lo, hi) => { const a = Math.max(lo, START), b = Math.min(hi, END); if (b > a) kinds[kind] += b - a; };
@@ -445,6 +452,13 @@ test('K-180: the growth check refuses a regex-exec mutant of the start-tag scan 
   t.diagnostic(`regex-exec mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
   refusedByCount(m, 'regex-exec mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
 });
+// K-188: the same search on a derived subject (a suffix copy from nameEnd), which the page-subject charge never sees.
+const mutateSuffix = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  />/.exec(s.substring(nameEnd)); // mutant"));
+test('K-188: the count refuses a regex search on a derived subject (s.substring) inside scanStartTag, by its own count', t => {
+  const m = growthRun('<link ', mutateSuffix);
+  t.diagnostic(`suffix mutant: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)}); ${m.a.ms} ms and ${m.b.ms} ms`);
+  refusedByCount(m, 'suffix mutant', [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+});
 // C180-1: the same search made by a method other than exec (test), and by exec moved into a helper that scanStartTag calls. Both must be charged.
 const mutateRegexTest = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + "\n  { const re = new RegExp('>', 'g'); re.lastIndex = nameEnd; re.test(s); } // mutant"));
 const mutateRegexHelper = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('export function scanStartTag(s, nameEnd, max = META_MAX, collect = false) {', m => "function findGt(s, from) { const re = new RegExp('>', 'g'); re.lastIndex = from; return re.exec(s); }\n" + m).replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + '\n  findGt(s, nameEnd); // mutant'));
@@ -463,6 +477,58 @@ test('C180-1: the real reader stays linear under the deeper frame chain, and its
   t.diagnostic(`real reader: work ${m.a.work} at ${GROWTH_SMALL} openers, ${m.b.work} at ${GROWTH_LARGE} (ratio ${(m.b.work / m.a.work).toFixed(2)})`);
   assert.ok(growthOk(m.a.work, m.b.work), 'real reader: scan work must grow linearly');
 });
+// K-186: the exec span of every regex the page's rules run over the page (the ticket's measure), counted on the real reader. MODE 'ticket' charges a failed search to the
+// end of the string; MODE 'sticky' charges a sticky (y) search only the characters its one attempt examines. `mutate`, when given, edits the copy first.
+const ruleSpanWork = (dir, unit, n, mode, mutate) => {
+  const after = edit(dir, 'web/index.html', s => s.replace('</body>', unit.repeat(n) + '</body>'));
+  if (mutate) mutate(dir);
+  const child = `
+    const execOrig = RegExp.prototype.exec;
+    const LEN = ${after.length};
+    const MODE = ${JSON.stringify(mode)};
+    let span = 0;
+    RegExp.prototype.exec = function (s) {
+      const from = (this.global || this.sticky) ? this.lastIndex : 0;
+      const m = execOrig.call(this, s);
+      if (typeof s === 'string' && s.length === LEN) span += Math.max(0, (m ? m.index + m[0].length : (MODE === 'sticky' && this.sticky ? from + 1 : LEN)) - from);
+      return m;
+    };
+    process.on('exit', () => process.stderr.write('K186_SPAN ' + JSON.stringify({ exec: span }) + '\\n'));
+    await import('./scripts/surface-check.mjs');
+  `;
+  const t0 = Date.now();
+  const r = spawnSync(process.execPath, ['--max-old-space-size=1024', '--input-type=module', '-e', child], { encoding: 'utf8', timeout: 60000, killSignal: 'SIGKILL', cwd: dir, env: childEnv(dir), maxBuffer: 64 << 20 });
+  const measured = /^K186_SPAN (\{.*\})$/m.exec(r.stderr || '');
+  return { r, work: measured ? JSON.parse(measured[1]).exec : NaN, ms: Date.now() - t0 };
+};
+// A span the child printed: a positive safe integer. A child that ends without its line gives NaN, and NaN must never pass for a measured count (CodeRabbit #203).
+const measuredSpan = x => Number.isSafeInteger(x) && x > 0;
+const ruleSpanRun = (n, mode, mutate) => { const dir = surfaceCopy(); try { return ruleSpanWork(dir, '<link ', n, mode, mutate); } finally { rmSync(dir, { recursive: true, force: true }); } };
+// K-186: the sticky rules' span, counted as the engine walks it, grows linearly; the ticket's measure (a failed sticky search charged to the string's end) read 15 times for
+// 4 times the openers, and that was the instrument: a sticky search attempts one position (0.5 ms at both sizes, probe 2026-11-21), so the rules never walked the page.
+// The mutant below drops the sticky flag (each opener searches the page to its end) and must be refused by the same count.
+const mutateStickyDropped = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace("re.flags.replace(/[gy]/g, '') + 'y');", "re.flags.replace(/[gy]/g, '') + 'g');"));
+test('K-186: the page-wide element rules\' exec span grows linearly on the real reader (5,000 vs 20,000 unrelated openers)', t => {
+  const a = ruleSpanRun(GROWTH_SMALL, 'sticky'), b = ruleSpanRun(GROWTH_LARGE, 'sticky');
+  finishedNamed(a.r, `rule span, ${GROWTH_SMALL} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  finishedNamed(b.r, `rule span, ${GROWTH_LARGE} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  const ta = ruleSpanRun(GROWTH_SMALL, 'ticket'), tb = ruleSpanRun(GROWTH_LARGE, 'ticket');
+  t.diagnostic(`sticky span: ${a.work} at ${GROWTH_SMALL} openers, ${b.work} at ${GROWTH_LARGE} (ratio ${(b.work / a.work).toFixed(2)}); ${a.ms} ms and ${b.ms} ms. Ticket measure, for the record: ${ta.work} and ${tb.work} (ratio ${(tb.work / ta.work).toFixed(2)})`);
+  // A child that ends without printing its span gives NaN, which growthOk already refuses; say so by the measurement, not by the comparison.
+  assert.ok(measuredSpan(a.work), `K-186 rule span: no span printed at ${GROWTH_SMALL} openers, so nothing is measured`);
+  assert.ok(measuredSpan(b.work), `K-186 rule span: no span printed at ${GROWTH_LARGE} openers, so nothing is measured`);
+  assert.ok(growthOk(a.work, b.work), `rule span grew from ${a.work} to ${b.work} for 4 times the openers`);
+});
+test('K-186: the span count refuses a page-wide rule that drops the sticky flag and searches from each opener, by its own count', t => {
+  const a = ruleSpanRun(GROWTH_SMALL, 'sticky', mutateStickyDropped), b = ruleSpanRun(GROWTH_LARGE, 'sticky', mutateStickyDropped);
+  t.diagnostic(`no-sticky mutant: span ${a.work} at ${GROWTH_SMALL} openers, ${b.work} at ${GROWTH_LARGE} (ratio ${(b.work / a.work).toFixed(2)}); ${a.ms} ms and ${b.ms} ms`);
+  finishedNamed(a.r, `no-sticky mutant, ${GROWTH_SMALL} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  finishedNamed(b.r, `no-sticky mutant, ${GROWTH_LARGE} openers`, [/web\/index\.html: has \d+ <link> tag\(s\) the reader cannot read to its end/]);
+  assert.ok(measuredSpan(a.work), `no-sticky mutant: no span printed at ${GROWTH_SMALL} openers, so nothing is refused by count`);
+  assert.ok(measuredSpan(b.work), `no-sticky mutant: no span printed at ${GROWTH_LARGE} openers, so nothing is refused by count`);
+  assert.equal(growthOk(a.work, b.work), false, 'no-sticky mutant: the count must refuse the growth');
+});
+
 // K-183: a mutant child that exits before the reader finishes prints no count (or a zero one), so growthOk is false and the refusal assertion would pass vacuously.
 const mutateEarlyExit = dir => edit(dir, 'scripts/lib/page-claims.mjs', t => t.replace('  const stop = Math.min(s.length, nameEnd + max);', m => m + '\n  process.exit(0); // mutant'));
 test('K-183: an early-exit mutant is not a refusal: both children must finish and name the finding, so the old count assertion cannot pass on it', () => {
