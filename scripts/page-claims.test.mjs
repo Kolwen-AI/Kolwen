@@ -356,10 +356,9 @@ const finishedNamed = (r, label, msgs) => {
 // K-178: the growth row counts scan work as the characters the string primitives charCodeAt, indexOf and slice read or copy inside the planted region (a count, never a
 // clock), counted in the child, which keeps the production reader unchanged. A quadratic reader grows that count 16 times for 4 times the openers, a linear one 4 times.
 // The sizes are 5,000 and 20,000, so a quadratic mutant finishes inside the 60 s clock and is refused by its count; the timer stays a kill ceiling.
+// Not counted: includes, lastIndexOf, startsWith, endsWith, substring, and split with a string; a search made with them is unseen.
 // K-180: RegExp exec is counted only when its caller's frame chain holds scanStartTag, the reader's start-tag search (the child reads the chain to its depth), and then by the
-// characters the search scans. A sticky (y) search is charged only the characters its one attempt examines (K-186). Charged to the string's end, a failed sticky search made
-// the page-wide element rules read as quadratic (15 times for 4 times the openers); that was the instrument, not the rules, which a sticky attempt never walks past (0.5 ms at
-// 5,000 and at 20,000 openers). So the page-wide rules are not charged, because no chain holds scanStartTag, and their span stays linear (K-186's row).
+// characters the search scans. A sticky (y) search is charged only the characters its one attempt examines (K-186). A failed sticky (y) search is charged the one position it attempts, which holds for the rules' fixed-prefix patterns (`<(name)\b`), not for a sticky pattern whose start can walk (`[^>]*…`). The page-wide rules' short attempts (at most SPAN_STACK characters) are charged without the chain check (K-187) and grow linearly; their longer searches are not charged, because no chain holds scanStartTag, and their whole span is K-186's row.
 const GROWTH_SMALL = 5000, GROWTH_LARGE = 20000;
 const bulkWork = (dir, unit, n) => {
   const after = edit(dir, 'web/index.html', s => s.replace('</body>', unit.repeat(n) + '</body>'));
@@ -370,7 +369,7 @@ const bulkWork = (dir, unit, n) => {
     const kinds = { charCodeAt: 0, indexOf: 0, slice: 0, exec: 0 };
     const SPAN_STACK = 64;
     const execOrig = RegExp.prototype.exec;
-    Error.stackTraceLimit = 10; // the frame chain of the call, read to its depth: a search by exec, test, search, match, matchAll, replace or split (each calls exec), on the page or a derived string, directly or through a helper, has scanStartTag in its chain
+    Error.stackTraceLimit = 10; // the frame chain of the call, read to its depth: a search by exec, test, search, match, matchAll, replace, replaceAll or split with a RegExp (each calls exec; replace, replaceAll and split with a string do not), on the page or a derived string, directly or through a helper, has scanStartTag in its chain
     RegExp.prototype.exec = function (s) {
       const from = (this.global || this.sticky) ? this.lastIndex : 0;
       const m = execOrig.call(this, s);
@@ -378,6 +377,7 @@ const bulkWork = (dir, unit, n) => {
         const to = m ? m.index + m[0].length : (this.sticky ? from + 1 : s.length);
         // A search scanning at most SPAN_STACK characters costs a constant per start tag, so it is charged without the chain check (the stack capture is the slow part).
         // A longer one is charged when its chain holds scanStartTag, on the page (by the page's characters) or on a derived string (by the characters it scans).
+        // Many short searches per start tag are charged one unit each (a failed sticky attempt), so their number, not their length, carries a quadratic; this count may not refuse it at 5,000 and 20,000 (K-189).
         if (to - from <= SPAN_STACK || new Error().stack.includes('scanStartTag')) {
           if (s.length === LEN) charge('exec', from, to); else kinds.exec += Math.max(0, to - from);
         }
