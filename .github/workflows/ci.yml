@@ -175,7 +175,11 @@ jobs:
       # on Node 24) and the gate's spawn tests run first; then the gate itself in tree mode, the only mode a CI
       # checkout can run (it has no pushed range, and the gate says so in its PASS line). The push-time scan of
       # added lines, commit messages and tags runs in .githooks/pre-push on the pusher's box.
-      - run: node --test scripts/secret-scan.test.mjs scripts/secret-gate.test.mjs
+      # The per-file bound (--test-timeout, 360000 ms) is sized from the canon's measurement: secret-gate.test.mjs runs 88 tests in about
+      # 168 s on a Windows runner, its slowest single test about 8 s (THE CANON COPY ROUND OF 2026-11-21; ci-evidence chose 360 s per file).
+      # This job runs on ubuntu, a different machine, so the margin (about 2.1 times the Windows figure) is the stated allowance, not a
+      # measurement here. The heap cap is the one the rendered job uses for the same kind of test run.
+      - run: node --max-old-space-size=1024 --test --test-timeout=360000 scripts/secret-scan.test.mjs scripts/secret-gate.test.mjs
       - run: node scripts/secret-gate.mjs
   # A single STABLE required-check context (job names drift; this does not).
   # Rulesets require `all-green`, never the per-job names.
