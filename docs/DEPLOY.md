@@ -85,7 +85,7 @@ and nothing else. `kolwen.com` does not end in `.previews.kolwen.com`, and the b
 semantics (the preview host matches; `kolwen.com` and `www.kolwen.com` do not). That matcher is not
 Cloudflare's engine, so a live read of a preview's headers is the check that decides it.
 
-The Worker's own responses on a preview host (its status and subscribe answers, its 404 and its MTA-STS policy) carry the same header from `secured()` in `worker/index.mjs` (K-192), because `web/_headers` does not reach them. `secured()` adds it only when the host ends in `.previews.kolwen.com`, so production hosts get neither.
+The Worker's own responses on a preview host (its status and subscribe answers and its 404) carry the same header from `secured()` in `worker/index.mjs` (K-192), because `web/_headers` does not reach them. `secured()` adds it only when the host ends in `.previews.kolwen.com`, so production hosts get neither.
 
 - **The workers.dev rule is gone.** It was `https://:version.:subdomain.workers.dev/*`, which also
   matched production's own `workers.dev` alias. With the workers.dev previews off, no rule of this file
