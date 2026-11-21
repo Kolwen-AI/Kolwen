@@ -68,7 +68,7 @@ jobs:
   surface:
     name: surface (published claims)
     runs-on: ubuntu-latest
-    timeout-minutes: 10 # LWK-216: max 10 s over 11 runs
+    timeout-minutes: 15 # K-193: 210 to 374 s over 20 runs (median 281.5 s, 2026-11-20 to 2026-11-22); 15 min is about 2.4 times the slowest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
