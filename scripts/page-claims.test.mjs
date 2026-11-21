@@ -102,7 +102,7 @@ test('rule 16 reads web/_headers: an X-Robots-Tag noindex or none on a productio
     assert.ok(r.out.includes(`web/_headers: line ${b}: sets X-Robots-Tag "none, nofollow" on "/probe-b"`), r.out);
     // The hostname of every https URL the output names, parsed. A substring test would also match a lookalike that carries the host in its query.
     const hostsNamed = [...r.out.matchAll(/https?:\/\/[^\s"]+/g)].map(m => { try { return new URL(m[0]).hostname; } catch { return null; } });
-    assert.ok(!hostsNamed.includes('other.previews.kolwen.com'), 'an absolute previews.kolwen.com pattern is a preview host and is not named');
+    assert.ok(!hostsNamed.some(h => h === 'other.previews.kolwen.com'), 'an absolute previews.kolwen.com pattern is a preview host and is not named');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
