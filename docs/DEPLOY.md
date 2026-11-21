@@ -134,12 +134,17 @@ serve two policies instead of one.
     `.svg` came back with the `Cache-Control` that `/*.svg` sets. So the `/*` rule covers the
     404 page there, and `deploy-check` requires `kolwen.com` to serve the committed `web/404.html`
     with the declared headers, when it reads `kolwen.com`, its default origin.
-  - **A Workers Preview.** An unmatched path got a 9-byte platform "Not found" instead of
-    `web/404.html`, with no `_headers` rule applied, not the path rules and not the host rule. Its
-    `X-Robots-Tag: noindex` is Cloudflare's own. So a preview's 404 carries none of the policy. A 404 the Worker builds on a preview host carries `X-Robots-Tag: noindex` from `secured()` (K-192).
-    Cloudflare's headers page says rules apply to assets served from the assets pipeline, not to
-    Worker-generated responses; it does not name this case. Why a preview does not serve the
-    `not_found_handling` fallback is not known and was not tested further. `deploy-check` run
+  - **A Workers Preview (retired).** On a workers.dev preview an unmatched path got a 9-byte platform
+    "Not found", with no `_headers` rule applied, and its `X-Robots-Tag: noindex` was Cloudflare's own
+    (Cloudflare adds it only on workers.dev previews). workers.dev previews are off now. On the
+    custom-domain preview `previews.kolwen.com`, measured 2026-11-21 on `fix-k191-k192.previews.kolwen.com`,
+    an unmatched path (`/no-such-page-xyz`) answered `HTTP/1.1 404`, `Content-Type: text/html`,
+    `x-robots-tag: noindex`, `X-Content-Type-Options: nosniff` and a 15,913-byte body, the byte length of
+    `web/404.html` (title "Not found — Kolwen"): the site's own page, with the preview host's `_headers`
+    rules. `/subscribe` (switched off) answered 404 `text/plain` with `x-robots-tag: noindex`, from
+    `secured()` (K-192). The measurement is one path on one preview. Cloudflare's headers page says rules
+    apply to assets served from the assets pipeline, not to Worker-generated responses; it does not name
+    this case. `deploy-check` run
     with `--origin` on a preview prints a note and skips the 404 headers rather than failing.
   - No host-scoped copy of the policy was added: no rule of ours reaches that response, and a second
     policy line would break the one-policy rule above.
