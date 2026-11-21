@@ -61,9 +61,12 @@ after it is audited.
 
 - **Previews are public, with no access gate.** Owner ruling, 2026-09-23: there is no Cloudflare
   Access in front of them, so anyone holding a preview URL can load it. What they load is the
-  same static files, from the branch. The Cloudflare pages read on 2026-10-30 do not say whether a
-  preview runs the Cron Trigger or receives the production bindings, so the preview's reach beyond
-  the public page is not established.
+  same static files, from the branch. Cloudflare's Previews resources page (last updated
+  2026-11-09) says Previews do not take over production triggers, and that the scheduler does not
+  call a Preview's `scheduled()` handler, so a preview runs no cron. Its bindings are the `previews`
+  block of `wrangler.jsonc`: one, `STATUS`, on a namespace of its own. The page does not state the
+  general no-inheritance rule in one sentence; the file's comment cites the Configuration page, read
+  2026-10-30, for that half, and it was not re-read here.
 - **noindex applies to the preview host only.** See the next subsection.
 
 ### noindex applies to the preview host only
