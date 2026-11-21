@@ -142,7 +142,7 @@ serve two policies instead of one.
     `x-robots-tag: noindex`, `X-Content-Type-Options: nosniff` and a 15,913-byte body, the byte length of
     `web/404.html` (title "Not found — Kolwen"): the site's own page, with the preview host's `_headers`
     rules. `/subscribe` (switched off) answered 404 `text/plain` with `x-robots-tag: noindex`, from
-    `secured()` (K-192). The measurement is one path on one preview. Cloudflare's headers page says rules
+    `secured()` (K-192). The measurement is two paths on one preview (`/no-such-page-xyz` and `/subscribe`), read live by the department head on 2026-11-21. Cloudflare's headers page says rules
     apply to assets served from the assets pipeline, not to Worker-generated responses; it does not name
     this case. `deploy-check` run
     with `--origin` on a preview prints a note and skips the 404 headers rather than failing.
