@@ -145,23 +145,17 @@
   Cross-Origin-Resource-Policy: same-origin
   Permissions-Policy: accelerometer=(), autoplay=(), bluetooth=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), hid=(), idle-detection=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()
 
-# noindex on PREVIEW hosts, never on production (LWK-198, owner ruling 2026-09-23).
-# A rule keyed on PATH cannot express this -- `_headers` matches by absolute HOST when the
-# left-hand side is an absolute URL (Cloudflare's own docs), so the host itself is the scope.
-# This is Cloudflare's own documented example for exactly this need (the "search engines"
-# section of the same page): a placeholder matches one dot-delimited host label, whatever it
-# contains, so `:version.:subdomain.workers.dev` matches ANY two-label host ending in
-# `.workers.dev` -- both a Preview URL (`<preview-name>-kolwen.<subdomain>.workers.dev`) and a
-# Version URL (`<version-prefix>-kolwen.<subdomain>.workers.dev`) have exactly that shape.
-# PROVEN, not assumed: `kolwen.com` does not end in `.workers.dev`, so no placeholder binding
-# can make this rule match it -- verified by a local script re-implementing the documented
-# matching semantics against 8 cases, including kolwen.com and www.kolwen.com (no match).
-# NAMED RESIDUAL: this also matches kolwen.hetcreep.workers.dev, production's OWN bare
-# workers.dev alias -- not kolwen.com, but a production-adjacent surface. (LWK-220 item 3 sets
-# `workers_dev: false` in wrangler.jsonc, which disables that alias on the next deploy; this
-# note stays true for any host of that shape until then.) Left in rather than narrowed further: no documented `_headers`
-# syntax can express "ends with -kolwen" within one label (placeholders are whole-label-only,
-# `*` is unconditionally greedy to the end of the pattern) -- narrowing here would be a rule
-# whose scope cannot be proven, and an unprovable scope is not shipped.
-https://:version.:subdomain.workers.dev/*
+# noindex on the PREVIEW host, never on production (AW-35 (1), BB-535; the host itself is the scope).
+# Previews are served on previews.kolwen.com, the preview hostname attached to this Worker through the Cloudflare
+# API on 2026-11-21 (the owner signed card BB-535; main pressed it). A rule keyed on PATH cannot express this: _headers matches an absolute URL by HOST, so the host is
+# the scope. A placeholder matches one dot-delimited label, so the pattern below matches <name>.previews.kolwen.com and
+# nothing else. kolwen.com does not end in .previews.kolwen.com, and the bare previews.kolwen.com has no label before it.
+# scripts/headers-file.test.mjs checks both with a local matcher over the documented placeholder semantics (the
+# preview host matches; kolwen.com and www.kolwen.com do not). Cloudflare adds noindex only on workers.dev: its Custom domains page says "Cloudflare adds this header automatically to workers.dev Preview
+# URLs, but not to custom domain Preview URLs." So on previews.kolwen.com this rule is what sends it. A Preview URL is
+# <preview-name>.previews.kolwen.com and a deployment URL <deployment>-<preview-name>.previews.kolwen.com (the Previews page, "URLs");
+# both are one label before the host, so the rule covers both.
+# The workers.dev preview rule is gone with the workers.dev previews (wrangler.jsonc preview_urls is false), so no
+# rule of this file names a workers.dev host, and production's own alias cannot be given noindex by this file.
+https://:preview.previews.kolwen.com/*
   X-Robots-Tag: noindex

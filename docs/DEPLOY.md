@@ -45,62 +45,54 @@ A push is not finished until both have answered. Read the verdict; do not assume
 
 ## Previews: a pull request can get a URL
 
-`wrangler.jsonc` carries an empty `previews` block, and that block is what makes this Worker
-preview-enabled: Cloudflare's configuration page says *"The `previews` block is required, but it
-can be empty"*, and says to keep `assets` and `compatibility_date` at the top level, where they
-stay. A pull request gets a preview URL only if Workers Builds built it after Previews was switched
-on for the Worker in Cloudflare, which was done on 2026-09-24, and only while that Cloudflare-side
-setting stays on. A pull request built before then has no preview URL. That setting and the build
-credential behind it live in Cloudflare, not in this repository. A preview is a copy of the site
-built from the branch. The URL has the shape `<preview-name>-kolwen.<subdomain>.workers.dev`.
+Previews are served on `previews.kolwen.com`, the preview hostname attached to this Worker
+through the Cloudflare API on 2026-11-21 (the owner signed card BB-535; main pressed it). A preview is a copy of the site built
+from the branch, and its URL is a name under that host. A pull request gets a preview URL only when
+its Workers Builds build runs with that host attached; the build's comment on the pull request names
+the exact URL. Until the host was attached, a pull request had no preview URL. The workers.dev
+preview URLs, and Version URLs with their aliases, are off: `wrangler.jsonc` sets `preview_urls: false`, which Cloudflare's Version URLs page says also disables routing to Version URLs and aliased Version URLs; the Worker's `workers_dev`
+alias is off too (see the comment there). That setting and the build credential live in Cloudflare,
+not in this repository.
+
+`wrangler.jsonc` carries a `previews` block with one binding, `STATUS`, on a namespace kept for
+previews (its comment in the file says why it is separate from production's). A preview's service
+bindings call the bound Worker's *production* deployment, so a binding is added to that block only
+after it is audited.
 
 - **Previews are public, with no access gate.** Owner ruling, 2026-09-23: there is no Cloudflare
   Access in front of them, so anyone holding a preview URL can load it. What they load is the
-  same static files, from the branch. The Worker's bindings are `ASSETS`, `EMAIL` and the `ALERT_FROM`
-  variable, and its `ALERT_TO` secret is set outside the tree; the Cloudflare pages read on 2026-10-30
-  do not say whether a preview runs the Cron Trigger or receives these settings, so the preview's
-  reach beyond the public page is not established. A binding is added to `wrangler.jsonc`
-  only after that is checked again, because a preview's service binding calls the bound Worker's
-  *production* deployment.
-- **Observed live, in part.** A preview of this branch was measured on 2026-09-25; the
-  measurements are stated where they apply below (the noindex header and the 404 page).
+  same static files, from the branch. Cloudflare's Previews resources page (last updated
+  2026-11-09) says Previews do not take over production triggers, and that the scheduler does not
+  call a Preview's `scheduled()` handler, so a preview runs no cron. Its bindings are the `previews`
+  block of `wrangler.jsonc`: one, `STATUS`, on a namespace of its own. The page does not state the
+  general no-inheritance rule in one sentence; the file's comment cites the Configuration page, read
+  2026-10-30, for that half, and it was not re-read here.
+- **noindex applies to the preview host only.** See the next subsection.
 
-### noindex applies to preview and version hosts only
+### noindex applies to the preview host only
 
-`web/_headers` ends with one rule keyed on the host, not the path:
+`web/_headers` carries one rule keyed on the host, not the path:
 
 ```
-https://:version.:subdomain.workers.dev/*
+https://:preview.previews.kolwen.com/*
   X-Robots-Tag: noindex
 ```
 
-It is the example Cloudflare's own headers page gives under "Prevent your workers.dev URLs showing
-in search results". Each placeholder matches exactly one dot-delimited host label, and the
-pattern ends in the literal `.workers.dev`, so it matches a Preview URL and a Version URL, both of
-which have that shape. **Production `kolwen.com` never carries it**: `kolwen.com` does not end in
-`.workers.dev`, so no binding of the placeholders can make the rule match it.
+A placeholder matches one dot-delimited label, so the pattern matches `<name>.previews.kolwen.com`
+and nothing else. `kolwen.com` does not end in `.previews.kolwen.com`, and the bare
+`previews.kolwen.com` has no label before it, so **production `kolwen.com` never carries it**.
+`scripts/headers-file.test.mjs` checks this with a local matcher over the documented placeholder
+semantics (the preview host matches; `kolwen.com` and `www.kolwen.com` do not). That matcher is not
+Cloudflare's engine, so a live read of a preview's headers is the check that decides it.
 
-- **How that was checked.** A local script re-implemented the documented matching over eight
-  hosts, `kolwen.com` and `www.kolwen.com` among them, and neither matched. That script is not
-  Cloudflare's engine. A live preview was measured on 2026-09-25 and does send
-  `X-Robots-Tag: noindex`, but that header is Cloudflare's own preview header, not this rule's, so
-  the measurement does not show this rule applying to a preview.
-- **One residual, named.** The rule also matches `kolwen.hetcreep.workers.dev`, production's own
-  `workers.dev` alias. That is not `kolwen.com`, and the alias is off: `wrangler.jsonc` sets
-  `workers_dev: false`, and it answered 404 when read on 2026-10-04, so the match is moot unless the alias is
-  served again. The check no longer reads it. While the alias was served it sent `noindex`. No
-  documented `_headers` syntax can tell a preview label from that bare one within a single label,
-  so the rule was not narrowed by guesswork.
-- **Cloudflare's Previews page is silent** on whether previews send `X-Robots-Tag` (read
-  2026-09-23), which is why the rule was written. Measured 2026-09-25: a preview sends it on its
-  own. The rule is therefore redundant on a Preview URL; it is what put `noindex` on
-  production's own `workers.dev` alias, which is not a preview, for as long as that alias was served.
-- **The repo-side gate.** `scripts/surface-check.mjs` (rule 16) holds the other half of "production never says
-  noindex": it fails a production page that carries a robots `noindex` (or `none`) meta tag, and any
-  `web/_headers` rule that sets `X-Robots-Tag` noindex on a pattern that is not an absolute `*.workers.dev` URL, and a `<meta` tag that does not end within 4,096 characters (for example, one whose quoted attribute value is never closed) as a finding rather than a pass. A quote that a later quote closes is read the way a browser reads it.
-  `web/404.html` carries a `noindex` meta on purpose, because it answers unmatched paths with HTTP 404, and is
-  exempt there by name; its `X-Robots-Tag` header is still refused. The rule trusts every `*.workers.dev`
-  pattern as a preview host, which would include production's own alias if it were ever served again (the residual above). The script is the list of record for what it checks.
+- **The workers.dev rule is gone.** It was `https://:version.:subdomain.workers.dev/*`, which also
+  matched production's own `workers.dev` alias. With the workers.dev previews off, no rule of this file
+  names a workers.dev host.
+- **Cloudflare adds `noindex` only on workers.dev.** The Custom domains page: "Cloudflare adds this header automatically to `workers.dev` Preview URLs, but not to custom domain Preview URLs." So on `previews.kolwen.com` this rule is what sends it. A Preview URL is `<preview-name>.previews.kolwen.com` and a deployment URL `<deployment>-<preview-name>.previews.kolwen.com` (the Previews page, "URLs"); both are one label before the host, so the rule covers both.
+- **The repo-side gate.** `scripts/surface-check.mjs` (rule 16) holds the other half of "production
+  never says noindex": it fails a production page that carries a robots `noindex` (or `none`) meta tag,
+  and any `web/_headers` rule that sets `X-Robots-Tag` noindex on a pattern that is not an absolute
+  `*.previews.kolwen.com` URL. It is the list of record for what it checks.
 
 ## Security headers
 

@@ -118,6 +118,10 @@ the pointer to it.
 
 ### Changed
 
+- **Previews move to `previews.kolwen.com`, and the workers.dev preview and Version URLs are off** (AW-35 (1), BB-535). `wrangler.jsonc` sets
+  `preview_urls: false`, which also switches off Version URLs and aliased Version URLs (Cloudflare's Version URLs page). `web/_headers` gives the preview host `X-Robots-Tag: noindex` and no longer carries the workers.dev rule; production
+  `kolwen.com` carries no noindex. The preview hostname is attached to this Worker through the Cloudflare API on 2026-11-21 (the owner signed card BB-535; main pressed it). The host is attached. On 2026-11-21 a live read of `https://feat-previews-host.previews.kolwen.com` answered 200 with `x-robots-tag: noindex`, accepted TLS 1.2 and TLS 1.3, and refused TLS 1.0 and 1.1 with alert 70 (`protocol_version`); `kolwen.com` carries no `x-robots-tag`.
+
 - The index says answers will ship with their sources and a confidence level, since nothing ships yet. The English and Thai catalogue entries for the title, the description and the structured data are in the future tense, including that answers which cannot be verified will be flagged, never hidden; the built pages follow from them.
 - CONTRIBUTING.md names the launch-form Release a first pre-release version gets, by pointer to the series release pattern.
 - Rule 11 of `scripts/surface-check.mjs` now fails closed on a workflow's jobs. It reads a job key at two spaces of indent, which must be a plain name with nothing after its colon. The members of a job sit at the indent of its first member line, whatever that indent is, and each member line must be a plain `key:` line; a member line that is not one is a finding at its own line, and its job is not passed. It reads the lines of a `permissions:` block, and a `permissions:` value other than an empty block, `{}`, `read-all` or `write-all` is named as unread. Lines deeper than the members are read only for a `uses:` line naming `actions/checkout@`. Step items and `run: |` bodies are otherwise not read; a `- ` step item at the member indent (the indentless form of `steps:`) is read as a step of the key above it.

@@ -89,18 +89,20 @@ test('rule 16 reads the tag as a parser does: case, order, quotes, none, and a >
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('rule 16 reads web/_headers: an X-Robots-Tag noindex or none on a production path fails, and the absolute workers.dev preview rule does not', () => {
+test('rule 16 reads web/_headers: an X-Robots-Tag noindex or none on a production path fails, and the absolute previews.kolwen.com preview rule does not', () => {
   const dir = surfaceCopy();
   try {
     const before = readFileSync(join(dir, 'web/_headers'), 'utf8');
-    assert.match(before, /https:\/\/:version\.:subdomain\.workers\.dev\/\*\n {2}X-Robots-Tag: noindex/, 'the real preview rule is in the tree, so a pass means the exemption works');
-    const after = edit(dir, 'web/_headers', s => s.replace(/\s*$/, '\n') + '\n/probe-a\n  X-Robots-Tag: noindex\n\n/probe-b\n  x-robots-tag: none, nofollow\n\nhttps://other.workers.dev/*\n  X-Robots-Tag: noindex\n');
+    assert.match(before, /https:\/\/:preview\.previews\.kolwen\.com\/\*\n {2}X-Robots-Tag: noindex/, 'the real preview rule is in the tree, so a pass means the exemption works');
+    const after = edit(dir, 'web/_headers', s => s.replace(/\s*$/, '\n') + '\n/probe-a\n  X-Robots-Tag: noindex\n\n/probe-b\n  x-robots-tag: none, nofollow\n\nhttps://other.previews.kolwen.com/*\n  X-Robots-Tag: noindex\n');
     const r = surface(dir);
     assert.equal(r.status, 1, r.out);
     const a = lineOf(after, after.indexOf('  X-Robots-Tag: noindex\n\n/probe-b')), b = lineOf(after, after.indexOf('  x-robots-tag: none'));
     assert.ok(r.out.includes(`web/_headers: line ${a}: sets X-Robots-Tag "noindex" on "/probe-a"`), r.out);
     assert.ok(r.out.includes(`web/_headers: line ${b}: sets X-Robots-Tag "none, nofollow" on "/probe-b"`), r.out);
-    assert.ok(!r.out.includes('other.workers.dev'), 'an absolute workers.dev pattern is a preview host and is not named');
+    // The hostname of every https URL the output names, parsed. A substring test would also match a lookalike that carries the host in its query.
+    const hostsNamed = [...r.out.matchAll(/https?:\/\/[^\s"]+/g)].map(m => { try { return new URL(m[0]).hostname; } catch { return null; } });
+    assert.ok(!hostsNamed.some(h => h === 'other.previews.kolwen.com'), 'an absolute previews.kolwen.com pattern is a preview host and is not named');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
