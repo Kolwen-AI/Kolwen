@@ -1,0 +1,3 @@
+# tools/
+
+Helpers for the repository's GitHub, CI and CodeRabbit work: reading check runs and review comments, judging a commit's gates, a guarded merge, and a CodeRabbit Verify read. The Worker never serves or uploads this folder: `wrangler.jsonc` sets `assets.directory` to `./web`, so nothing here reaches a visitor. Credentials are read by name from the environment (`GITHUB_READ_TOKEN` for reads, `GITHUB_TOKEN` only where a tool writes); no value is written here. The node tests run in CI (`tools/ciwait.test.mjs` is in the surface job); the PowerShell tests (`*.test.ps1`) run locally with Windows PowerShell 5.1 (`powershell -NoProfile -File tools/kw-merge.test.ps1`), because the CI runner has no PowerShell here.
