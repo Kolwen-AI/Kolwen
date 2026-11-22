@@ -293,6 +293,11 @@ test('passagesOf and pinnedHitter: passages in order with a text fingerprint, an
   assert.equal(pinnedM(openerAttr), false, 'a claim in the opener attribute is not excused');
   assert.equal(pinnedM(nestedAttr), false, 'a claim in a nested tag attribute is not excused');
   assert.equal(pinnedM(textHit), true, 'a claim in the passage text is excused by its pin');
+  // C188-2: a claim inside an HTML comment in a pinned passage is reported, as a claim inside a tag is; the words after the comment stay excused.
+  const commented = '<p class="t">history <!-- no trackers --> text</p>';
+  const pinnedC = pinnedHitter('web/x.html', commented, pin(passagesOf(commented)[0].fp, 1));
+  assert.equal(pinnedC(commented.indexOf('no trackers')), false, 'a claim inside an HTML comment is not excused');
+  assert.equal(pinnedC(commented.indexOf('text')), true, 'the words after the comment are still excused');
 });
 
 // ── linear, under a kill timeout ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -318,6 +323,11 @@ test('the readers finish on bulk input that gives them nothing to match: untermi
       for (const re of claims) for (const m of s.matchAll(re)) pinned(m.index);
       seen++;
     }
+    // C188-1: a page whose pin MATCHES, so the tag scan runs on every hit (with no matching pin the reader returns before any scan).
+    const big = '<p class=' + Q + 't' + Q + '>' + 'no trackers <b>x</b> '.repeat(N) + '</p>';
+    const hitBig = pinnedHitter('web/x.html', big, [{ file: 'web/x.html', fp: passagesOf(big)[0].fp, count: 1 }]);
+    for (const m of big.matchAll(claims[0])) if (!hitBig(m.index)) throw new Error('a text hit in a pinned passage was reported');
+    seen++;
     console.log('FINISHED ' + seen);
   `;
   try {
@@ -325,7 +335,7 @@ test('the readers finish on bulk input that gives them nothing to match: untermi
     assert.equal(r.error, undefined, 'the child was not killed by the timeout: ' + (r.error && r.error.message));
     assert.equal(r.signal, null);
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout, /^FINISHED 14\n?$/);
+    assert.match(r.stdout, /^FINISHED 15\n?$/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

@@ -311,15 +311,16 @@ export function passagesOf(s) {
 }
 // A function from a character index of the page text s to whether a pin excuses a hit there. A pin is { file, fp, count }: it excuses a hit inside the passage with that fingerprint only while the page holds exactly
 // count copies of the passage (a pinned passage pasted again excuses none of them). The passages are read once per page and each hit finds its passage by binary search.
-// The tags of one passage as [start, end) ranges: a start tag through its `>` (scanStartTag reads its attributes as the tokenizer does), an end tag through its `>`. A hit
+// The tags of one passage as [start, end) ranges: a start tag through its `>` (scanStartTag reads its attributes as the tokenizer does), an end tag through its `>`, an HTML comment through its `-->` (to the passage's end when unclosed). A hit
 // inside one is in an attribute or a tag name, never in the passage's words, so a pin does not excuse it (LWK2-080). One pass over the passage; passages do not overlap.
 function tagSpansIn(s, start, end) {
   const out = [];
-  const re = /<\/?[a-zA-Z]/g;
+  const re = /<!--|<\/?[a-zA-Z]/g;
   re.lastIndex = start;
   for (let m; (m = re.exec(s)) && m.index < end; ) {
     let e;
-    if (s[m.index + 1] === '/') { e = s.indexOf('>', m.index); e = e === -1 ? end : e + 1; }
+    if (m[0] === '<!--') { e = s.indexOf('-->', m.index + 4); e = e === -1 ? end : e + 3; }
+    else if (s[m.index + 1] === '/') { e = s.indexOf('>', m.index); e = e === -1 ? end : e + 1; }
     else { let k = m.index + 1; while (k < s.length && /[A-Za-z0-9-]/.test(s[k])) k++; e = scanStartTag(s, k).end; if (!(e > m.index)) e = end; }
     out.push([m.index, e]);
     re.lastIndex = Math.max(e, m.index + 1);
