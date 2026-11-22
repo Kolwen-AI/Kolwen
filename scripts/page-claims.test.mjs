@@ -284,6 +284,42 @@ test('passagesOf and pinnedHitter: passages in order with a text fingerprint, an
   assert.equal(pinnedHitter('web/x.html', page, pin(ps[0].fp, 1))(page.indexOf('two')), false, 'a pasted copy excuses none');
   assert.equal(pinnedHitter('web/x.html', page, pin(ps[1].fp, 1))(0), false, 'a hit outside the passage');
   assert.equal(pinnedHitter('web/x.html', page, [])(at), false, 'no pins');
+  // LWK2-080: a pinned passage excuses its TEXT only. A claim in an attribute, the opener's own or a nested tag's, is reported.
+  const marked = '<p class="t" title="no trackers">x <a href="#" title="no trackers">y</a> no trackers</p>';
+  const fpM = passagesOf(marked)[0].fp;
+  const occurrences = word => { const out = []; for (let i = marked.indexOf(word); i !== -1; i = marked.indexOf(word, i + 1)) out.push(i); return out; };
+  const [openerAttr, nestedAttr, textHit] = occurrences('no trackers');
+  const pinnedM = pinnedHitter('web/x.html', marked, pin(fpM, 1));
+  assert.equal(pinnedM(openerAttr), false, 'a claim in the opener attribute is not excused');
+  assert.equal(pinnedM(nestedAttr), false, 'a claim in a nested tag attribute is not excused');
+  assert.equal(pinnedM(textHit), true, 'a claim in the passage text is excused by its pin');
+  // C188-2: a claim inside an HTML comment in a pinned passage is reported, as a claim inside a tag is; the words after the comment stay excused.
+  const commented = '<p class="t">history <!-- no trackers --> text</p>';
+  const pinnedC = pinnedHitter('web/x.html', commented, pin(passagesOf(commented)[0].fp, 1));
+  assert.equal(pinnedC(commented.indexOf('no trackers')), false, 'a claim inside an HTML comment is not excused');
+  assert.equal(pinnedC(commented.indexOf('text')), true, 'the words after the comment are still excused');
+});
+
+test('passagesOf and pinnedHitter (CodeRabbit #210): a comment ended by --!> is read as one, so its claim is reported and the words after it stay excused', async () => {
+  const { passagesOf, pinnedHitter } = await lib();
+  const bang = '<p class="t">history <!-- no trackers --!> text</p>';
+  const pinned = pinnedHitter('web/x.html', bang, [{ file: 'web/x.html', fp: passagesOf(bang)[0].fp, count: 1 }]);
+  assert.equal(pinned(bang.indexOf('no trackers')), false, 'a claim inside a comment ended by --!> is not excused');
+  assert.equal(pinned(bang.indexOf('text')), true, 'the words after a --!> comment are still excused');
+});
+
+test('passagesOf and pinnedHitter (CodeRabbit #210): an end tag is read as a start tag is, so a quoted > in its attribute does not end it early', async () => {
+  const { passagesOf, pinnedHitter } = await lib();
+  const endq = '<p class="t">x <a href="#">y</a title="> no trackers"> z</p>';
+  const pinned = pinnedHitter('web/x.html', endq, [{ file: 'web/x.html', fp: passagesOf(endq)[0].fp, count: 1 }]);
+  assert.equal(pinned(endq.indexOf('no trackers')), false, 'a claim in a quoted attribute of an end tag is not excused');
+});
+
+test('passagesOf and pinnedHitter (CodeRabbit #210): a tag longer than META_MAX is read through its real end, so the text after it keeps its pin', async () => {
+  const { passagesOf, pinnedHitter } = await lib();
+  const long = '<p class="t"><a title="' + 'a'.repeat(4500) + '">y</a> plain text</p>';
+  const pinned = pinnedHitter('web/x.html', long, [{ file: 'web/x.html', fp: passagesOf(long)[0].fp, count: 1 }]);
+  assert.equal(pinned(long.indexOf('plain text')), true, 'text after a tag longer than META_MAX is excused by its pin');
 });
 
 // ── linear, under a kill timeout ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -309,6 +345,11 @@ test('the readers finish on bulk input that gives them nothing to match: untermi
       for (const re of claims) for (const m of s.matchAll(re)) pinned(m.index);
       seen++;
     }
+    // C188-1: a page whose pin MATCHES, so the tag scan runs on every hit (with no matching pin the reader returns before any scan).
+    const big = '<p class=' + Q + 't' + Q + '>' + 'no trackers <b>x</b> '.repeat(N) + '</p>';
+    const hitBig = pinnedHitter('web/x.html', big, [{ file: 'web/x.html', fp: passagesOf(big)[0].fp, count: 1 }]);
+    for (const m of big.matchAll(claims[0])) if (!hitBig(m.index)) throw new Error('a text hit in a pinned passage was reported');
+    seen++;
     console.log('FINISHED ' + seen);
   `;
   try {
@@ -316,7 +357,7 @@ test('the readers finish on bulk input that gives them nothing to match: untermi
     assert.equal(r.error, undefined, 'the child was not killed by the timeout: ' + (r.error && r.error.message));
     assert.equal(r.signal, null);
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout, /^FINISHED 14\n?$/);
+    assert.match(r.stdout, /^FINISHED 15\n?$/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

@@ -921,6 +921,7 @@ const WEB_PAGES = tracked.filter(f => f.startsWith('web/') && f.endsWith('.html'
 // of copies (a pinned passage pasted into a new entry) the pin exempts none of them and a finding names the count, so a copy cannot ride on a pin.
 // STATED LIMITS: a pin compares text, not meaning. Editing a pinned passage changes its fingerprint and fires both a new hit and a stale pin, so a person
 // re-confirms the pin; and it holds only the rendered page, not CHANGELOG.md itself (where the same words are history).
+// A pin excuses a passage's WORDS only: a claim inside a tag, an attribute of the passage's own opener or of a nested tag, is reported (LWK2-080).
 const HISTORY_PINS = [
   { file: 'web/changelog.html', fp: '518613b551644633', start: "The home page footer no longer says \"no trackers ...\"", count: 1, reason: 'a record of a withdrawn claim' },
   { file: 'web/changelog.html', fp: '510c767ab5d9bc0c', start: "Rule 17 of scripts/surface-check.mjs, on the web pages", count: 1, reason: 'a record of a withdrawn claim' },

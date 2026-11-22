@@ -311,15 +311,51 @@ export function passagesOf(s) {
 }
 // A function from a character index of the page text s to whether a pin excuses a hit there. A pin is { file, fp, count }: it excuses a hit inside the passage with that fingerprint only while the page holds exactly
 // count copies of the passage (a pinned passage pasted again excuses none of them). The passages are read once per page and each hit finds its passage by binary search.
+// The tags of one passage as [start, end) ranges: a start tag through its `>` (scanStartTag reads its attributes as the tokenizer does), an end tag through its `>` (read as a start tag is), an HTML comment through its end, as the tokenizer ends it (`-->` or `--!>`, or the empty `<!-->` and `<!--->`; to the passage's end when unclosed). A hit
+// inside one is in an attribute, a tag name or a comment, never in the passage's words, so a pin does not excuse it (LWK2-080). One pass over the passage; passages do not overlap.
+function tagSpansIn(s, start, end) {
+  const out = [], shut = { from: Infinity }; // one cache for the comment searches, as walk keeps one
+  const re = /<!--|<\/?[a-zA-Z]/g;
+  re.lastIndex = start;
+  for (let m; (m = re.exec(s)) && m.index < end; ) {
+    let e;
+    if (m[0] === '<!--') { e = commentEnd(s, m.index, shut); e = e === -1 ? end : e; }
+    else {
+      // an end tag is read as a start tag is (its attributes, a quoted > included); a tag longer than META_MAX is read to its real end, within the passage
+      let k = m.index + (s[m.index + 1] === '/' ? 2 : 1);
+      while (k < s.length && /[A-Za-z0-9-]/.test(s[k])) k++;
+      e = scanStartTag(s, k, Math.max(META_MAX, end - k)).end;
+      if (!(e > m.index)) e = end;
+    }
+    out.push([m.index, e]);
+    re.lastIndex = Math.max(e, m.index + 1);
+  }
+  return out;
+}
+const inTag = (index, tags) => {
+  let lo = 0, hi = tags.length - 1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (index < tags[mid][0]) hi = mid - 1; else if (index >= tags[mid][1]) lo = mid + 1; else return true; }
+  return false;
+};
 export function pinnedHitter(file, s, pins) {
   const ps = passagesOf(s);
   const copies = new Map();
   for (const p of ps) copies.set(p.fp, (copies.get(p.fp) || 0) + 1);
   const excused = new Set(pins.filter(q => q.file === file && copies.get(q.fp) === q.count).map(q => q.fp));
+  const tags = new Map(); // a passage's tag ranges, read on the first hit that lands in it
   return index => {
     if (excused.size === 0) return false;
     let lo = 0, hi = ps.length - 1;
-    while (lo <= hi) { const mid = (lo + hi) >> 1; if (index < ps[mid].start) hi = mid - 1; else if (index >= ps[mid].end) lo = mid + 1; else return excused.has(ps[mid].fp); }
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (index < ps[mid].start) hi = mid - 1;
+      else if (index >= ps[mid].end) lo = mid + 1;
+      else {
+        if (!excused.has(ps[mid].fp)) return false;
+        if (!tags.has(mid)) tags.set(mid, tagSpansIn(s, ps[mid].start, ps[mid].end));
+        return !inTag(index, tags.get(mid));
+      }
+    }
     return false;
   };
 }
