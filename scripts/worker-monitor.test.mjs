@@ -143,6 +143,13 @@ test('a failed status write is caught, logged at error level with the class only
   assert.ok(!logs.some(l => l.startsWith('state write failed')), 'a failed write is not logged as information');
 });
 
+test('a failed status read is caught, logged at error level with the class only, and the run goes on', async () => {
+  const env = { STATUS: { get: async () => { throw new Error('get refused for owner@example.com ' + SECRET); }, put: async () => {} } };
+  const { errors } = await captureBoth(async () => { await monitor(env, { fetchImpl: stubFetch() }); });
+  assert.ok(errors.includes('state read failed: Error'), errors.join('\n'));
+  assert.doesNotMatch(errors.join('\n'), new RegExp(SECRET + '|@'));
+});
+
 test('the probe lines stay information lines, and a run with every probe OK logs no error', async () => {
   const env = { STATUS: { get: async () => null, put: async () => {} } };
   const { logs, errors } = await captureBoth(async () => { await monitor(env, { fetchImpl: stubFetch() }); });

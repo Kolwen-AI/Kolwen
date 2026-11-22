@@ -39,7 +39,7 @@
 	"triggers": {
 		"crons": ["*/15 * * * *"]
 	},
-	// Workers Logs (https://developers.cloudflare.com/workers/observability/logs/workers-logs/): invocation_logs off, so a visitor's request is never logged; only the probe results (console.log) and the Worker's own failures (console.error, the class only) are kept.
+	// Workers Logs (https://developers.cloudflare.com/workers/observability/logs/workers-logs/): invocation_logs off, so a visitor's request is never written as an invocation log; only the probe results (console.log) and the Worker's own failures (console.error, the class only) are kept. Workers Issues (below) can still keep a failed request's details for seven days (https://developers.cloudflare.com/workers/observability/issues/investigate/).
 	// Today the Workers Logs page above states the Free plan's daily limit and retention. From 2026-12-01 these logs fall under
 	// Cloudflare Observability pricing (https://developers.cloudflare.com/observability/pricing/): on Free, ingestion stops at the daily limit and resumes at 00:00 UTC.
 	"observability": {
@@ -49,7 +49,7 @@
 		"traces": { "enabled": false },
 		"enabled": true,
 		// Workers Issues (https://developers.cloudflare.com/workers/observability/issues/, read 2026-11-22): an uncaught exception, a failed invocation, a 5xx response or an
-		// error-level log becomes an issue, and so does each handled failure the Worker logs with console.error (worker/index.mjs: the alert send and the status write).
+		// error-level log becomes an issue, and so does each handled failure the Worker logs with console.error (worker/index.mjs: the alert send, the status write and the status read).
 		// It needs Wrangler 4.134.0 or later, and the room's pinned Wrangler is in package.json. It is set here, not in the dashboard, because "If you deploy with Wrangler,
 		// also set observability.issues.enabled to true in your Wrangler configuration file. Otherwise, the next deployment turns off Issues" (the same page).
 		"issues": { "enabled": true },

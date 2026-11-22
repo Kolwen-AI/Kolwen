@@ -79,7 +79,10 @@ export function composeRecovery(results, when) {
 
 async function readState(env) {
   if (!env.STATUS) return null;
-  try { return JSON.parse(await env.STATUS.get(STATE_KEY)) ?? null; } catch { return null; }
+  let raw;
+  try { raw = await env.STATUS.get(STATE_KEY); } catch (e) { console.error(`state read failed: ${e?.name ?? 'error'}`); return null; }
+  // an absent or unparsable record is silent: no record is the first run's state, not a fault
+  try { return JSON.parse(raw) ?? null; } catch { return null; }
 }
 
 // The last result the owner was told about, in the shape transition() judges: no record, or a record from before `notified`, counts as told all OK.
