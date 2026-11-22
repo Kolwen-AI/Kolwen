@@ -284,6 +284,15 @@ test('passagesOf and pinnedHitter: passages in order with a text fingerprint, an
   assert.equal(pinnedHitter('web/x.html', page, pin(ps[0].fp, 1))(page.indexOf('two')), false, 'a pasted copy excuses none');
   assert.equal(pinnedHitter('web/x.html', page, pin(ps[1].fp, 1))(0), false, 'a hit outside the passage');
   assert.equal(pinnedHitter('web/x.html', page, [])(at), false, 'no pins');
+  // LWK2-080: a pinned passage excuses its TEXT only. A claim in an attribute, the opener's own or a nested tag's, is reported.
+  const marked = '<p class="t" title="no trackers">x <a href="#" title="no trackers">y</a> no trackers</p>';
+  const fpM = passagesOf(marked)[0].fp;
+  const occurrences = word => { const out = []; for (let i = marked.indexOf(word); i !== -1; i = marked.indexOf(word, i + 1)) out.push(i); return out; };
+  const [openerAttr, nestedAttr, textHit] = occurrences('no trackers');
+  const pinnedM = pinnedHitter('web/x.html', marked, pin(fpM, 1));
+  assert.equal(pinnedM(openerAttr), false, 'a claim in the opener attribute is not excused');
+  assert.equal(pinnedM(nestedAttr), false, 'a claim in a nested tag attribute is not excused');
+  assert.equal(pinnedM(textHit), true, 'a claim in the passage text is excused by its pin');
 });
 
 // ── linear, under a kill timeout ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
