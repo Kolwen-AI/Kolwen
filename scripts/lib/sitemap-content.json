@@ -31,13 +31,13 @@
   },
   "https://kolwen.com/privacy": {
     "page": "web/privacy.html",
-    "sha256": "d5c53cd5d44a65f4d0715d9edf69fe00ae351a175320cee8a41942f066ee6fae",
-    "lastmod": "2026-11-21"
+    "sha256": "507c0a383f046c6c0ed8ac4d7c429b94cc2f5bfd200398920a33e83daac361fb",
+    "lastmod": "2026-11-22"
   },
   "https://kolwen.com/th/privacy": {
     "page": "web/th/privacy.html",
-    "sha256": "93a95dca4225e2e7c91da8647a1643649da30cd3f84b7aab7eb92c54e8464d84",
-    "lastmod": "2026-11-21"
+    "sha256": "fd4e667ac788396924037c8b0dab5031f11d84cf28439523ef56af14061c5d82",
+    "lastmod": "2026-11-22"
   },
   "https://kolwen.com/refund": {
     "page": "web/refund.html",
@@ -51,13 +51,13 @@
   },
   "https://kolwen.com/changelog": {
     "page": "web/changelog.html",
-    "sha256": "465dd857736fb63390d0415009a6e8d7b7cccc3c1df913ce88c6e63d85ac68f6",
-    "lastmod": "2026-11-21"
+    "sha256": "7b092ce3c7dd4cbb49161adcacfaf669376a47fd826d63bea2975d32ab88146f",
+    "lastmod": "2026-11-22"
   },
   "https://kolwen.com/th/changelog": {
     "page": "web/th/changelog.html",
-    "sha256": "6876b74a91d96b5eef25183e70c43b975ac9c39c4a1952059ea27f75ef28f77e",
-    "lastmod": "2026-11-21"
+    "sha256": "7d4eaef2b9452a470a857bfb32023a970faaa44b7fce315d5834a24bee61a5a3",
+    "lastmod": "2026-11-22"
   },
   "https://kolwen.com/accessibility": {
     "page": "web/accessibility.html",

@@ -29,7 +29,7 @@ which parts change on the day the assistant itself ships.
 
 Static pages, served by a Cloudflare Worker. **The Worker runs one small script of ours** (`worker/index.mjs`). It hands every request for a path with no static file to the pages, so a missing page gets the 404 page, except that it answers `/status.json` and `/subscribe` itself, and every 15 minutes it requests fourteen of our own addresses, the seven pages in English and the same seven in Thai, to check that they answer. It does not log, keep or store a visitor's request, and there is no database and no storage of visitor data on our side. The status record holds only the time, each page check's result, and which result the owner was last told of. A subscriber store is built and switched off: while it is switched off, no address can be stored, and no mail goes to a subscriber in this build. Once an alert address is set, the Worker tries to mail the owner when the result of its checks changes: from all passing to a failure, with each failed check's path, HTTP status or error (a timeout or a network error), timing and content-type result, the number of failed checks and the UTC time; and from failing back to all passing, with a recovery note. Once the status record is bound and can be read, a failure that goes on is not mailed again once the owner has been told, and a send that fails is tried again by the next run that still finds the failure (until then, and whenever the record cannot be read, every failing check run is mailed), and no visitor data is in either mail (a send that fails is logged by its error class only). Until an address is set, nothing is sent.
 
-*Measured: `grep -nE '^[[:space:]]*"main"' wrangler.jsonc` returns one line, `"main": "worker/index.mjs",`; the config declares a name, a compatibility date, the `assets` block, a cron trigger (`*/15 * * * *`), the `observability` block with invocation logs off, the `send_email` binding, one variable (`ALERT_FROM`) and an empty `previews` block. The alert recipient is a secret set outside the file, so the file holds no recipient address; its one address is the sender, the published `info@kolwen.com` in `ALERT_FROM`.*
+*Measured: `grep -nE '^[[:space:]]*"main"' wrangler.jsonc` returns one line, `"main": "worker/index.mjs",`; the config declares a name, a compatibility date, the `assets` block, a cron trigger (`*/15 * * * *`), the `observability` block with invocation logs off and Workers Issues on, the `send_email` binding, one variable (`ALERT_FROM`) and an empty `previews` block. The alert recipient is a secret set outside the file, so the file holds no recipient address; its one address is the sender, the published `info@kolwen.com` in `ALERT_FROM`.*
 
 ## Cookies
 
@@ -107,7 +107,7 @@ gives only a "Maximum log retention period" of 7 days.
 
 [pending legal review] Whether a log line also holds the visitor's IP address or request headers is not itemised
 by that page, so it is not claimed either way here. It is to be measured on a live log line when the Worker ships.
-Which retention applies from 1 December 2026 is likewise not claimed here; the page is to be read again when the Worker ships.
+Which retention applies from 1 December 2026 is likewise not claimed here; the page is to be read again when the Worker ships. [pending legal review] Workers Issues is also on. It records an uncaught exception, a failed invocation, a 5xx response or an error-level log as an occurrence, and groups occurrences into issues (Cloudflare's Issues page, read 2026-11-22). The Worker's own alert-send and status-write failures are logged at error level, with the error's class only. [pending legal review] An occurrence's diagnostic context can include the request details of that invocation, kept seven days at Cloudflare, and an issue stays listed after its occurrences expire. [pending legal review] The Issues page does not itemise which request details an occurrence keeps while invocation logs are off, so that is not claimed either way here; it is to be read on a live occurrence when the Worker ships. [pending legal review] From 1 December 2026 Issues shares Cloudflare's Observability allowance with Workers Logs, and on the Free plan Cloudflare stops ingesting new data at the daily limit (Cloudflare's Observability pricing page, read 2026-11-22).
 
 **This section is a commitment about a thing that does not exist yet.** It is written here now so
 that the claim and the feature ship together rather than the page quietly going out of date.
@@ -161,7 +161,7 @@ configuration outside this repository.** Not measurable here; returned rather th
 - [pending legal review] No advertising and no ad networks. The only counter on this page is the Cloudflare
   Web Analytics described above.
 - No account, no sign-up, and nothing to log in to.
-- Kolwen's own systems—the site and its Worker—collect and store nothing about a visitor, so there is nothing
+- Kolwen's own systems—the site and its Worker—collect and store nothing about a visitor, except what "Worker logs" above describes, so there is nothing
   there to sell or share. **Two parties outside those systems do handle data, as this notice
   already says:** Cloudflare handles every request; and the mailbox behind the contact address holds what you send to it. What each
   retains cannot be measured from this repository.
