@@ -3,7 +3,8 @@ param([Parameter(Mandatory)][int]$Pr, [Parameter(Mandatory)][string]$HeadPrefix,
 # (all-green success, no failing run). The check is Assert-GreenRuns in kw-check-runs.ps1; no flag or parameter bypasses it.
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'kw-check-runs.ps1')
-$tok = [Environment]::GetEnvironmentVariable('GITHUB_TOKEN','User')
+. (Join-Path $PSScriptRoot 'github-token.ps1')
+$tok = Get-GitHubToken -Name GITHUB_TOKEN
 $h = @{ Authorization = "Bearer $tok"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
 $a = @((Invoke-WebRequest -TimeoutSec 60 -UseBasicParsing -Uri "https://api.github.com/repos/TheColliery/Kolwen/code-scanning/alerts?ref=refs/pull/$Pr/merge&state=open&per_page=50" -Headers $h).Content | ConvertFrom-Json | ForEach-Object { $_ })
 "codeql open on PR ref: $($a.Count)"

@@ -5,6 +5,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { reportRuns, judge } from './ciwait.mjs';
+import { githubToken } from './github-token.mjs';
+
+// The token helper (C194b-1): the process environment first, the Windows User environment on Windows, and a plain error naming the variable.
+test('githubToken returns the process environment value without a shell', () => {
+  const saved = process.env.GITHUB_READ_TOKEN;
+  try {
+    process.env.GITHUB_READ_TOKEN = 'stub-read-token';
+    assert.equal(githubToken('GITHUB_READ_TOKEN'), 'stub-read-token');
+  } finally {
+    if (saved === undefined) delete process.env.GITHUB_READ_TOKEN; else process.env.GITHUB_READ_TOKEN = saved;
+  }
+});
+
+test('githubToken refuses any name other than the two house token names', () => {
+  assert.throws(() => githubToken('PATH'), /unknown token name: PATH/);
+  assert.throws(() => githubToken('GITHUB_READ_TOKEN; calc'), /unknown token name/);
+});
 
 const RECORDED = JSON.parse(readFileSync(new URL('./fixture-fbc1164-checkruns.json', import.meta.url), 'utf8')).check_runs;
 const run = (name, conclusion = 'success', status = 'completed') => ({ name, status, conclusion, id: name.length });

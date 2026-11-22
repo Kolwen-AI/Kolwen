@@ -1,6 +1,6 @@
-import { execSync } from 'node:child_process';
+import { githubToken } from './github-token.mjs';
 const [pr, maxS = '480'] = process.argv.slice(2);
-const tok = execSync(`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('GITHUB_READ_TOKEN','User')"`).toString().trim();
+const tok = githubToken('GITHUB_READ_TOKEN');
 const h = { Authorization: `Bearer ${tok}`, Accept: 'application/vnd.github+json' };
 const g = async p => (await fetch(`https://api.github.com/repos/TheColliery/Kolwen/${p}`, { headers: h })).json();
 const end = Date.now() + Number(maxS) * 1000;

@@ -20,6 +20,10 @@ try {
   Assert-GreenRuns -Runs @((Run-Check 'all-green'), (Run-Check 'secret scan'), (Run-Check 'optional check' 'skipped'))
   Write-Output 'PASS a green list passes through'
 } catch { Write-Output "FAIL a green list was refused: $($_.Exception.Message)"; $script:fails++ }
+$fx = Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'fixture-fbc1164-checkruns.json') | ConvertFrom-Json
+$real = @(if ($fx.check_runs) { $fx.check_runs } else { $fx })
+Expect-Refused 'recorded red head fbc1164: all-green' $real 'all-green failure'
+Expect-Refused 'recorded red head fbc1164: rendered' $real 'rendered'
 if ($script:fails -gt 0) { Write-Output "FAILED $($script:fails)"; exit 1 }
 Write-Output 'ALL PASS'
 exit 0

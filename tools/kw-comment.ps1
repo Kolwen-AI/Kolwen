@@ -1,7 +1,8 @@
 param([Parameter(Mandatory)][int]$Issue, [Parameter(Mandatory)][string]$BodyFile)
 # Kolwen head: post one issue/PR comment by REST and read its length back.
 $ErrorActionPreference = 'Stop'
-$t = [Environment]::GetEnvironmentVariable('GITHUB_TOKEN','User')
+. (Join-Path $PSScriptRoot 'github-token.ps1')
+$t = Get-GitHubToken -Name GITHUB_TOKEN
 $h = @{ Authorization = "Bearer $t"; Accept = 'application/vnd.github+json' }
 $b = [string](Get-Content -Raw -Encoding UTF8 $BodyFile)
 $p = @{ body = $b } | ConvertTo-Json -Compress

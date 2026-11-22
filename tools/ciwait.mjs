@@ -2,7 +2,7 @@
 // conclusion and id, then a verdict. It JUDGES: exit 0 only when the check named all-green concluded success and no completed check concluded a failure;
 // exit 1 on RED (each failing check named); exit 3 while runs are still open at the time limit. A successful, skipped or neutral run is not a failure.
 // Read token (GITHUB_READ_TOKEN). The judgment is pure (judge, reportRuns) so a test can feed it a recorded list; the CLI sits behind the entry guard.
-import { execFileSync } from 'node:child_process';
+import { githubToken } from './github-token.mjs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,7 +31,7 @@ export function reportRuns(runs) {
 }
 
 async function main() {
-  const tok = execFileSync('powershell', ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('GITHUB_READ_TOKEN','User')"]).toString().trim();
+  const tok = githubToken('GITHUB_READ_TOKEN');
   const H = { Authorization: `Bearer ${tok}`, Accept: 'application/vnd.github+json' };
   const [sha, maxS = '500'] = process.argv.slice(2);
   const end = Date.now() + Number(maxS) * 1000;

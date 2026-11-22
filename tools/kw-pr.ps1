@@ -1,6 +1,7 @@
 param([string]$Title, [string]$Head, [string]$BodyFile)
 $ErrorActionPreference = 'Stop'
-$tok = [Environment]::GetEnvironmentVariable('GITHUB_TOKEN','User')
+. (Join-Path $PSScriptRoot 'github-token.ps1')
+$tok = Get-GitHubToken -Name GITHUB_TOKEN
 $h = @{ Authorization = "Bearer $tok"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
 $body = [string](Get-Content -Raw -Encoding UTF8 $BodyFile)
 $payload = @{ title = [string]$Title; head = [string]$Head; base = 'main'; body = $body } | ConvertTo-Json -Compress
