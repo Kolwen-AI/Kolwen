@@ -311,17 +311,22 @@ export function passagesOf(s) {
 }
 // A function from a character index of the page text s to whether a pin excuses a hit there. A pin is { file, fp, count }: it excuses a hit inside the passage with that fingerprint only while the page holds exactly
 // count copies of the passage (a pinned passage pasted again excuses none of them). The passages are read once per page and each hit finds its passage by binary search.
-// The tags of one passage as [start, end) ranges: a start tag through its `>` (scanStartTag reads its attributes as the tokenizer does), an end tag through its `>`, an HTML comment through its `-->` (to the passage's end when unclosed). A hit
-// inside one is in an attribute or a tag name, never in the passage's words, so a pin does not excuse it (LWK2-080). One pass over the passage; passages do not overlap.
+// The tags of one passage as [start, end) ranges: a start tag through its `>` (scanStartTag reads its attributes as the tokenizer does), an end tag through its `>` (read as a start tag is), an HTML comment through its end, as the tokenizer ends it (`-->` or `--!>`, or the empty `<!-->` and `<!--->`; to the passage's end when unclosed). A hit
+// inside one is in an attribute, a tag name or a comment, never in the passage's words, so a pin does not excuse it (LWK2-080). One pass over the passage; passages do not overlap.
 function tagSpansIn(s, start, end) {
-  const out = [];
+  const out = [], shut = { from: Infinity }; // one cache for the comment searches, as walk keeps one
   const re = /<!--|<\/?[a-zA-Z]/g;
   re.lastIndex = start;
   for (let m; (m = re.exec(s)) && m.index < end; ) {
     let e;
-    if (m[0] === '<!--') { e = s.indexOf('-->', m.index + 4); e = e === -1 ? end : e + 3; }
-    else if (s[m.index + 1] === '/') { e = s.indexOf('>', m.index); e = e === -1 ? end : e + 1; }
-    else { let k = m.index + 1; while (k < s.length && /[A-Za-z0-9-]/.test(s[k])) k++; e = scanStartTag(s, k).end; if (!(e > m.index)) e = end; }
+    if (m[0] === '<!--') { e = commentEnd(s, m.index, shut); e = e === -1 ? end : e; }
+    else {
+      // an end tag is read as a start tag is (its attributes, a quoted > included); a tag longer than META_MAX is read to its real end, within the passage
+      let k = m.index + (s[m.index + 1] === '/' ? 2 : 1);
+      while (k < s.length && /[A-Za-z0-9-]/.test(s[k])) k++;
+      e = scanStartTag(s, k, Math.max(META_MAX, end - k)).end;
+      if (!(e > m.index)) e = end;
+    }
     out.push([m.index, e]);
     re.lastIndex = Math.max(e, m.index + 1);
   }

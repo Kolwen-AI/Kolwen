@@ -300,6 +300,28 @@ test('passagesOf and pinnedHitter: passages in order with a text fingerprint, an
   assert.equal(pinnedC(commented.indexOf('text')), true, 'the words after the comment are still excused');
 });
 
+test('passagesOf and pinnedHitter (CodeRabbit #210): a comment ended by --!> is read as one, so its claim is reported and the words after it stay excused', async () => {
+  const { passagesOf, pinnedHitter } = await lib();
+  const bang = '<p class="t">history <!-- no trackers --!> text</p>';
+  const pinned = pinnedHitter('web/x.html', bang, [{ file: 'web/x.html', fp: passagesOf(bang)[0].fp, count: 1 }]);
+  assert.equal(pinned(bang.indexOf('no trackers')), false, 'a claim inside a comment ended by --!> is not excused');
+  assert.equal(pinned(bang.indexOf('text')), true, 'the words after a --!> comment are still excused');
+});
+
+test('passagesOf and pinnedHitter (CodeRabbit #210): an end tag is read as a start tag is, so a quoted > in its attribute does not end it early', async () => {
+  const { passagesOf, pinnedHitter } = await lib();
+  const endq = '<p class="t">x <a href="#">y</a title="> no trackers"> z</p>';
+  const pinned = pinnedHitter('web/x.html', endq, [{ file: 'web/x.html', fp: passagesOf(endq)[0].fp, count: 1 }]);
+  assert.equal(pinned(endq.indexOf('no trackers')), false, 'a claim in a quoted attribute of an end tag is not excused');
+});
+
+test('passagesOf and pinnedHitter (CodeRabbit #210): a tag longer than META_MAX is read through its real end, so the text after it keeps its pin', async () => {
+  const { passagesOf, pinnedHitter } = await lib();
+  const long = '<p class="t"><a title="' + 'a'.repeat(4500) + '">y</a> plain text</p>';
+  const pinned = pinnedHitter('web/x.html', long, [{ file: 'web/x.html', fp: passagesOf(long)[0].fp, count: 1 }]);
+  assert.equal(pinned(long.indexOf('plain text')), true, 'text after a tag longer than META_MAX is excused by its pin');
+});
+
 // ── linear, under a kill timeout ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 test('the readers finish on bulk input that gives them nothing to match: unterminated and unclosed tags, passages without a closer, hits with no passage, and many passages with a hit each', () => {
   const dir = mkdtempSync(join(tmpdir(), 'page-claims-linear-'));
