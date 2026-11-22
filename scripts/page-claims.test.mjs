@@ -322,6 +322,23 @@ test('passagesOf and pinnedHitter (CodeRabbit #210): a tag longer than META_MAX 
   assert.equal(pinned(long.indexOf('plain text')), true, 'text after a tag longer than META_MAX is excused by its pin');
 });
 
+// K-195: a construct the tokenizer reads as NOT text (a processing instruction, `</` before a non-letter, `<!` that opens no comment, a CDATA section
+// in HTML content, a DOCTYPE) ends at its first `>`, and a claim inside it is reported. One test per form, so each is red on its own.
+for (const [form, html] of [
+  ['<? (a processing instruction)', '<p class="t">history <? no trackers> text</p>'],
+  ['</ (an end tag with no name)', '<p class="t">history </ no trackers> text</p>'],
+  ['<!x (a bogus comment)', '<p class="t">history <!x no trackers> text</p>'],
+  ['<![CDATA[ (in HTML content)', '<p class="t">history <![CDATA[ no trackers]]> text</p>'],
+  ['<!DOCTYPE', '<p class="t">history <!DOCTYPE no trackers> text</p>'],
+]) {
+  test(`passagesOf and pinnedHitter (K-195): ${form} is not text, so a claim inside it is reported and the text after it stays excused`, async () => {
+    const { passagesOf, pinnedHitter } = await lib();
+    const pinned = pinnedHitter('web/x.html', html, [{ file: 'web/x.html', fp: passagesOf(html)[0].fp, count: 1 }]);
+    assert.equal(pinned(html.indexOf('no trackers')), false, 'a claim inside the construct is not excused');
+    assert.equal(pinned(html.indexOf('text')), true, 'the text after the construct is still excused');
+  });
+}
+
 // ── linear, under a kill timeout ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 test('the readers finish on bulk input that gives them nothing to match: unterminated and unclosed tags, passages without a closer, hits with no passage, and many passages with a hit each', () => {
   const dir = mkdtempSync(join(tmpdir(), 'page-claims-linear-'));
@@ -350,6 +367,11 @@ test('the readers finish on bulk input that gives them nothing to match: untermi
     const hitBig = pinnedHitter('web/x.html', big, [{ file: 'web/x.html', fp: passagesOf(big)[0].fp, count: 1 }]);
     for (const m of big.matchAll(claims[0])) if (!hitBig(m.index)) throw new Error('a text hit in a pinned passage was reported');
     seen++;
+    // K-195: the five forms repeated on a page whose pin matches; a claim inside any of them is reported, so the scan reads every one.
+    const bog = '<p class=' + Q + 't' + Q + '>' + ['<? no trackers>', '</ no trackers>', '<!x no trackers>', '<![CDATA[ no trackers]]>', '<!DOCTYPE no trackers>'].join(' ').repeat(N) + '</p>';
+    const hitBog = pinnedHitter('web/x.html', bog, [{ file: 'web/x.html', fp: passagesOf(bog)[0].fp, count: 1 }]);
+    for (const m of bog.matchAll(claims[0])) if (hitBog(m.index)) throw new Error('a claim inside a bogus construct in a pinned passage was excused');
+    seen++;
     console.log('FINISHED ' + seen);
   `;
   try {
@@ -357,7 +379,7 @@ test('the readers finish on bulk input that gives them nothing to match: untermi
     assert.equal(r.error, undefined, 'the child was not killed by the timeout: ' + (r.error && r.error.message));
     assert.equal(r.signal, null);
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout, /^FINISHED 15\n?$/);
+    assert.match(r.stdout, /^FINISHED 16\n?$/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
