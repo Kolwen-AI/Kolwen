@@ -31,7 +31,7 @@ Static pages, served by a Cloudflare Worker. **The Worker runs one small script 
 
 [pending legal review] One exception sits at Cloudflare: if the Worker fails, or logs one of its own failures, while answering a visitor's request, Cloudflare's error monitor, Workers Issues, can keep that request's details for seven days (see "Worker logs").
 
-*Measured: `grep -nE '^[[:space:]]*"main"' wrangler.jsonc` returns one line, `"main": "worker/index.mjs",`; the config declares a name, a compatibility date, the `assets` block, a cron trigger (`*/15 * * * *`), the `observability` block with invocation logs off and Workers Issues on, the `send_email` binding, one variable (`ALERT_FROM`) a `kv_namespaces` binding (`STATUS`, the status record) and a `previews` block whose one binding is a separate `STATUS` namespace for previews. The alert recipient is a secret set outside the file, so the file holds no recipient address; its one address is the sender, the published `info@kolwen.com` in `ALERT_FROM`.*
+*Measured: `grep -nE '^[[:space:]]*"main"' wrangler.jsonc` returns one line, `"main": "worker/index.mjs",`; the config declares a name, a compatibility date, the `assets` block, a cron trigger (`*/15 * * * *`), the `observability` block with invocation logs off and Workers Issues on, the `send_email` binding, one variable (`ALERT_FROM`), a `kv_namespaces` binding (`STATUS`, the status record), and a `previews` block whose one binding is its own `STATUS` namespace for previews. The alert recipient is a secret set outside the file, so the file holds no recipient address; its one address is the sender, the published `info@kolwen.com` in `ALERT_FROM`.*
 
 ## Cookies
 
