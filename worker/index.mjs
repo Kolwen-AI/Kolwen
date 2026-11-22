@@ -105,12 +105,13 @@ export async function monitor(env, { fetchImpl = fetch, now = new Date() } = {})
       sent = true;
       notified = change === 'failing' ? 'failing' : 'ok';
     } catch (e) {
-      console.log(`alert send failed: ${e?.name ?? 'error'}`);
+      // a failure of the Worker itself, at error level so Workers Issues keeps it; the class only, never the message (an address can sit in it)
+      console.error(`alert send failed: ${e?.name ?? 'error'}`);
     }
   }
   // one write per run, after the send, so it carries the outcome of the send
   if (env.STATUS) {
-    try { await env.STATUS.put(STATE_KEY, JSON.stringify(buildState(results, now, notified))); } catch (e) { console.log(`state write failed: ${e?.name ?? 'error'}`); }
+    try { await env.STATUS.put(STATE_KEY, JSON.stringify(buildState(results, now, notified))); } catch (e) { console.error(`state write failed: ${e?.name ?? 'error'}`); }
   }
   return { sent, dark, results };
 }

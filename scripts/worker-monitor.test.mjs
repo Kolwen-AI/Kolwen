@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import worker, { PATHS, composeAlert, monitor, probe } from '../worker/index.mjs';
+import { jsoncWithoutComments } from './lib/wrangler-jsonc.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SECRET = 'SECRET-value-7f3a9c';
@@ -28,6 +29,14 @@ const capture = async fn => {
   console.log = (...a) => logs.push(a.join(' '));
   try { await fn(); } finally { console.log = log; }
   return logs;
+};
+// Captures both streams: a failure the Worker logs at error level goes to console.error, an information line to console.log.
+const captureBoth = async fn => {
+  const logs = [], errors = [], log = console.log, error = console.error;
+  console.log = (...a) => logs.push(a.join(' '));
+  console.error = (...a) => errors.push(a.join(' '));
+  try { await fn(); } finally { console.log = log; console.error = error; }
+  return { logs, errors };
 };
 
 test('the probe list is the sitemap\'s own URLs', () => {
@@ -119,8 +128,30 @@ test('a page answered with an upper-case media type is a passing check: Text/HTM
 test('a send that throws is caught, and its log line names the error class only, never its message', async () => {
   const env = { ALERT_TO: 'owner@example.com', ALERT_FROM: 'info@kolwen.com', EMAIL: { send: async () => { throw new Error('refused for owner@example.com ' + SECRET); } } };
   let out;
-  const logs = await capture(async () => { out = await monitor(env, { fetchImpl: stubFetch({ '/': new Response('x', { status: 503 }) }) }); });
+  const { logs, errors } = await captureBoth(async () => { out = await monitor(env, { fetchImpl: stubFetch({ '/': new Response('x', { status: 503 }) }) }); });
   assert.equal(out.sent, false);
-  assert.ok(logs.includes('alert send failed: Error'), logs.join('\n'));
-  assert.doesNotMatch(logs.join('\n'), new RegExp(SECRET + '|@'));
+  assert.ok(errors.includes('alert send failed: Error'), errors.join('\n'));
+  assert.doesNotMatch(errors.join('\n'), new RegExp(SECRET + '|@'));
+  assert.ok(!logs.some(l => l.startsWith('alert send failed')), 'a failure is not logged as information');
+});
+
+test('a failed status write is caught, logged at error level with the class only, and holds no address', async () => {
+  const env = { STATUS: { get: async () => null, put: async () => { throw new Error('put refused for owner@example.com ' + SECRET); } } };
+  const { logs, errors } = await captureBoth(async () => { await monitor(env, { fetchImpl: stubFetch() }); });
+  assert.ok(errors.includes('state write failed: Error'), errors.join('\n'));
+  assert.doesNotMatch(errors.join('\n'), new RegExp(SECRET + '|@'));
+  assert.ok(!logs.some(l => l.startsWith('state write failed')), 'a failed write is not logged as information');
+});
+
+test('the probe lines stay information lines, and a run with every probe OK logs no error', async () => {
+  const env = { STATUS: { get: async () => null, put: async () => {} } };
+  const { logs, errors } = await captureBoth(async () => { await monitor(env, { fetchImpl: stubFetch() }); });
+  assert.ok(logs.some(l => l.includes('"probe"')), logs.join('\n'));
+  assert.deepEqual(errors, []);
+});
+
+test('wrangler.jsonc turns Workers Issues on through its own file, and keeps invocation logs off', () => {
+  const config = JSON.parse(jsoncWithoutComments(readFileSync(join(ROOT, 'wrangler.jsonc'), 'utf8')));
+  assert.equal(config.observability.issues.enabled, true, 'observability.issues.enabled');
+  assert.equal(config.observability.logs.invocation_logs, false, 'observability.logs.invocation_logs');
 });
