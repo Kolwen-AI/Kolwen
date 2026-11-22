@@ -98,6 +98,8 @@ A separate scale from A4. A4 grades what happened to people's personal data; thi
 | 4 | a check fails and no visitor's page is affected: a stale sitemap date, a missed scheduled check, a delayed alert | the same | the same, for the service's own tooling | no visitor sees it |
 | 5 | a wording or cosmetic error with no effect on use | the same | the same | no effect on use |
 
+**What the numbers are sized from: not yet measured.** Every threshold in this table is Kolwen's own and is a judgment, stated with its reason in the last column; none is a vendor's number. The availability log (`scripts/availability-log.mjs`) records each check's status and latency when it runs, but no stored history of failures exists yet, so no threshold here comes from a measured failure. Each is re-sized from the log's own readings once failures are on record.
+
 **Rules that bind every grade:**
 
 - **Assume the worst.** When unsure between two levels, take the higher. Lower it as facts arrive, and write each change with its reason. A severity debate waits for the postmortem and is not held during the incident.
