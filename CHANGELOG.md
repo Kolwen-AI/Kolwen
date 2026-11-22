@@ -118,6 +118,8 @@ the pointer to it.
 
 ### Changed
 
+- **The postmortem promise is now a target** (BB-544). A blameless postmortem is aimed at within 5 business days after an incident is closed, and when it will take longer, the public notice says when it will come. The notice promise is unchanged.
+
 - **Workers Issues is on, and the Worker's own failures are logged at error level** (LWK2-065). `wrangler.jsonc` sets `observability.issues.enabled`, so Cloudflare groups errors and failed requests into issues. The alert-send, status-read and status-write failures now log at error level, with the error's class only. The privacy draft and the logging note say what an occurrence can hold, and that Cloudflare keeps it for seven days; on the public privacy pages that part waits for legal review.
 
 - **Previews move to `previews.kolwen.com`, and the workers.dev preview and Version URLs are off** (AW-35 (1), BB-535). `wrangler.jsonc` sets
