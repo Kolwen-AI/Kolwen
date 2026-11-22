@@ -118,7 +118,7 @@ the pointer to it.
 
 ### Changed
 
-- **Workers Issues is on, and the Worker's own failures are logged at error level** (LWK2-065). `wrangler.jsonc` sets `observability.issues.enabled`, so Cloudflare groups errors and failed requests into issues. The alert-send and status-write failures now log at error level, with the error's class only. The privacy page and the logging note say what an occurrence can hold, and that Cloudflare keeps it for seven days.
+- **Workers Issues is on, and the Worker's own failures are logged at error level** (LWK2-065). `wrangler.jsonc` sets `observability.issues.enabled`, so Cloudflare groups errors and failed requests into issues. The alert-send, status-read and status-write failures now log at error level, with the error's class only. The privacy page and the logging note say what an occurrence can hold, and that Cloudflare keeps it for seven days.
 
 - **Previews move to `previews.kolwen.com`, and the workers.dev preview and Version URLs are off** (AW-35 (1), BB-535). `wrangler.jsonc` sets
   `preview_urls: false`, which also switches off Version URLs and aliased Version URLs (Cloudflare's Version URLs page). `web/_headers` gives the preview host `X-Robots-Tag: noindex` and no longer carries the workers.dev rule; production
