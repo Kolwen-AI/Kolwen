@@ -79,7 +79,10 @@ export function composeRecovery(results, when) {
 
 async function readState(env) {
   if (!env.STATUS) return null;
-  try { return JSON.parse(await env.STATUS.get(STATE_KEY)) ?? null; } catch { return null; }
+  let raw;
+  try { raw = await env.STATUS.get(STATE_KEY); } catch (e) { console.error(`state read failed: ${e?.name ?? 'error'}`); return null; }
+  // an absent or unparsable record is silent: no record is the first run's state, not a fault
+  try { return JSON.parse(raw) ?? null; } catch { return null; }
 }
 
 // The last result the owner was told about, in the shape transition() judges: no record, or a record from before `notified`, counts as told all OK.
@@ -105,12 +108,13 @@ export async function monitor(env, { fetchImpl = fetch, now = new Date() } = {})
       sent = true;
       notified = change === 'failing' ? 'failing' : 'ok';
     } catch (e) {
-      console.log(`alert send failed: ${e?.name ?? 'error'}`);
+      // a failure of the Worker itself, at error level so Workers Issues keeps it; the class only, never the message (an address can sit in it)
+      console.error(`alert send failed: ${e?.name ?? 'error'}`);
     }
   }
   // one write per run, after the send, so it carries the outcome of the send
   if (env.STATUS) {
-    try { await env.STATUS.put(STATE_KEY, JSON.stringify(buildState(results, now, notified))); } catch (e) { console.log(`state write failed: ${e?.name ?? 'error'}`); }
+    try { await env.STATUS.put(STATE_KEY, JSON.stringify(buildState(results, now, notified))); } catch (e) { console.error(`state write failed: ${e?.name ?? 'error'}`); }
   }
   return { sent, dark, results };
 }

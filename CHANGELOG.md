@@ -118,6 +118,8 @@ the pointer to it.
 
 ### Changed
 
+- **Workers Issues is on, and the Worker's own failures are logged at error level** (LWK2-065). `wrangler.jsonc` sets `observability.issues.enabled`, so Cloudflare groups errors and failed requests into issues. The alert-send, status-read and status-write failures now log at error level, with the error's class only. The privacy draft and the logging note say what an occurrence can hold, and that Cloudflare keeps it for seven days; on the public privacy pages that part waits for legal review.
+
 - **Previews move to `previews.kolwen.com`, and the workers.dev preview and Version URLs are off** (AW-35 (1), BB-535). `wrangler.jsonc` sets
   `preview_urls: false`, which also switches off Version URLs and aliased Version URLs (Cloudflare's Version URLs page). `web/_headers` gives the preview host `X-Robots-Tag: noindex` and no longer carries the workers.dev rule; production
   `kolwen.com` carries no noindex. The preview hostname is attached to this Worker through the Cloudflare API on 2026-11-21 (the owner signed card BB-535; main pressed it). The host is attached. On 2026-11-21 a live read of `https://feat-previews-host.previews.kolwen.com` answered 200 with `x-robots-tag: noindex`, accepted TLS 1.2 and TLS 1.3, and refused TLS 1.0 and 1.1 with alert 70 (`protocol_version`); `kolwen.com` carries no `x-robots-tag`.

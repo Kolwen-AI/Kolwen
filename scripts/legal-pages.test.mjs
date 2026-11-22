@@ -158,7 +158,7 @@ test('the counts of the three sources today', () => {
   const i = inputs();
   const s = file => classify(file, i[{ 'TERMS.md': 'terms', 'PRIVACY.md': 'privacy', 'legal/thai-7day-clause.md': 'clause' }[file]], { holds: holds.holds }).stats;
   assert.deepEqual(s('TERMS.md'), { passages: 76, text: 27, held: 49 });
-  assert.deepEqual(s('PRIVACY.md'), { passages: 56, text: 14, held: 42 });
+  assert.deepEqual(s('PRIVACY.md'), { passages: 57, text: 14, held: 43 });
   assert.deepEqual(s('legal/thai-7day-clause.md'), { passages: 4, text: 0, held: 4 });
 });
 
