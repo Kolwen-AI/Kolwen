@@ -101,7 +101,7 @@
       "usage-q": "How does usage work?",
       "usage-a": "Each plan has a token quota, shown against Standard. A usage view will show how much of each usage window you have used, in percent. No quota amount is shown yet.",
       "limit-q": "What happens at the limit?",
-      "limit-a": "This has not been decided yet.",
+      "limit-a": "[pending legal review] The owner has decided this order: Kolwen uses your plan's usage allowance first, then your prepaid credits, oldest credit first. Kolwen draws on your credits past a plan limit only if you have turned on that setting, which is off until you turn it on. This is preliminary until counsel reads the Terms.",
       "refund-q": "Can I get a refund?",
       "refund-a": "See the {#refund}refund page{/refund}. Refund terms are a draft.",
       "tax-q": "What about taxes and regional prices?",
@@ -117,7 +117,7 @@
       "key-refund": "An unredeemed key is refundable in full within 14 days of purchase, and expires 12 months after purchase. [pending legal review]",
       "key-limits": "2 keys per order, and 4 per account per sale window or per rolling 30 days.",
       "key-bind": "A key is non-transferable and binds to your account when you activate it. [pending legal review]",
-      "credits": "{#strong}Usage credits.{/strong} Prepaid units of Kolwen’s own metered service. They are used only at Kolwen and cannot be moved to anyone else or cashed out. Unused credits are refundable at the price you paid, within 14 days. [pending legal review] Whether credits expire has not been decided yet."
+      "credits": "{#strong}Usage credits.{/strong} Prepaid units of Kolwen’s own metered service. They are used only at Kolwen and cannot be moved to anyone else or cashed out. Unused credits are refundable at the price you paid, within 14 days. [pending legal review] The owner has decided that credit bought with money does not expire and carries no dormancy fee (a fee because credit or an account is unused). This is preliminary until counsel reads the Terms."
     },
     "setting": {
       "title": "How prices are set",
