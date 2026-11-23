@@ -9,7 +9,7 @@ A tool that counts how many tokens a tokenizer makes of a sample text, per chara
 - `measure.py`: the script. `python measure.py --help` lists the flags.
 - `test_measure.py`: tests. Standard library only. Run `python -m unittest` in this folder.
 - `requirements.txt`: the tokenizer library, needed only for `--fetch`.
-- `word-separated-languages.txt`: the languages whose words are separated by spaces. Tokens per word is measured only for these.
+- `word-separated-languages.txt`: one `language unit` pair per line, for the languages whose words are separated by spaces. The unit is `word` or `syllable`. Tokens per word is measured only for these.
 - `samples/`: two original sample sentences per file, for the offline mode. They are not FLORES text.
 
 ## The entrant list (`--entrants`, required)
@@ -34,7 +34,7 @@ Comma-separated language codes (FLORES-200 style, for example `eng_Latn,tha_Thai
 
 ## Outputs (in `--out-dir`, default `out/`)
 
-- `measurements.csv`: one row per entrant and language.
+- `measurements.csv`: one row per entrant and language. Its `word_unit` column says whether `tokens_per_word` counts words or syllables (Vietnamese counts syllables); it reads `not measured` where tokens per word is not measured.
 - `sha256.csv`: the file name and sha256 of each sample file and each tokenizer file read.
 - `errors.csv`: one row per failure, with its stage (`sample`, `tokenizer`, `measure`). The run exits 1 when this file has a row.
 

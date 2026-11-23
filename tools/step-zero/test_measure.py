@@ -5,9 +5,9 @@ Counting only. No FLORES text is written here; the samples are written in these 
 import subprocess
 import sys
 import tempfile
-import unittest
+import types
 from pathlib import Path
-from unittest import mock
+from unittest import TestCase, main, mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -29,7 +29,7 @@ class _FakeTokenizer:
         return [0] * len(text)
 
 
-class CountingTests(unittest.TestCase):
+class CountingTests(TestCase):
     def test_thai_code_points_and_utf8_bytes(self):
         # Thai letters are 3 bytes each in UTF-8: 6 code points, 18 bytes.
         self.assertEqual(measure.text_sizes(THAI_SAWASDEE), (6, 18))
@@ -46,7 +46,7 @@ class CountingTests(unittest.TestCase):
         self.assertEqual(measure.text_sizes(chr(0x1F600)), (1, 4))
 
 
-class WordCountTests(unittest.TestCase):
+class WordCountTests(TestCase):
     def test_space_separated_language_counts_words(self):
         self.assertEqual(measure.words_for("eng_Latn", ["one two three", "four"]), 4)
 
@@ -58,12 +58,12 @@ class WordCountTests(unittest.TestCase):
         self.assertEqual(measure.cell(0), "0")
 
 
-class RowTests(unittest.TestCase):
+class RowTests(TestCase):
     def test_thai_row_has_not_measured_words_and_real_ratios(self):
         row = measure.measurement_row(
             entrant="x/y", revision_pinned="abc", revision_returned="abc",
             tokenizer_source="STAND-IN", language="tha_Thai",
-            lines=[THAI_SAWASDEE], tokenize=lambda s: list(s),
+            lines=[THAI_SAWASDEE], tokenize=list,
         )
         self.assertEqual(row["tokens_per_word"], "not measured")
         self.assertEqual(row["characters"], 6)
@@ -71,7 +71,7 @@ class RowTests(unittest.TestCase):
         self.assertEqual(row["tokens"], 6)
 
 
-class RunTests(unittest.TestCase):
+class RunTests(TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
@@ -137,7 +137,7 @@ class RunTests(unittest.TestCase):
             self.assertNotIn("secret sentence", (self.out / name).read_text(encoding="utf-8"))
 
 
-class CliTests(unittest.TestCase):
+class CliTests(TestCase):
     def _run(self, *args):
         return subprocess.run([sys.executable, str(HERE / "measure.py"), *args],
                               capture_output=True, text=True, encoding="utf-8")
@@ -157,7 +157,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(r.returncode, 2)
 
 
-class FetchModeTests(unittest.TestCase):
+class FetchModeTests(TestCase):
     def test_fetch_without_languages_refuses_before_any_network_call(self):
         with tempfile.TemporaryDirectory() as tmp:
             flores = Path(tmp) / "devtest"
@@ -171,7 +171,7 @@ class FetchModeTests(unittest.TestCase):
             net.assert_not_called()
 
 
-class CompletenessTests(unittest.TestCase):
+class CompletenessTests(TestCase):
     def test_run_calls_the_completeness_check(self):
         with tempfile.TemporaryDirectory() as tmp:
             flores = Path(tmp) / "devtest"
@@ -180,7 +180,7 @@ class CompletenessTests(unittest.TestCase):
             with mock.patch.object(measure, "check_complete") as check:
                 measure.run(entrants=[("x/y", "abc")], languages=["eng_Latn"], flores_dir=flores,
                             tok_for=lambda e: (_FakeTokenizer(), "abc", None, None),
-                            out_dir=Path(tmp) / "out", limit=100, separated=set())
+                            out_dir=Path(tmp) / "out", limit=100, separated={})
             check.assert_called_once()
 
     def test_check_complete_fails_loud_on_a_short_result(self):
@@ -189,7 +189,7 @@ class CompletenessTests(unittest.TestCase):
             measure.check_complete(short, [("x/y", "abc"), ("p/q", "def")], ["eng_Latn", "tha_Thai"])
 
 
-class EntrantTests(unittest.TestCase):
+class EntrantTests(TestCase):
     """The real entrant list is the operator's, read from a file; the repository holds none. These tests use a stand-in list they write themselves."""
 
     def test_offline_refuses_without_entrants(self):
@@ -233,5 +233,83 @@ class EntrantTests(unittest.TestCase):
 
 
 
+class _RecordingTokenizer:
+    def __init__(self, path):
+        self.calls = [("from_file", path)]
+
+    def no_truncation(self):
+        self.calls.append("no_truncation")
+
+    def no_padding(self):
+        self.calls.append("no_padding")
+
+
+class _FakeTokenizerClass:
+    @staticmethod
+    def from_file(path):
+        return _RecordingTokenizer(path)
+
+
+class LoadTokenizerTests(TestCase):
+    def test_real_tokenizer_path_turns_off_truncation_and_padding(self):
+        fake = types.ModuleType("tokenizers")
+        fake.Tokenizer = _FakeTokenizerClass
+        with mock.patch.dict(sys.modules, {"tokenizers": fake}):
+            tok = measure.load_tokenizer("x.json")
+        self.assertEqual(tok.calls, [("from_file", "x.json"), "no_truncation", "no_padding"])
+
+
+class TokenizerFailureTests(TestCase):
+    def test_a_tokenizer_exception_stops_one_pair_not_the_run(self):
+        class FlakyTokenizer:
+            def encode(self, text):
+                if "boom" in text:
+                    raise RuntimeError("unknown token")
+                return types.SimpleNamespace(ids=text.split())
+
+        with tempfile.TemporaryDirectory() as tmp:
+            flores = Path(tmp) / "devtest"
+            flores.mkdir()
+            (flores / "eng_Latn.devtest").write_text("fine words\nboom here\n", encoding="utf-8")
+            (flores / "tha_Thai.devtest").write_text("fine words\n", encoding="utf-8")
+            out = Path(tmp) / "out"
+            result = measure.run(
+                entrants=[("x/y", "abc")], languages=["eng_Latn", "tha_Thai"], flores_dir=flores,
+                tok_for=lambda e: (FlakyTokenizer(), "abc", None, None), out_dir=out, limit=100,
+                separated={"eng_Latn": "word"},
+            )
+            measure.write_outputs(result, out)
+            csv_rows = (out / "measurements.csv").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(result.rows), 1)
+        self.assertEqual(len(result.errors), 1)
+        self.assertEqual(result.errors[0]["stage"], "measure")
+        self.assertEqual(result.errors[0]["language"], "eng_Latn")
+        self.assertIn("RuntimeError", result.errors[0]["message"])
+        self.assertNotIn("boom", result.errors[0]["message"])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(len(csv_rows), 2)  # header and the Thai row
+
+
+class WordUnitTests(TestCase):
+    def test_vietnamese_row_is_labelled_syllable(self):
+        row = measure.measurement_row("x/y", "abc", "abc", "STAND-IN", "vie_Latn", ["one two"],
+                                      lambda s: s.split(), {"vie_Latn": "syllable"})
+        self.assertEqual(row["word_unit"], "syllable")
+        self.assertEqual(row["tokens_per_word"], "1.000000")
+
+    def test_unlisted_language_word_unit_is_not_measured(self):
+        row = measure.measurement_row("x/y", "abc", "abc", "STAND-IN", "tha_Thai", ["one two"],
+                                      lambda s: s.split(), {"eng_Latn": "word"})
+        self.assertEqual(row["word_unit"], "not measured")
+        self.assertEqual(row["tokens_per_word"], "not measured")
+
+    def test_word_list_refuses_a_unit_it_does_not_know(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "words.txt"
+            f.write_text("eng_Latn letter\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                measure.separated_languages(f)
+
+
 if __name__ == "__main__":
-    unittest.main()
+    main()

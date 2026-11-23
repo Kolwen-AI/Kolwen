@@ -1,10 +1,11 @@
-# Languages whose words are separated by spaces. Used only for tokens per word.
+# Languages whose words are separated by spaces, each with the unit it is counted in: "word" or "syllable".
+# One "language unit" pair per line. Used only for tokens per word and the word_unit column.
 # Written by hand for the languages that separate words with spaces. No source was read for this list.
 # Check it against the Unicode script data and the FLORES codes before any figure is reported.
-# vie_Latn: spaces separate syllables, so its "words" are syllables; state that wherever its figure appears.
+# vie_Latn counts syllables: spaces separate syllables in Vietnamese, not words.
 # NOT listed on purpose: languages written without spaces between words (for example tha_Thai, jpn_Jpan)
-# read "not measured". Any language stays "not measured" until it is added here and checked.
-eng_Latn
-vie_Latn
-ind_Latn
-spa_Latn
+# read "not measured" for tokens per word and word_unit. Any language stays "not measured" until it is added here and checked.
+eng_Latn word
+vie_Latn syllable
+ind_Latn word
+spa_Latn word

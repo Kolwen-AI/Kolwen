@@ -39,10 +39,11 @@ STANDIN_NAME = "STAND-IN: whitespace and non-ASCII code-point splitter (offline,
 PINNED_NAME = "tokenizer.json at the pinned revision"
 MEASURE_COLUMNS = [
     "entrant", "revision_pinned", "revision_returned", "tokenizer", "language", "sentences",
-    "characters", "utf8_bytes", "tokens", "tokens_per_char", "tokens_per_byte", "tokens_per_word",
+    "characters", "utf8_bytes", "tokens", "tokens_per_char", "tokens_per_byte", "tokens_per_word", "word_unit",
 ]
 ERROR_COLUMNS = ["entrant", "language", "stage", "message"]
 SHA_COLUMNS = ["kind", "path", "sha256", "bytes"]
+WORD_UNITS = ("word", "syllable")
 
 
 def load_entrants(path):
@@ -62,13 +63,18 @@ def load_entrants(path):
 
 
 def separated_languages(path=WORD_LIST):
-    """Languages whose words are separated by spaces. Raises FileNotFoundError when the list is missing."""
-    codes = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        s = line.strip()
-        if s and not s.startswith("#"):
-            codes.add(s)
-    return codes
+    """Map of language code to its word unit ("word" or "syllable"), read from the list file.
+    Raises FileNotFoundError when the list is missing and ValueError on a malformed line."""
+    units = {}
+    for number, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
+        text = line.strip()
+        if not text or text.startswith("#"):
+            continue
+        fields = text.split()
+        if len(fields) != 2 or fields[1] not in WORD_UNITS:
+            raise ValueError(f"{path}:{number}: expected 'language word' or 'language syllable', got {text!r}")
+        units[fields[0]] = fields[1]
+    return units
 
 
 def text_sizes(text):
@@ -105,7 +111,8 @@ def measurement_row(entrant, revision_pinned, revision_returned, tokenizer_sourc
         tokens += len(tokenize(line))
     if chars == 0:
         raise ValueError("empty sample")
-    words = words_for(language, lines, separated)
+    units = separated_languages() if separated is None else separated
+    words = words_for(language, lines, units)
     if words == 0:
         raise ValueError("no words in a space-separated sample")
     return {
@@ -114,6 +121,7 @@ def measurement_row(entrant, revision_pinned, revision_returned, tokenizer_sourc
         "characters": chars, "utf8_bytes": utf8, "tokens": tokens,
         "tokens_per_char": f"{tokens / chars:.6f}", "tokens_per_byte": f"{tokens / utf8:.6f}",
         "tokens_per_word": cell(None if words is None else f"{tokens / words:.6f}"),
+        "word_unit": cell(units.get(language)),
     }
 
 
@@ -149,6 +157,12 @@ class StandIn:
             if run:
                 ids.append(run)
         return types.SimpleNamespace(ids=ids)
+
+    def no_truncation(self):
+        return None
+
+    def no_padding(self):
+        return None
 
 
 @dataclass
@@ -208,6 +222,9 @@ def run(entrants, languages, flores_dir, tok_for, out_dir, limit=SAMPLE_LIMIT, s
             except ValueError as exc:
                 fail(repo, language, "measure", str(exc))
                 continue
+            except Exception as exc:  # a tokenizer's own failure stops this pair only, never the run
+                fail(repo, language, "measure", f"tokenizer raised {type(exc).__name__}")
+                continue
             result.rows.append(row)
 
     check_complete(result, entrants, languages)
@@ -232,6 +249,15 @@ def offline_tok_for(entrant):
     return StandIn(), "not fetched (offline)", None, None
 
 
+def load_tokenizer(path):
+    """Load a saved tokenizer with truncation and padding switched off, so the count covers the whole text."""
+    from tokenizers import Tokenizer
+    tokenizer = Tokenizer.from_file(str(path))
+    tokenizer.no_truncation()
+    tokenizer.no_padding()
+    return tokenizer
+
+
 def fetch_tok_for(out_dir):
     def tok_for(entrant):
         repo, pinned = entrant
@@ -251,8 +277,7 @@ def fetch_tok_for(out_dir):
         except Exception as exc:
             return None, returned, None, f"tokenizer download failed: {type(exc).__name__}"
         try:
-            from tokenizers import Tokenizer
-            tokenizer = Tokenizer.from_file(str(dest))
+            tokenizer = load_tokenizer(dest)
         except ImportError:
             return None, returned, tok_sha, "tokenizers library not installed"
         except Exception as exc:
