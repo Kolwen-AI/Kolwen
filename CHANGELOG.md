@@ -124,6 +124,8 @@ the pointer to it.
 
 - **The "Training on Outputs" entry's two values are filled in the draft** (BB-551). The entry is still pending counsel and held on both public pages, so its values are not published here.
 
+- **Four signed-card entries are drafted in the terms and held, pending counsel** (BB-553, BB-554, BB-555, BB-556): on credit expiry, the order of use of plan allowance and credits, resale, and decisions about people. Each is held on both public terms pages, and none of its values is published here.
+
 - **The postmortem promise is now a target** (BB-544). A blameless postmortem is aimed at within 5 business days after an incident is closed, and when it will take longer, the public notice says when it will come. The notice promise is unchanged.
 
 - **Workers Issues is on, and the Worker's own failures are logged at error level** (LWK2-065). `wrangler.jsonc` sets `observability.issues.enabled`, so Cloudflare groups errors and failed requests into issues. The alert-send, status-read and status-write failures now log at error level, with the error's class only. The privacy draft and the logging note say what an occurrence can hold, and that Cloudflare keeps it for seven days; on the public privacy pages that part waits for legal review.

@@ -72,11 +72,19 @@ in what they unlock. A **subscription** renews until you cancel it. **Credits** 
 Kolwen's own metered service: they are used only at Kolwen, cannot be moved to anyone else, and cannot
 be cashed out.
 
+[pending legal review] **Credit does not expire.** Credit you buy with money does not expire, and Kolwen charges no dormancy fee (a fee because credit or an account is unused).
+
+> [รอที่ปรึกษากฎหมาย] **เครดิตไม่หมดอายุ** เครดิตที่คุณซื้อด้วยเงินไม่มีวันหมดอายุ และ Kolwen ไม่คิดค่าธรรมเนียมเพราะเครดิตหรือบัญชีไม่ถูกใช้งาน (dormancy fee)
+
 A key is a licence to consume, not a thing you own. It is **non-transferable and binds to your account
 when you activate it.** Before activation a key can be given as a gift; after activation it is yours
 alone.
 
 ## How usage is counted
+
+[pending legal review] **Order of use.** Kolwen uses your plan's usage allowance first. After that it uses your prepaid credits, oldest credit first. When you reach a limit of your plan, Kolwen draws on your credits only if you have turned on the setting that allows it. That setting is off until you turn it on.
+
+> [รอที่ปรึกษากฎหมาย] **ลำดับการใช้** Kolwen ใช้โควตาการใช้งานของแผนของคุณก่อน หลังจากนั้นจึงใช้เครดิตเติมเงินของคุณ โดยใช้เครดิตที่เก่าที่สุดก่อน เมื่อคุณถึงขีดจำกัดของแผน Kolwen จะหักเครดิตต่อก็ต่อเมื่อคุณเปิดการตั้งค่าที่อนุญาตไว้เท่านั้น และการตั้งค่านี้ปิดอยู่จนกว่าคุณจะเปิดเอง
 
 [pending legal review] This section applies to metered use, billed against credits at the prices per
 million tokens Kolwen publishes; a key or subscription is paid for by its own price and carries no
@@ -222,6 +230,14 @@ and this section does not guess at it beyond that entry.
 [pending legal review] **Training on Outputs.** You may not use Outputs, or data derived from them, to train, fine-tune or distil an AI model, or to build a dataset for doing so, without Kolwen's prior written authorisation. To ask for it, write to permissions@kolwen.com and say which model you would train, for what purpose and on how many Outputs; Kolwen answers in writing within 10 business days. Kolwen's silence is not authorisation. This line does not limit what you do with an Output as your own work: you may use, publish and sell it, and use it as an input to features of your own product.
 
 > [รอที่ปรึกษากฎหมาย] **การนำ Outputs ไปใช้ฝึกโมเดล** คุณจะนำผลลัพธ์ที่ได้จากบริการ (Outputs) หรือข้อมูลที่ได้มาจาก Outputs นั้น ไปใช้เพื่อ train, fine-tune หรือ distil โมเดล AI หรือเพื่อสร้างชุดข้อมูล (dataset) สำหรับการนั้น โดยไม่ได้รับอนุญาตเป็นลายลักษณ์อักษรจาก Kolwen ล่วงหน้าไม่ได้ หากต้องการขออนุญาต ให้เขียนถึง permissions@kolwen.com และระบุว่าคุณจะ train โมเดลใด เพื่อวัตถุประสงค์ใด และด้วย Outputs จำนวนเท่าใด Kolwen จะตอบเป็นลายลักษณ์อักษรภายใน 10 วันทำการ การที่ Kolwen ไม่ตอบไม่ถือเป็นการอนุญาต ข้อนี้ไม่จำกัดสิ่งที่คุณทำกับ Output ในฐานะงานของคุณเอง คุณใช้ เผยแพร่ และขาย Output นั้นได้ และใช้เป็น input ให้ฟีเจอร์ของผลิตภัณฑ์ของคุณเองได้
+
+[pending legal review] **Resale.** You may not resell Kolwen, a key or credits, or access to any of them, without Kolwen's prior written authorisation. To ask for it, write to permissions@kolwen.com.
+
+> [รอที่ปรึกษากฎหมาย] **การขายต่อ** คุณจะขายต่อ Kolwen, key, เครดิต หรือสิทธิเข้าใช้สิ่งใดสิ่งหนึ่งเหล่านี้ โดยไม่ได้รับอนุญาตเป็นลายลักษณ์อักษรจาก Kolwen ล่วงหน้าไม่ได้ หากต้องการขออนุญาต ให้เขียนถึง permissions@kolwen.com
+
+[pending legal review] **Decisions about people.** If you use Kolwen in work whose results affect a person's health, legal matters, finances or employment, a person must review the result before any decision about that person is made. Kolwen is not the decision-maker.
+
+> [รอที่ปรึกษากฎหมาย] **การตัดสินใจเกี่ยวกับบุคคล** หากคุณใช้ Kolwen ในงานที่ผลลัพธ์กระทบต่อสุขภาพ เรื่องทางกฎหมาย การเงิน หรือการจ้างงานของบุคคล ต้องมีบุคคลตรวจผลลัพธ์ก่อนที่จะมีการตัดสินใจเกี่ยวกับบุคคลนั้น Kolwen ไม่ใช่ผู้ตัดสินใจ
 
 What is written is how Kolwen acts when it believes a customer
 has broken a rule, which is a process, in this order:
