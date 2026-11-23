@@ -42,7 +42,7 @@
 | Value | Status | Pending with |
 |---|---|---|
 | Indonesian-customer account period | open, the lawyer to confirm | BB-275 (3), lawyer |
-| Credit expiry and refund of unused credit | open; never copied from a vendor | BB-275 (2), lawyer |
+| Credit expiry and refund of unused credit | bought credit: no expiry and no dormancy fee (BB-553 (1), 2026-11-23); plan allowance first, then oldest credit, and the plan-limit switch off by default (BB-554 (1)); both preliminary until counsel; refund of unused credit as the Terms' refunds section states it, unchanged here | BB-553, BB-554, BB-275 (2), lawyer |
 | Flagged-content period | open | BB-276, lawyer |
 | Worker request-log period and purpose | open; the owner sets it | owner |
 | Tax-record period | open; waits on the lawyer | lawyer |
