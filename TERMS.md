@@ -216,7 +216,7 @@ preserve consumer rights either way.**
 
 ## Acceptable use and how it is enforced
 
-**The list of prohibited conduct is not written yet.** One entry is drafted and waits for counsel; until counsel reads it, it is not shown here. It is an open decision for the owner and counsel,
+**The list of prohibited conduct is not written yet.** One entry is drafted and waits for counsel; until counsel reads it, the published pages do not show it. It is an open decision for the owner and counsel,
 and this section does not guess at it beyond that entry.
 
 [pending legal review] **Training on Outputs.** You may not use Outputs, or data derived from them, to train, fine-tune or distil an AI model, or to build a dataset for doing so, without Kolwen's prior written authorisation. To ask for it, write to [authorisation address: the owner's choice; the Terms publish only appeals@kolwen.com today (owner card BB-551)] and say which model you would train, for what purpose and on how many Outputs; Kolwen answers in writing within [N business days: the owner's number (owner card BB-551)]. Silence is not authorisation. This line does not limit what you do with an Output as your own work: you may use, publish and sell it, and use it as an input to features of your own product.
@@ -260,7 +260,7 @@ money is gone. It is **restored** if the dispute resolves in Kolwen's favour or 
 directly.
 
 > **[รอที่ปรึกษากฎหมาย] ขั้นตอนเมื่อ Kolwen เห็นว่าลูกค้าฝ่าฝืนกฎ**
-> รายการพฤติกรรมที่ห้ามยังไม่ได้เขียน มีข้อเดียวที่ร่างไว้และรอที่ปรึกษากฎหมาย จนกว่าที่ปรึกษาจะอ่าน ข้อนั้นจะยังไม่แสดงที่นี่ เป็นเรื่องที่เจ้าของและที่ปรึกษากฎหมายต้องตัดสิน และหัวข้อนี้ไม่เดาแทน
+> รายการพฤติกรรมที่ห้ามยังไม่ได้เขียน มีข้อเดียวที่ร่างไว้และรอที่ปรึกษากฎหมาย จนกว่าที่ปรึกษาจะอ่าน หน้าที่เผยแพร่จะยังไม่แสดงข้อนั้น เป็นเรื่องที่เจ้าของและที่ปรึกษากฎหมายต้องตัดสิน และหัวข้อนี้ไม่เดาแทน
 > สิ่งที่เขียนไว้คือวิธีที่ Kolwen ปฏิบัติเมื่อเห็นว่าลูกค้าฝ่าฝืนกฎ ตามลำดับนี้
 > 1. แจ้งข้อกำหนดที่เห็นว่าฝ่าฝืน พร้อมสรุปพยานหลักฐาน
 > 2. ระงับบัญชี ไม่ใช่เลิกสัญญา ระหว่างที่เคสยังเปิด ถ้าสินค้าเป็นคีย์ นาฬิกานับวันของคีย์หยุดตลอดทั้งเคส
