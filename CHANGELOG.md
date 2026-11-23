@@ -122,6 +122,8 @@ the pointer to it.
 
 - **The Thai text of the "Training on Outputs" entry is drafted, pending counsel** (K-205). `TERMS.md` carries the Thai clause beside the English one, as a block quote marked pending legal review, so it is held on both public pages with the English. The English clause's "Silence is not authorisation" now reads "Kolwen's silence is not authorisation", to match the Thai subject; nothing else in the English moves. Its two placeholders stay open (owner card BB-551).
 
+- **The "Training on Outputs" entry's two values are filled in the draft** (BB-551). The entry is still pending counsel and held on both public pages, so its values are not published here.
+
 - **The postmortem promise is now a target** (BB-544). A blameless postmortem is aimed at within 5 business days after an incident is closed, and when it will take longer, the public notice says when it will come. The notice promise is unchanged.
 
 - **Workers Issues is on, and the Worker's own failures are logged at error level** (LWK2-065). `wrangler.jsonc` sets `observability.issues.enabled`, so Cloudflare groups errors and failed requests into issues. The alert-send, status-read and status-write failures now log at error level, with the error's class only. The privacy draft and the logging note say what an occurrence can hold, and that Cloudflare keeps it for seven days; on the public privacy pages that part waits for legal review.
