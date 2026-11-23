@@ -2,6 +2,7 @@
 
 Counting only. No FLORES text is written here; the samples are written in these tests or are the two original files in samples/.
 """
+import io
 import subprocess
 import sys
 import tempfile
@@ -303,12 +304,32 @@ class WordUnitTests(TestCase):
         self.assertEqual(row["word_unit"], "not measured")
         self.assertEqual(row["tokens_per_word"], "not measured")
 
+    def test_shipped_list_labels_vietnamese_syllable(self):
+        self.assertEqual(measure.separated_languages()["vie_Latn"], "syllable")
+
     def test_word_list_refuses_a_unit_it_does_not_know(self):
         with tempfile.TemporaryDirectory() as tmp:
             f = Path(tmp) / "words.txt"
             f.write_text("eng_Latn letter\n", encoding="utf-8")
             with self.assertRaises(ValueError):
                 measure.separated_languages(f)
+
+
+class WordListMainTests(TestCase):
+    def test_malformed_word_list_exits_one_with_a_plain_message(self):
+        real = measure.separated_languages
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "words.txt"
+            bad.write_text("eng_Latn letter\n", encoding="utf-8")
+            entrants = Path(tmp) / "entrants.txt"
+            entrants.write_text("example-org/standin-a aa11bb22cc33\n", encoding="utf-8")
+            with mock.patch.object(measure, "separated_languages", side_effect=lambda *a, **k: real(bad)):
+                with mock.patch("sys.stderr", new_callable=io.StringIO) as err:
+                    code = measure.main(["--offline", "--entrants", str(entrants), "--languages", "eng_Latn",
+                                         "--out-dir", str(Path(tmp) / "out")])
+        self.assertEqual(code, 1)
+        self.assertIn("error: word list:", err.getvalue())
+        self.assertIn("expected 'language word'", err.getvalue())
 
 
 if __name__ == "__main__":

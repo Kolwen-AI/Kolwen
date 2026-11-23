@@ -330,6 +330,9 @@ def main(argv=None):
     except FileNotFoundError:
         print(f"error: word list missing: {WORD_LIST}", file=sys.stderr)
         return 1
+    except ValueError as exc:
+        print(f"error: word list: {exc}", file=sys.stderr)
+        return 1
     tok_for = offline_tok_for if args.offline else fetch_tok_for(args.out_dir)
     result = run(entrants, languages, flores_dir, tok_for, args.out_dir, args.limit, separated)
     write_outputs(result, args.out_dir)
