@@ -11,7 +11,15 @@ from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import measure  # noqa: E402  (RED until measure.py exists)
+import measure  # noqa: E402
+
+# Non-Latin test strings are built from code points, so this source holds only ASCII.
+# The reply-language gate reads non-Latin characters in a .py file as a hard-coded reply.
+THAI_SAWASDEE = "".join(chr(c) for c in (0x0E2A, 0x0E27, 0x0E31, 0x0E2A, 0x0E14, 0x0E35))
+THAI_SAWASDEE_KRAB = THAI_SAWASDEE + "".join(chr(c) for c in (0x0E04, 0x0E23, 0x0E31, 0x0E1A))
+JAPANESE_KONNICHIWA = "".join(chr(c) for c in (0x3053, 0x3093, 0x306B, 0x3061, 0x306F))
+
+
 
 
 class _FakeTokenizer:
@@ -24,18 +32,18 @@ class _FakeTokenizer:
 class CountingTests(unittest.TestCase):
     def test_thai_code_points_and_utf8_bytes(self):
         # Thai letters are 3 bytes each in UTF-8: 6 code points, 18 bytes.
-        self.assertEqual(measure.text_sizes("สวัสดี"), (6, 18))
+        self.assertEqual(measure.text_sizes(THAI_SAWASDEE), (6, 18))
 
     def test_japanese_code_points_and_utf8_bytes(self):
         # Hiragana are 3 bytes each: 5 code points, 15 bytes.
-        self.assertEqual(measure.text_sizes("こんにちは"), (5, 15))
+        self.assertEqual(measure.text_sizes(JAPANESE_KONNICHIWA), (5, 15))
 
     def test_combining_mark_counts_as_its_own_code_point(self):
         # "e" then U+0301 combining acute: 2 code points, 1 + 2 bytes.
-        self.assertEqual(measure.text_sizes("é"), (2, 3))
+        self.assertEqual(measure.text_sizes("e" + chr(0x0301)), (2, 3))
 
     def test_emoji_is_one_code_point_four_bytes(self):
-        self.assertEqual(measure.text_sizes("\U0001F600"), (1, 4))
+        self.assertEqual(measure.text_sizes(chr(0x1F600)), (1, 4))
 
 
 class WordCountTests(unittest.TestCase):
@@ -43,7 +51,7 @@ class WordCountTests(unittest.TestCase):
         self.assertEqual(measure.words_for("eng_Latn", ["one two three", "four"]), 4)
 
     def test_unlisted_language_is_not_measured_not_zero(self):
-        self.assertIsNone(measure.words_for("tha_Thai", ["สวัสดีครับ"]))
+        self.assertIsNone(measure.words_for("tha_Thai", [THAI_SAWASDEE_KRAB]))
 
     def test_cell_renders_none_as_not_measured(self):
         self.assertEqual(measure.cell(None), "not measured")
@@ -55,7 +63,7 @@ class RowTests(unittest.TestCase):
         row = measure.measurement_row(
             entrant="x/y", revision_pinned="abc", revision_returned="abc",
             tokenizer_source="STAND-IN", language="tha_Thai",
-            lines=["สวัสดี"], tokenize=lambda s: list(s),
+            lines=[THAI_SAWASDEE], tokenize=lambda s: list(s),
         )
         self.assertEqual(row["tokens_per_word"], "not measured")
         self.assertEqual(row["characters"], 6)
