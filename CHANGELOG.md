@@ -118,6 +118,8 @@ the pointer to it.
 
 ### Changed
 
+- **The liability, refund and price-change parts of the terms are redrafted and held pending counsel, and the credit wording follows the owner's signed refund decision, preliminary until counsel** (BB-558, BB-559, BB-568). The redrafted terms are not shown on the public pages.
+
 - **The terms draft gains one prohibited-conduct entry, pending counsel** (LWK3-081). `TERMS.md` carries "Training on Outputs" as the first entry of the list of prohibited conduct. It is marked pending legal review and held on the public pages. Its authorisation address and its response time are open (owner card BB-551).
 
 - **The Thai text of the "Training on Outputs" entry is drafted, pending counsel** (K-205). `TERMS.md` carries the Thai clause beside the English one, as a block quote marked pending legal review, so it is held on both public pages with the English. The English clause's "Silence is not authorisation" now reads "Kolwen's silence is not authorisation", to match the Thai subject; nothing else in the English moves. Its two placeholders stay open (owner card BB-551).

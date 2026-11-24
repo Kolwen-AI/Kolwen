@@ -76,6 +76,10 @@ be cashed out.
 
 > [รอที่ปรึกษากฎหมาย] **เครดิตไม่หมดอายุ** เครดิตที่คุณซื้อด้วยเงินไม่มีวันหมดอายุ และ Kolwen ไม่คิดค่าธรรมเนียมเพราะเครดิตหรือบัญชีไม่ถูกใช้งาน (dormancy fee)
 
+[pending legal review] **Minimum top-up.** The smallest amount of credit you can buy in one purchase is **[minimum top-up]**.
+
+> [รอที่ปรึกษากฎหมาย] **ยอดเติมขั้นต่ำ** จำนวนเครดิตที่น้อยที่สุดที่คุณซื้อได้ในการซื้อหนึ่งครั้งคือ **[ยอดเติมขั้นต่ำ]**
+
 A key is a licence to consume, not a thing you own. It is **non-transferable and binds to your account
 when you activate it.** Before activation a key can be given as a gift; after activation it is yours
 alone.
@@ -137,8 +141,16 @@ adds to it:
   the days that have passed since your subscription started, counted from the start time recorded on
   your Paddle receipt and in your Kolwen account, and the records we count from are available to you on
   request.
-- **Unused prepaid credits are refundable at the price you paid, in the same 14-day window.**
+- [pending legal review] **Credit you bought with money.** Within 14 days of buying it, you can ask for a refund of the part you have not used, at the price you paid for it. Credit you have already used is not refunded. After 14 days, credit you bought with money is refunded only when Kolwen closes your account or shuts the service down.
+- [pending legal review] **Promotional credit.** Credit Kolwen gives you without payment is never refunded.
+- [pending legal review] **Part of your credit below one cent.** Kolwen charges your usage exactly, request by request, so the balance of credit you bought with money can hold a fraction of a cent. A refund is paid in whole cents of the currency you bought the credit in, and the amount refunded is your unused balance of credit bought with money, rounded down to the whole cent. What is left below one cent stays in your account as ordinary credit bought with money: it is shown on your usage page, it does not expire, your next request uses it first, and Kolwen never takes it. When Kolwen closes your account or shuts the service down, the refund is rounded the same way, and a balance below one cent cannot be paid out.
+- [pending legal review] **Anything else.** What these bullets do not decide is decided by Paddle's refund policy and by the law that applies to you.
 - When Kolwen ends the contract without cause, it refunds the unused part (see "Ending the contract").
+
+> - [รอที่ปรึกษากฎหมาย] **เครดิตที่คุณซื้อด้วยเงิน** ภายใน 14 วันหลังซื้อ คุณขอคืนเงินส่วนที่ยังไม่ได้ใช้ได้ ตามราคาที่คุณจ่าย เครดิตที่ใช้ไปแล้วไม่คืน เมื่อพ้น 14 วัน เครดิตที่ซื้อด้วยเงินจะคืนเฉพาะเมื่อ Kolwen ปิดบัญชีของคุณหรือปิดบริการ
+> - [รอที่ปรึกษากฎหมาย] **เครดิตโปรโมชัน** เครดิตที่ Kolwen ให้โดยไม่ต้องจ่ายเงิน ไม่คืนไม่ว่ากรณีใด
+> - [รอที่ปรึกษากฎหมาย] **เศษเครดิตที่ต่ำกว่าหนึ่งเซนต์** Kolwen คิดการใช้งานของคุณตามจริงทีละคำขอ ยอดเครดิตที่ซื้อด้วยเงินจึงอาจมีเศษของเซนต์ การคืนเงินจ่ายเป็นเซนต์เต็มหน่วยของสกุลเงินที่คุณซื้อเครดิต และยอดที่คืนคือยอดเครดิตที่ซื้อด้วยเงินและยังไม่ได้ใช้ ปัดลงเป็นเซนต์เต็มหน่วย เศษที่ต่ำกว่าหนึ่งเซนต์คงอยู่ในบัญชีของคุณในฐานะเครดิตที่ซื้อด้วยเงินตามปกติ แสดงในหน้าการใช้งาน ไม่หมดอายุ คำขอถัดไปของคุณใช้เศษนั้นก่อน และ Kolwen ไม่เอาเศษนั้นไปเด็ดขาด เมื่อ Kolwen ปิดบัญชีของคุณหรือปิดบริการ การคืนเงินปัดแบบเดียวกัน และยอดที่ต่ำกว่าหนึ่งเซนต์จ่ายออกไม่ได้
+> - [รอที่ปรึกษากฎหมาย] **เรื่องอื่น** เรื่องที่ข้อความข้างต้นไม่ได้กำหนด ให้เป็นไปตามนโยบายคืนเงินของ Paddle และกฎหมายที่ใช้กับคุณ
 
 **GAP 6—[pending legal review]: counsel signs the wording of this clause, and confirms the
 immediate-start consent works as the basis for deducting days used.**
@@ -189,12 +201,6 @@ rejecting a changed term in "Changes to these Terms". Every other change to thes
   stay fixed for as long as that version is offered. A new version carries its own price.
 - [pending legal review] **Retiring a model version.** Kolwen retires a model version only after
   notice of at least **[M]**, and not before the date it published for that version when it launched.
-- [pending legal review] **A cost outside Kolwen's control.** If a cost Kolwen does not control makes
-  it impossible to keep a price for the periods above, Kolwen may shorten the **[N months]** hold in "A
-  price you already pay" and end the fixed price of a model version in "Model versions", and only after
-  the 30 days' notice above. It never reaches a period you have already paid for, a key you have already
-  bought or prepaid credit you have already bought: those keep the price you paid. In that case you may
-  end the subscription, and Kolwen refunds the charges taken after the effective date of the change.
 
 **GAP 11—[pending legal review]: counsel confirms that the opt-in rule where the customer's home
 law requires consent, and the refund of only the charges taken after the effective date, hold under
@@ -204,11 +210,13 @@ counted, and for **[M]**.**
 
 ## Limit of liability
 
-To the extent permitted by law, Kolwen's total liability for a claim arising from a product is limited
-to **the amount you paid for that product in the 12 months before the event that gave rise to the claim,
-or US$100, whichever is higher.** This is a ceiling on damages you prove, not an amount Kolwen pays. It
-does not apply to acts done wilfully or with gross negligence, and it takes away no right that a
-consumer has by law.
+[pending legal review] To the extent permitted by law, Kolwen's total liability for a claim arising from the service is limited to **the fees you paid to Kolwen in the 12 months before the event that gave rise to the claim.** This is a ceiling on damages you prove, not an amount Kolwen pays. It does not apply to acts done wilfully or with gross negligence, and it does not apply to injury to life, body or health caused intentionally or negligently. It takes away no right that a consumer has by law, including, where the law of the place where you live gives it, a right to a refund or a price reduction in cash when the service is not provided as agreed. How far this carve-out reaches is for counsel to fix.
+
+> [รอที่ปรึกษากฎหมาย] ในขอบเขตที่กฎหมายอนุญาต ความรับผิดรวมของ Kolwen สำหรับข้อเรียกร้องที่เกิดจากบริการ จำกัดไม่เกินค่าบริการที่คุณชำระให้ Kolwen ในช่วง 12 เดือนก่อนเหตุที่ทำให้เกิดข้อเรียกร้องนั้น นี่เป็นเพดานของความเสียหายที่คุณพิสูจน์ได้ ไม่ใช่จำนวนเงินที่ Kolwen จะจ่าย ข้อจำกัดนี้ไม่ใช้กับการกระทำที่ทำโดยจงใจหรือประมาทเลินเล่ออย่างร้ายแรง และไม่ใช้กับความเสียหายต่อชีวิต ร่างกาย หรืออนามัยที่เกิดจากการกระทำโดยจงใจหรือประมาทเลินเล่อ ข้อจำกัดนี้ไม่ลิดรอนสิทธิที่กฎหมายให้ผู้บริโภค รวมถึงสิทธิขอคืนเงินหรือลดราคาเป็นเงินสดเมื่อบริการไม่เป็นไปตามที่ตกลง ในกรณีที่กฎหมายของถิ่นที่คุณอาศัยอยู่ให้สิทธินั้น ขอบเขตของข้อยกเว้นนี้ให้ที่ปรึกษากฎหมายเป็นผู้กำหนด
+
+[pending legal review] **Indemnity for intellectual-property claims.** Kolwen gives no indemnity against a third party's intellectual-property claim about an Output, unless a named enterprise customer asks for one. Where that customer asks, Kolwen gives it in writing.
+
+> [รอที่ปรึกษากฎหมาย] **การชดใช้กรณีข้อเรียกร้องด้านทรัพย์สินทางปัญญา** Kolwen ไม่ให้การชดใช้กรณีบุคคลภายนอกเรียกร้องเกี่ยวกับทรัพย์สินทางปัญญาในเรื่อง Output เว้นแต่ลูกค้าองค์กรรายที่ระบุชื่อเป็นผู้ขอ ในกรณีที่ลูกค้ารายนั้นขอ Kolwen จะให้การชดใช้เป็นลายลักษณ์อักษร
 
 **GAP 7—[pending legal review]: Thailand's Unfair Contract Terms Act B.E. 2540 may trim a cap like this
 one in a consumer contract of adhesion. Counsel confirms the wording and how far it holds.**
