@@ -91,11 +91,10 @@ the pointer to it.
   "Nothing is retained today" is scoped to conversation content in the four documents that carried
   it, because the contact mailbox holds what a visitor sends it.
 - **Two Thai summaries said less than their English, in Kolwen's favour.** The cookie interim
-  position dropped the promise not to rely on the strictly-necessary characterisation to skip a
-  banner, and the retention sentence kept "no statute supplies the number" while dropping that a
-  period must be stated, recorded and enforced. Both Thai summaries, and the one for the retrieval
-  basis, now carry every obligation their English carries. The Thai has still not been read by a
-  native legal reviewer.
+  position's Thai dropped one of its English promises, and the retention sentence kept "no statute
+  supplies the number" while dropping that a period must be stated, recorded and enforced. Both Thai
+  summaries, and the one for the retrieval basis, now carry every obligation their English carries.
+  The Thai has still not been read by a native legal reviewer.
 - **A correction to the correction above: the fix made the English the looser half.** Fixing the cookie interim position's Thai left its English reading wider than the Thai, and it could be read back to a different clause. The English now matches the Thai's scope; the clause stays held pending counsel. The Thai is unchanged.
 - **`PRIVACY.md` cited the owner's rulings by their register id** in its draft header, in both
   languages, and in its gapped note. That published the numbering of a decision log that is not
