@@ -118,6 +118,8 @@ the pointer to it.
 
 ### Changed
 
+- **The liability, refund and price-change parts of the terms are redrafted and held pending counsel, and the credit wording follows the owner's signed refund decision, preliminary until counsel** (BB-558, BB-559, BB-568). The redrafted terms are not shown on the public pages.
+
 - **The terms draft gains one prohibited-conduct entry, pending counsel** (LWK3-081). `TERMS.md` carries "Training on Outputs" as the first entry of the list of prohibited conduct. It is marked pending legal review and held on the public pages. Its authorisation address and its response time are open (owner card BB-551).
 
 - **The Thai text of the "Training on Outputs" entry is drafted, pending counsel** (K-205). `TERMS.md` carries the Thai clause beside the English one, as a block quote marked pending legal review, so it is held on both public pages with the English. The English clause's "Silence is not authorisation" now reads "Kolwen's silence is not authorisation", to match the Thai subject; nothing else in the English moves. Its two placeholders stay open (owner card BB-551).
@@ -259,7 +261,7 @@ the pointer to it.
 - The shared blocks (a header slot, empty today; the footer of each language; the footer CSS) are written once in `scripts/lib/legal-render.mjs`, and `node scripts/legal-pages.mjs --write` puts them into all seven pages between fixed markers and updates the matching `style-src` hashes in `web/_headers`, so one edit reaches every page in one run and a footer CSS change needs no hand-typed hash. `--write` refuses a page whose marker pairs overlap, nest or stand out of order, and never edits a `style-src-elem` directive. `--check` stays the CI gate: it fails on a differing block, a marker that is missing, doubled or out of order, pairs that overlap or nest, a stale hash, or a `style-src-elem` that lacks one. The script's header is the list of record.
 - `README.md`: a CodeRabbit pull-request reviews badge under the tagline, in the organisation's standard form for this repository.
 - `PRIVACY.md`: a conditional "Worker logs" paragraph. Today the Worker runs no code of ours and logs nothing; when it does and Workers Logs is switched on (Cloudflare's default for a new Worker), Cloudflare Workers Logs will record each request, kept 3 days on the Workers plan without a monthly charge and 7 days on the paid plan until 30 November 2026; from 1 December 2026 the page names Observability pricing and no retention per plan (Cloudflare documentation, read 2026-10-17). Whether a log line holds the IP address or headers is a pending line to measure when the Worker ships.
-- `TERMS.md`: a "Price changes" section (draft, every part under the pending-legal-review marker): at least 30 days' notice by email and in the app, a change only at the first renewal on or after the later of the notice's end and the price hold's end, and never inside a paid period, a key or prepaid credit, the customer's acceptance where their home law requires it, a refund on rejection of only the charges taken after the effective date, and a price kept for an open number of months. Model versions keep their per-million-token prices for their life, and retire only on notice. An extraordinary-cost valve can shorten only the hold and a version's fixed price, never a paid period, a key or prepaid credit. The values are left open.
+- `TERMS.md`: a "Price changes" section (draft, every part under the pending-legal-review marker): at least 30 days' notice by email and in the app, a change only at the first renewal on or after the later of the notice's end and the price hold's end, and never inside a paid period, a key or prepaid credit, the customer's acceptance where their home law requires it, a refund on rejection of only the charges taken after the effective date, and a price kept for an open number of months. Model versions keep their per-million-token prices for their life, and retire only on notice. The values are left open.
 - `/changelog`: a page rendered from this file by `scripts/legal-pages.mjs`, every passage shown as written (nothing here waits for counsel, so no
   passage is held), in the site's own shell with the English and Thai chrome. `node scripts/legal-pages.mjs --check` fails in CI when the page is not
   the render of this file, so a change to the changelog without a re-render cannot merge. The page is in `web/sitemap.xml` and `web/llms.txt`, and
@@ -325,9 +327,8 @@ the pointer to it.
 - `TERMS.md` (still a draft, not linked from the site) now carries the signed commercial terms, each marked
   `[pending legal review]` where counsel decides: the age rule (18, or the local consent age if higher, a neutral
   confirmation, no identity image kept); outputs owned by the user, with "if any" and "similar outputs" wording and
-  training only on opt-in; Thai law and courts with consumer rights preserved; a liability cap of the amount paid in
-  the 12 months before the event or US$100, whichever is higher; refunds (an unredeemed key in full within 14 days,
-  days used deducted inside a subscription's first period, unused credits at the price paid); a refund of the unused
+  training only on opt-in; Thai law and courts with consumer rights preserved; refunds (an unredeemed key in full within 14 days,
+  days used deducted inside a subscription's first period); a refund of the unused
   part when Kolwen ends the contract without cause; 30 days' notice of a change by email and banner; and the key
   limits (2 per order, 4 per account per sale window or rolling 30 days, stacking to a 36-month ceiling, an unredeemed
   key expiring at 12 months, non-transferable and bound to the account on activation). The acceptable-use list and the

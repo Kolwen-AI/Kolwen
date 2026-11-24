@@ -117,7 +117,7 @@
       "key-refund": "An unredeemed key is refundable in full within 14 days of purchase, and expires 12 months after purchase. [pending legal review]",
       "key-limits": "2 keys per order, and 4 per account per sale window or per rolling 30 days.",
       "key-bind": "A key is non-transferable and binds to your account when you activate it. [pending legal review]",
-      "credits": "{#strong}Usage credits.{/strong} Prepaid units of Kolwen’s own metered service. They are used only at Kolwen and cannot be moved to anyone else or cashed out. Unused credits are refundable at the price you paid, within 14 days. [pending legal review] The owner has decided that credit bought with money does not expire and carries no dormancy fee (a fee because credit or an account is unused). This is preliminary until counsel reads the Terms."
+      "credits": "{#strong}Usage credits.{/strong} Prepaid units of Kolwen’s own metered service. They are used only at Kolwen and cannot be moved to anyone else or cashed out. [pending legal review] The owner has decided that credit bought with money does not expire and carries no dormancy fee (a fee because credit or an account is unused). The owner has also decided that, within 14 days of buying credit, you can ask for a refund of the part you have not used, at the price you paid; credit you have used and promotional credit are not refunded. After 14 days, credit is refunded only if Kolwen closes your account or shuts the service down. This is preliminary until counsel reads the Terms."
     },
     "setting": {
       "title": "How prices are set",
