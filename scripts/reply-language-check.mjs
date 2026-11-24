@@ -13,6 +13,7 @@
 //
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { reportField } from './lib/report-field.mjs';
 
 // ── language of a REPLY, by script range ─────────────────────────────────────
 // Deliberately script-based, not a model: a script range is deterministic, needs no network and
@@ -101,7 +102,12 @@ export function scanTree() {
 }
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
-if (import.meta.url.endsWith('reply-language-check.mjs')) {
+// `import.meta.url` is this module's own address, so a test that it ends in this file's name was true on every import: the command line (a scan of the git tree) ran for any importer. The shared entry
+// guard compares REAL paths and is true only for the main module. This file imports node builtins only (node/runtime.md section 1), so the guard is loaded inside a try.
+let started = false, guardError = null;
+try { started = (await import('./lib/entry-guard.mjs')).isMainModule(import.meta.url); } catch (e) { guardError = e; }
+if (guardError) { console.error('FAIL reply-language-check could not load scripts/lib/entry-guard.mjs'); process.exitCode = 1; }
+else if (started) {
   const arg = process.argv[2];
   const fail = m => { console.error(m); process.exitCode = 1; };
 
@@ -131,7 +137,7 @@ if (import.meta.url.endsWith('reply-language-check.mjs')) {
     if (!url) { fail('no KOLWEN_CHAT_ENDPOINT set and no mode given. /chat does not exist yet; use --self-test or --scan.'); }
     else {
       const fails = await runMatrix((l, p) => endpointAdapter(url, l, p));
-      if (fails.length) fail(`reply-language FAILED against ${url}:\n  - ` + fails.map(f => `${f.lang}/${f.path} answered in ${f.got}: ${f.reply}`).join('\n  - '));
+      if (fails.length) fail(`reply-language FAILED against ${url}:\n  - ` + fails.map(f => `${f.lang}/${f.path} answered in ${f.got}: ${reportField(f.reply)}`).join('\n  - '));
       else console.log(`reply-language passed against ${url} — every path answers in the language of the message`);
     }
   }

@@ -1,0 +1,189 @@
+import { MTA_STS_HOST, MTA_STS_PATH, MTA_STS_POLICY } from './mta-sts.mjs';
+// Kolwen's Worker. fetch hands every request to the ASSETS binding unchanged, with two exceptions: GET /status.json answers from the stored state (binding STATUS,
+// when it exists), and /subscribe answers 404 unless SUBSCRIBE is "on" (binding SUBSCRIBERS). The routes are WORKER_ROUTES (the policy path too); wrangler.jsonc's assets.run_worker_first
+// lists the same paths, so a browser's navigation to them reaches this function too (scripts/worker-routes.test.mjs holds the two lists equal).
+// scheduled runs every 15 minutes (triggers.crons in wrangler.jsonc): it probes the sitemap pages on kolwen.com, writes ONE state object to STATUS (96 a day
+// against Free's 1,000 writes), and mails an alert only when the result changes: all-OK to failing, and one recovery note from failing back to all-OK.
+// Rules kept here: a probe reads no response body; the state, the alert and the log lines hold only paths, status codes, timings, ok flags and the UTC time (never a body,
+// a header, an IP, an address or a secret); with ALERT_TO unset nothing is sent and the log line holds no address.
+// The change rule compares this run with the last result the owner was told about (notified), which moves only after a send succeeds; the 15-minute schedule bounds the rate. With STATUS unbound nothing is remembered, so a failing run alerts on every run.
+// shortcut: whether a cron or a secret reaches a preview deployment is not on the Cloudflare pages read for this file; the ALERT_TO secret is the guard until a preview setting is read.
+// shortcut: KV is eventually consistent; the window is not on the pages read, so /status.json can lag a run by that window.
+
+// The public pages: the English ones and their Thai twins under /th/ (ORDER 1017j). The sitemap lists the same 14 addresses (worker-monitor.test.mjs holds them equal).
+export const PATHS = ['/', '/pricing', '/terms', '/privacy', '/refund', '/changelog', '/accessibility', '/th/', '/th/pricing', '/th/terms', '/th/privacy', '/th/refund', '/th/changelog', '/th/accessibility'];
+const ORIGIN = 'https://kolwen.com';
+const TIMEOUT_MS = 10_000;
+const HTML = 'text/html';
+const STATE_KEY = 'state';
+// The site's security headers on every response the Worker builds itself: web/_headers sets them on asset responses only. The four shared values are the /* rule's
+// (scripts/worker-headers.test.mjs reads that rule and compares), and the CSP is the Worker's own: nothing to load, nothing to frame.
+const SITE_HEADERS = {
+  'content-security-policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'permissions-policy': 'accelerometer=(), autoplay=(), bluetooth=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), hid=(), idle-detection=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()',
+  'cross-origin-opener-policy': 'same-origin',
+  'cross-origin-resource-policy': 'same-origin',
+};
+// K-192: the preview host (a host ending in .previews.kolwen.com) answers noindex on every response the Worker builds itself. web/_headers reaches
+// only the static assets, so the Worker sets it here, in secured(), the one place every such response passes through. kolwen.com gets nothing added.
+export const isPreviewHost = host => String(host ?? '').toLowerCase().endsWith('.previews.kolwen.com');
+const secured = (res, host = '') => { for (const [name, value] of Object.entries(SITE_HEADERS)) res.headers.set(name, value); if (isPreviewHost(host)) res.headers.set('x-robots-tag', 'noindex'); return res; };
+
+// One probe: the path, the status, the time taken, whether the content type is text/html, and ok (200 and text/html). A timeout or a network failure is named
+// by its class only, never by its message.
+export async function probe(path, fetchImpl, origin = ORIGIN) {
+  const started = Date.now();
+  try {
+    const res = await fetchImpl(origin + path, { redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'user-agent': 'kolwen-monitor' } });
+    try { await res.body?.cancel(); } catch { /* the body is never read */ }
+    // the media type is compared before its parameters, trimmed and lowercased: RFC 9110 §8.3.1 makes it case-insensitive
+    const typeOk = ((res.headers.get('content-type') ?? '').split(';')[0] || '').trim().toLowerCase() === HTML;
+    return { path, status: res.status, ms: Date.now() - started, typeOk, ok: res.status === 200 && typeOk };
+  } catch (e) {
+    return { path, status: 0, ms: Date.now() - started, typeOk: false, ok: false, error: e?.name === 'TimeoutError' ? 'timeout' : 'network error' };
+  }
+}
+
+// The state this run leaves in STATUS: the time, the last result the owner was told about (notified), and per probe only its path, status, time and ok.
+export function buildState(results, when, notified = 'ok') {
+  return { checked: when.toISOString(), notified, probes: results.map(({ path, status, ms, ok }) => ({ path, status, ms, ok })) };
+}
+
+// What changed since the stored state: 'failing' (all OK before, a failure now), 'recovered' (a failure before, all OK now), or null. No stored state counts as all OK.
+export function transition(prev, results) {
+  const wasOk = prev ? prev.probes.every(p => p.ok) : true;
+  const nowOk = results.every(r => r.ok);
+  if (wasOk && !nowOk) return 'failing';
+  if (prev && !wasOk && nowOk) return 'recovered';
+  return null;
+}
+
+// The alert, from the probe results only. Each line names a path, what it answered and how long it took.
+export function composeAlert(results, when) {
+  const failed = results.filter(r => !r.ok);
+  const lines = failed.map(r => `${r.path}: ${r.error ?? `HTTP ${r.status}`}, ${r.ms} ms${r.typeOk ? '' : ', content type not text/html'}`);
+  return {
+    subject: `Kolwen: ${failed.length} of ${results.length} page checks failed`,
+    text: [`${failed.length} of ${results.length} page checks failed at ${when.toISOString()} (UTC).`, ...lines, '', 'The probe details above contain only the paths, the HTTP status or error, the timings and the content-type result; no response body or response header is included.'].join('\n'),
+  };
+}
+
+// The recovery note: all checks pass again. It holds the count and the UTC time, nothing else.
+export function composeRecovery(results, when) {
+  return {
+    subject: `Kolwen: all ${results.length} page checks pass again`,
+    text: `All ${results.length} page checks passed again at ${when.toISOString()} (UTC). The count and the time above are all this note holds; no response body or response header is included.`,
+  };
+}
+
+async function readState(env) {
+  if (!env.STATUS) return null;
+  let raw;
+  try { raw = await env.STATUS.get(STATE_KEY); } catch (e) { console.error(`state read failed: ${e?.name ?? 'error'}`); return null; }
+  // an absent or unparsable record is silent: no record is the first run's state, not a fault
+  try { return JSON.parse(raw) ?? null; } catch { return null; }
+}
+
+// The last result the owner was told about, in the shape transition() judges: no record, or a record from before `notified`, counts as told all OK.
+const toldState = prev => ({ probes: [{ ok: (prev?.notified ?? 'ok') !== 'failing' }] });
+
+// One run: probe every path, mail one alert when the result differs from the last one the owner was told about, and store the state once. `notified` moves only after a
+// send succeeds, so a failed send, or a failure seen while ALERT_TO is unset, is alerted by the next run that still finds it. Returns { sent, dark, results }.
+export async function monitor(env, { fetchImpl = fetch, now = new Date() } = {}) {
+  const results = await Promise.all(PATHS.map(path => probe(path, fetchImpl)));
+  // one JSON line per probe: the logs carry only these (no body, no header, no visitor request)
+  for (const r of results) console.log(JSON.stringify({ probe: r.path, status: r.status, ms: r.ms, ok: r.ok, error: r.error }));
+  const prev = await readState(env);
+  const change = transition(toldState(prev), results);
+  let notified = prev?.notified ?? 'ok', sent = false, dark = false;
+  if (change && !env.ALERT_TO) {
+    console.log('alert path dark: ALERT_TO is not set, so nothing was sent');
+    dark = true;
+  } else if (change) {
+    const { subject, text } = change === 'failing' ? composeAlert(results, now) : composeRecovery(results, now);
+    try {
+      await env.EMAIL.send({ to: env.ALERT_TO, from: env.ALERT_FROM, subject, text });
+      console.log('alert sent');
+      sent = true;
+      notified = change === 'failing' ? 'failing' : 'ok';
+    } catch (e) {
+      // a failure of the Worker itself, at error level so Workers Issues keeps it; the class only, never the message (an address can sit in it)
+      console.error(`alert send failed: ${e?.name ?? 'error'}`);
+    }
+  }
+  // one write per run, after the send, so it carries the outcome of the send
+  if (env.STATUS) {
+    try { await env.STATUS.put(STATE_KEY, JSON.stringify(buildState(results, now, notified))); } catch (e) { console.error(`state write failed: ${e?.name ?? 'error'}`); }
+  }
+  return { sent, dark, results };
+}
+
+// GET /status.json: the stored state, or a plain line when no stored check result is available yet.
+export async function statusResponse(env, host = '') {
+  const state = (await readState(env)) ?? { checked: null, message: 'No stored check result is available yet.' };
+  const body = JSON.stringify(state);
+  // The byte length of THIS body, computed here, never a constant: HEAD copies these headers and sends no body (K-173).
+  const length = String(new TextEncoder().encode(body).length);
+  // K-194: the machine-read status record is kept out of search indexes on purpose, on every host: a named exception to the production-never-noindex rail.
+  return secured(new Response(body, { headers: { 'content-type': 'application/json; charset=utf-8', 'content-length': length, 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } }), host);
+}
+
+const text = (body, status = 200, host = '') => secured(new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } }), host);
+// The shape a subscription address must have: at most 254 characters (RFC 5321's path limit), no whitespace, one "@" with a
+// non-empty local part, and a dot in the domain that is neither its first nor its last character. The length check runs
+// first, so no long input reaches a scan, and every step after it is a single linear pass.
+const MAX_EMAIL_LENGTH = 254;
+export function emailShape(email) {
+  if (email.length > MAX_EMAIL_LENGTH || /\s/.test(email)) return false;
+  const at = email.indexOf('@');
+  if (at < 1 || email.indexOf('@', at + 1) !== -1) return false;
+  return email.slice(at + 1).slice(1, -1).includes('.');
+}
+const TOKEN_SHAPE = /^[0-9a-f]{48}$/;
+
+// /subscribe, switched off by default: while SUBSCRIBE is not "on" both methods answer 404 and the store is not touched. Returns null for any other path.
+// A subscriber is stored under a random token as { email, verified: false, created }; no mail is sent in this build.
+export async function handleSubscription(request, env) {
+  const url = new URL(request.url);
+  if (url.pathname !== '/subscribe') return null;
+  const off = env.SUBSCRIBE !== 'on' || !env.SUBSCRIBERS;
+  if (off) return secured(new Response('not found', { status: 404 }), url.hostname);
+  if (request.method === 'POST') {
+    const email = String((await request.formData().catch(() => null))?.get('email') ?? '').trim();
+    if (!emailShape(email)) return text('enter an email address', 400, url.hostname);
+    const token = [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, '0')).join('');
+    await env.SUBSCRIBERS.put(token, JSON.stringify({ email, verified: false, created: new Date().toISOString() }));
+    return text('subscribed; no confirmation mail is sent in this build', 200, url.hostname);
+  }
+  if (request.method === 'DELETE') {
+    const token = url.searchParams.get('token') ?? '';
+    if (!TOKEN_SHAPE.test(token)) return text('bad token', 400, url.hostname);
+    await env.SUBSCRIBERS.delete(token);
+    return text('removed', 200, url.hostname);
+  }
+  return secured(new Response('not found', { status: 404 }), url.hostname);
+}
+
+// The paths the Worker answers itself. Every other path goes to the assets; a navigation to one of these reaches the Worker only through run_worker_first (wrangler.jsonc).
+// RFC 8461 policy for mta-sts.kolwen.com: testing mode, served on that host only (LWK-220 item 1; dark until its DNS record exists). The body is the design's, CRLF line endings.
+const mtaStsResponse = (method, host = '') => secured(new Response(method === 'HEAD' ? null : MTA_STS_POLICY, { headers: { 'content-type': 'text/plain; charset=utf-8', 'content-length': String(new TextEncoder().encode(MTA_STS_POLICY).length), 'cache-control': 'no-store' } }), host);
+export const WORKER_ROUTES = ['/status.json', '/subscribe', MTA_STS_PATH];
+
+export default {
+  fetch: async (request, env) => {
+    const { pathname, hostname } = new URL(request.url);
+    if (!WORKER_ROUTES.includes(pathname)) return env.ASSETS.fetch(request);
+    if (pathname === MTA_STS_PATH) {
+      if (hostname !== MTA_STS_HOST || (request.method !== 'GET' && request.method !== 'HEAD')) return env.ASSETS.fetch(request);
+      return mtaStsResponse(request.method, hostname);
+    }
+    // RFC 9110 §9.3.2: HEAD answers as GET does, with the same status and headers and no body (K-168).
+    if ((request.method === 'GET' || request.method === 'HEAD') && pathname === '/status.json') {
+      const res = await statusResponse(env, hostname);
+      return request.method === 'HEAD' ? secured(new Response(null, { status: res.status, headers: res.headers }), hostname) : res;
+    }
+    return (await handleSubscription(request, env)) ?? env.ASSETS.fetch(request);
+  },
+  scheduled: (_event, env, ctx) => ctx.waitUntil(monitor(env)),
+};

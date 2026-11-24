@@ -1,0 +1,751 @@
+// Tests for the font subset (web-build rule W-PERF-06): the characters the pages render are derived, every font file carries every character it must (read from the
+// file's own cmap), the cut files carry the new family name and not the reserved one, and the pages ask for no layout feature the cut dropped.
+// Node builtins only. A test that needs a changed copy of the site works on a copy in a temp folder; the real tree is never written.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, cpSync, existsSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { brotliCompressSync } from 'node:zlib';
+import { tmpdir } from 'node:os';
+import { join, dirname, relative, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { decodeEntities, decodeAttribute, textOf, stripCssComments, cssContentOf, scriptStringsOf, renderedChars } from './lib/rendered-text.mjs';
+import { woff2Cmap, woff2Names } from './lib/woff2-cmap.mjs';
+import { htmlPages } from './lib/web-files.mjs';
+
+// Many doubled-slash spellings of one font address are one file on the disk: each must give one glyph-set entry, not one entry with its own copy of the needs.
+test('many spellings of one font address give one glyph-set entry, with the needs of that one address', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'glyph-spell-'));
+  try {
+    mkdirSync(join(dir, 'fonts'));
+    const rules = Array.from({ length: 3000 }, (_, i) => "@font-face{font-family:'A';font-weight:400;src:url('/fonts/x/" + '/'.repeat(i) + "a.0123456789.woff2') format('woff2');unicode-range:U+0000-FFFF;}").join('\n');
+    writeFileSync(join(dir, 'fonts', 'fonts.css'), rules);
+    const glyph = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), 'lib', 'font-coverage.mjs')).href;
+    const code = `import { glyphSets } from ${JSON.stringify(glyph)};
+const rendered = new Map(); for (let cp = 65; cp < 75; cp++) rendered.set(cp, new Set(['index.html']));
+const m = glyphSets(process.env.WEB, rendered);
+const needs = [...m.values()].reduce((n, f) => n + f.need.size, 0);
+const empty = glyphSets(process.env.WEB, new Map()).size;
+console.log('N ' + m.size + ' ' + needs + ' ' + empty);`;
+    const r = spawnSync(process.execPath, ['--max-old-space-size=256', '--input-type=module', '-e', code], { env: { ...process.env, WEB: dir }, encoding: 'utf8', timeout: 30000, killSignal: 'SIGKILL' });
+    assert.equal(r.signal, null, 'the child was killed');
+    assert.equal(r.stdout.trim(), 'N 1 14 1', 'one address, ten rendered needs plus the four Thai shaping characters (the range covers Thai), and one entry with no rendered text: ' + (r.stderr || '').slice(0, 200));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+import { glyphSets, coverageGaps, facesOf, fileUrlsOf, asksForLayoutFeature, THAI_SHAPING, hashOf } from './lib/font-coverage.mjs';
+import { cutSet, BASELINE } from './font-subset.mjs';
+import * as fontSubset from './font-subset.mjs';
+import * as fontCoverage from './lib/font-coverage.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const WEB = join(ROOT, 'web');
+const fontFiles = () => fileUrlsOf(readFileSync(join(WEB, 'fonts/fonts.css'), 'utf8').replace(/\r\n/g, '\n'));
+const cp = s => s.codePointAt(0);
+
+test('Q-9: an attribute value decodes its character references as the attribute state does: a legacy name with no semicolon before = or a letter or digit stays as written', () => {
+  assert.equal(decodeAttribute('/a?x=1&copy=2'), '/a?x=1&copy=2', 'a query string, not the copyright sign');
+  assert.equal(decodeAttribute('&copyx'), '&copyx');
+  assert.equal(decodeAttribute('&copy 2026'), String.fromCharCode(0xa9) + ' 2026', 'a space after it: decoded');
+  assert.equal(decodeAttribute('&copy'), String.fromCharCode(0xa9), 'at the end of the value it decodes');
+  assert.equal(decodeAttribute('&copy;2'), String.fromCharCode(0xa9) + '2', 'terminated: always');
+  assert.equal(decodeAttribute('&#106;avascript&colon;&amp;'), 'javascript:&');
+  assert.equal(decodeAttribute('&amp;#106;'), '&#106;', 'one pass: a decoded ampersand starts nothing');
+  assert.equal(decodeEntities('/a?x=1&copy=2'), '/a?x=1' + String.fromCharCode(0xa9) + '=2', 'text decodes it, which is why the attribute needs its own');
+  assert.throws(() => decodeAttribute('&nosuchname;'), /unknown character reference/);
+});
+
+test('the rendered text of a page: text nodes, character references, CSS content strings and script strings, and nothing from tags, comments or attributes', () => {
+  const html = '<html lang="th"><head><title>A &amp; B</title><style>a::after{content:"\\2192 x"}b{content:attr(x)}</style></head><body title="Z"><!-- Q --><p>\u0e01&#39;&#x2014;</p><script>var s = "\\u00e9\\n"; var t = \'q\';</script></body></html>';
+  const text = textOf(html);
+  assert.ok(text.includes('A & B') && text.includes(String.fromCodePoint(0x0e01) + "'" + String.fromCodePoint(0x2014)));
+  assert.ok(!text.includes('Q') && !text.includes('Z') && !text.includes('2192') && !text.includes('var'), 'no comment, attribute, style or script text in the text nodes: ' + JSON.stringify(text));
+  assert.equal(cssContentOf(html).trim(), String.fromCodePoint(0x2192) + 'x', 'the one space after a hex escape ends it');
+  assert.equal(scriptStringsOf(html).trim(), String.fromCodePoint(0xe9) + '\n q');
+  assert.throws(() => decodeEntities('&bogus;'), /unknown character reference &bogus;/);
+});
+
+test('CSS string escapes are decoded in ONE pass: an escaped backslash is a backslash and what follows it is plain text, a hex escape ends at one space, a bad code point is U+FFFD, a backslash-newline is nothing', () => {
+  const content = css => cssContentOf(`<style>a::after{content:${css}}</style>`);
+  const BS = String.fromCharCode(92);
+  assert.equal(content('"' + BS + BS + '00ff"'), BS + '00ff', 'CSS \\\\00ff draws a backslash and 00ff, not U+00FF');
+  assert.equal(content('"' + BS + BS + BS + '00ff"'), BS + String.fromCodePoint(0xff), 'an escaped backslash, then a real hex escape');
+  assert.equal(content('"a' + BS + BS + 'b"'), 'a' + BS + 'b');
+  assert.equal(content('"' + BS + BS + ' ' + BS + '2192 x"'), BS + ' ' + String.fromCodePoint(0x2192) + 'x');
+  assert.equal(content('"' + BS + '2192"'), String.fromCodePoint(0x2192));
+  assert.equal(content('"' + BS + '22 x"'), '"x', 'an escaped quote, the one space after the hex ends it');
+  assert.equal(content('"' + BS + 'A' + BS + 'a"'), '\n\n', 'A and a are hex digits: two escapes of U+000A');
+  for (const bad of ['0', 'd800', 'dfff', 'ffffff', '110000']) assert.equal(content('"' + BS + bad + '"'), String.fromCharCode(0xfffd), bad);
+  assert.equal(content('"a' + BS + '\nb"'), 'ab', 'a backslash before a line break continues the string');
+  assert.equal(content('"' + BS + 'z' + BS + '-"'), 'z-', 'a backslash before a character that is not a hex digit is that character');
+});
+
+test('CSS content is read as the browser reads it: the property name in any case, as a whole name, outside comments (HTML and CSS) and outside a script, and a string that is broken by a raw line break draws nothing', () => {
+  const ARROW = String.fromCodePoint(0x2192), BS = String.fromCharCode(92);
+  const arrow = BS + '2192';
+  const style = css => cssContentOf(`<style>${css}</style>`);
+  // CodeRabbit and Copilot, PR 48: property names are ASCII case-insensitive
+  assert.equal(style(`a::after{CONTENT:"${arrow}"}`), ARROW);
+  assert.equal(style(`a::after{Content : '${arrow}'}`), ARROW);
+  assert.equal(style(`a::after{cOnTeNt:"${arrow}"}`), ARROW);
+  // T1: text that draws nothing is not read
+  assert.equal(cssContentOf(`<!-- <style>a::after{content:"${arrow}"}</style> -->`), '', 'a commented-out <style> block');
+  assert.equal(cssContentOf(`<!-- x --><style>a::after{content:"q"}</style><!-- <style>b::after{content:"z"}</style> -->`), 'q', 'the live block beside a commented one');
+  assert.equal(cssContentOf(`<script>var s = "<style>a::after{content:'q'}</style>";</script>`), '', 'a <style> inside a script string is script text');
+  assert.equal(style(`/* a::after{content:"${arrow}"} */ b::after{content:"q"}`), 'q', 'content: inside a CSS comment');
+  assert.equal(style(`a::after{content:"q" /* ; content:"${arrow}" */}`), 'q');
+  assert.equal(style(`/* never closed a::after{content:"${arrow}"}`), '', 'a comment that runs to the end of the stylesheet');
+  assert.equal(style('a::after{content:"/* kept */"}'), '/* kept */', 'comment marks inside a string are text');
+  for (const prefixed of ['x-content', '-webkit-content', 'mycontent', 'a_content']) assert.equal(style(`a::after{${prefixed}:"${arrow}"}`), '', prefixed + ' is not content');
+  assert.equal(style(`.content:hover{color:red} #content:focus{color:red}`), '', 'a selector with the word is not a declaration');
+  assert.equal(style('a::after{color:red;content:"q"}'), 'q', 'after a semicolon');
+  assert.equal(style('a::after{content:"a\nb"}'), '', 'a raw line break ends a string as a bad string, and the declaration is dropped');
+  assert.equal(style('a::after{content:"q"; content:\'a\nb\'}'), 'q');
+});
+
+test('an HTML comment ends where the parser ends it: <!--> and <!---> are whole empty comments and --!> closes a comment, so what follows is live in cssContentOf and in textOf', () => {
+  const ARROW = String.fromCodePoint(0x2192), arrow = String.fromCharCode(92) + '2192';
+  const live = `<style>a::after{content:"${arrow}"}</style>`;
+  for (const [what, open] of [['<!-->', '<!-->'], ['<!--->', '<!--->'], ['--!>', '<!-- x --!>'], ['-->', '<!-- x -->'], ['an empty -->', '<!---->']]) {
+    // a real comment AFTER the live part: a pattern that ends a comment only at --> runs on from the opener to it and swallows the live part (without it the opener has no end and the old pattern fails for the wrong reason)
+    assert.equal(cssContentOf(open + live + '<!-- z -->'), ARROW, 'a <style> after ' + what);
+    assert.match(textOf(open + '<p>after</p><!-- z -->'), /after/, 'text after ' + what);
+    assert.doesNotMatch(textOf(open + '<p>after</p><!-- z -->'), /z/, 'and the comment after it is still a comment');
+  }
+  assert.equal(cssContentOf(`<!-- ${live} --!>`), '', 'a <style> inside a comment that --!> closes is still skipped');
+  assert.equal(cssContentOf(`<!-- ${live} -->`), '');
+  assert.doesNotMatch(textOf('<!-- hidden --><p>shown</p>'), /hidden/);
+  assert.doesNotMatch(textOf('<!-- hidden --!><p>shown</p>'), /hidden/);
+  assert.equal(cssContentOf(`<!-- never closed ${live}`), '', 'a comment that is never closed runs to the end');
+});
+
+// WHATWG tokenizer, at the level these checks need: `<!--` opens a comment only in the data state. Inside an attribute value, a raw-text body (script, style) or an RCDATA body (textarea, title) it is plain characters.
+test('RED PROOF: a "<!--" inside an attribute value, a <textarea>, a <title> or a <script> does not hide what follows, in cssContentOf and in textOf', () => {
+  const ARROW = String.fromCodePoint(0x2192), arrow = String.fromCharCode(92) + '2192', THAI = String.fromCodePoint(0x0e01);
+  const live = `<style>a::after{content:"${arrow}"}</style>`;
+  for (const [what, before] of [
+    ['an attribute value', '<a title="<!--">x</a>'], ['a single-quoted attribute value', '<a title=\'<!--\'>x</a>'],
+    ['a textarea', '<textarea><!--</textarea>'], ['a title', '<title><!--</title>'], ['a script string', '<script>var s = "<!--";</script>'],
+    ['a style comment-like text', '<style>/* <!-- */</style>'],
+  ]) {
+    assert.equal(cssContentOf(before + live), ARROW, 'a <style> after ' + what);
+    assert.ok(textOf(before + `<p>${THAI}</p>`).includes(THAI), 'text after ' + what);
+  }
+  assert.ok(!textOf('<script>var s = "<p>' + THAI + '</p>";</script>').includes(THAI), 'markup inside a script string is not page text');
+  assert.ok(!textOf('<style>/* <p>' + THAI + '</p> */</style>').includes(THAI), 'nor inside a style');
+  assert.ok(textOf('<textarea>' + THAI + '</textarea>').includes(THAI), 'but a textarea body is text the page draws');
+  assert.ok(textOf('<textarea><!-- ' + THAI + ' --></textarea>x').includes(THAI), 'a comment-like text in a textarea is text too');
+  assert.ok(textOf('a < b ' + THAI + ' > c').includes(THAI), 'a "<" that starts no tag is text');
+});
+
+test('a font url is read the way CSS reads it, unquoted, single-quoted or double-quoted alike, so a double-quoted spelling is compared and refused like the others', () => {
+  const sheet = `@font-face { font-family: 'KW Sans Thai'; src: url("/fonts/a/b.woff2") format("woff2"), url('/fonts/a/c.woff2') format('woff2'), url(/fonts/a/d.woff2) format('woff2'); }`;
+  assert.deepEqual(facesOf(sheet)[0].urls, ['/fonts/a/b.woff2', '/fonts/a/c.woff2', '/fonts/a/d.woff2'], 'the quotes are not part of the url');
+  const doubled = '/fonts/thai//kw-sans-thai-400.7a93a32da9.woff2';
+  const managed = new Set(['/fonts/thai/kw-sans-thai-400.7a93a32da9.woff2']);
+  assert.deepEqual(fontSubset.spellingProblems(`@font-face { src: url("${doubled}") format("woff2"); }`, managed), [doubled], 'a double-quoted doubled slash is refused');
+});
+
+test('a managed font url spelled with a percent-encoded dot or slash is decoded and refused, against the canonical managed name only, as the cut builds the set', () => {
+  const sheet = u => `@font-face { src: url('${u}') format('woff2'); }`;
+  const managed = new Set(['/fonts/thai/kw-sans-thai-400.7a93a32da9.woff2']);
+  const dot = '/fonts/thai/%2e/kw-sans-thai-400.7a93a32da9.woff2';
+  const upper = '/fonts/x/%2E%2E/thai/kw-sans-thai-400.7a93a32da9.woff2';
+  const slash = '/fonts/thai%2Fkw-sans-thai-400.7a93a32da9.woff2';
+  assert.deepEqual(fontSubset.spellingProblems(sheet(dot), managed), [dot], 'a percent-encoded dot segment is refused');
+  assert.deepEqual(fontSubset.spellingProblems(sheet(upper), managed), [upper], 'the upper-case form with a parent segment is refused');
+  assert.deepEqual(fontSubset.spellingProblems(sheet(slash), managed), [slash], 'a percent-encoded slash is refused');
+  assert.deepEqual(fontSubset.spellingProblems(sheet('/fonts/thai/kw-sans-thai-400.7a93a32da9.woff2'), managed), [], 'the canonical name is not refused');
+  assert.match(fontSubset.refusalLine(dot), /write it as \/fonts\/thai\/kw-sans-thai-400\.7a93a32da9\.woff2\)/, 'the hint names the decoded canonical file');
+});
+
+test('a font re-cut keeps fonts.css in step with the file it renames: a stylesheet that names a managed font by a non-canonical spelling is refused, and nothing it names is deleted', () => {
+  const canon = '/fonts/thai/kw-sans-thai-400.7a93a32da9.woff2';
+  const next = '/fonts/thai/kw-sans-thai-400.0123456789.woff2';
+  const sheet = u => `@font-face { src: url('${u}') format('woff2'); }`;
+  const managed = new Set([canon]);
+  const doubled = '/fonts/thai//kw-sans-thai-400.7a93a32da9.woff2';
+  const dotted = '/fonts/thai/./kw-sans-thai-400.7a93a32da9.woff2';
+  assert.deepEqual(fontSubset.spellingProblems(sheet(doubled), managed), [doubled], 'a doubled slash is refused');
+  assert.deepEqual(fontSubset.spellingProblems(sheet(dotted), managed), [dotted], 'a dot segment is refused');
+  assert.deepEqual(fontSubset.spellingProblems(sheet(canon), managed), [], 'the canonical spelling is not refused');
+  assert.deepEqual(fontSubset.spellingProblems(sheet('/fonts/other//x.woff2'), managed), [], 'a font the cut does not manage is not this rule');
+  assert.equal(fontSubset.restyle(sheet(canon), [[canon, next]]), sheet(next), 'the canonical name is restyled to the new file');
+  // The file half: a refused re-cut deletes nothing, so the spelling the stylesheet holds still resolves to a file on disk.
+  const dir = mkdtempSync(join(tmpdir(), 'font-css-'));
+  try {
+    mkdirSync(join(dir, 'fonts', 'thai'), { recursive: true });
+    writeFileSync(join(dir, canon), 'uncut bytes');
+    assert.ok(fontSubset.spellingProblems(sheet(doubled), managed).length > 0, 'refused before any file is touched');
+    assert.ok(existsSync(join(dir, canon)), 'the file the cut would have renamed is kept');
+    assert.ok(existsSync(join(dir, doubled)), 'the stylesheet spelling still resolves to a file');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// A copy of the scripts and web folders, so the subsetter can run on a stylesheet this test edits without touching the real web/.
+function siteCopy() {
+  const dir = mkdtempSync(join(tmpdir(), 'font-site-'));
+  cpSync(join(ROOT, 'scripts'), join(dir, 'scripts'), { recursive: true });
+  cpSync(join(ROOT, 'web'), join(dir, 'web'), { recursive: true });
+  return dir;
+}
+// One hash for a folder's files and their names, so an unchanged folder compares equal and a changed, added or removed file does not. Each file is read from the entry the walk
+// returned, with no stat before the read (CodeQL js/file-system-race): a file that vanishes mid-walk fails the read loudly rather than hashing a stale answer.
+function treeHash(dir) {
+  const files = readdirSync(dir, { recursive: true, withFileTypes: true }).filter(e => e.isFile()).map(e => join(e.parentPath, e.name)).sort();
+  return hashOf(Buffer.from(files.map(p => relative(dir, p) + ':' + hashOf(readFileSync(p))).join('\n')));
+}
+// The subsetter child: a heap cap, and a kill timeout that sends SIGKILL, as the other children of this file are. No real source and no real python: a run that reaches the cut fails on its first file.
+function subsetChild(dir) {
+  return {
+    args: ['--max-old-space-size=256', join(dir, 'scripts/font-subset.mjs'), '--src', join(dir, 'no-such-src'), '--python', join(dir, 'no-such-python')],
+    options: { encoding: 'utf8', timeout: 120000, killSignal: 'SIGKILL', maxBuffer: 1 << 24 },
+  };
+}
+function runSubset(dir) {
+  const { args, options } = subsetChild(dir);
+  return spawnSync(process.execPath, args, options);
+}
+
+test('a refused re-cut touches nothing and says so: the subsetter on a copy whose stylesheet doubles a slash exits 1, names the refusal, attempts no file and ends with its done line', () => {
+  const dir = siteCopy();
+  try {
+    const cssPath = join(dir, 'web/fonts/fonts.css');
+    const css = readFileSync(cssPath, 'utf8');
+    const doubled = css.split("url('/fonts/thai/kw-sans-thai-400.").join("url('/fonts/thai//kw-sans-thai-400.");
+    assert.notEqual(doubled, css, 'the copy names the managed font with a doubled slash');
+    writeFileSync(cssPath, doubled);
+    const before = treeHash(join(dir, 'web/fonts'));
+    const r = runSubset(dir);
+    assert.equal(r.status, 1, 'exit 1');
+    assert.match(r.stderr, /FAIL fonts\.css names \/fonts\/thai\/\/kw-sans-thai-400\.7a93a32da9\.woff2 by a spelling/, 'the refusal names the spelling');
+    assert.deepEqual(r.stderr.split('\n').filter(l => l.startsWith('FAIL ') && !l.startsWith('FAIL fonts.css names ')), [], 'no file was attempted');
+    assert.equal(treeHash(join(dir, 'web/fonts')), before, 'web/fonts is unchanged');
+    assert.match(r.stdout, /^done: 0 cut, 1 failed$/m, 'the refusal path ends with its done line');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a font the cut does not manage is not refused: an unmanaged font spelled with a doubled slash is reported by the loop, and the managed fonts still reach the cut', () => {
+  const dir = siteCopy();
+  try {
+    const cssPath = join(dir, 'web/fonts/fonts.css');
+    writeFileSync(cssPath, readFileSync(cssPath, 'utf8') + "\n@font-face { font-family: 'Other'; src: url('/fonts/zz//unmanaged.woff2') format('woff2'); unicode-range: U+0041; }\n");
+    const r = runSubset(dir);
+    assert.doesNotMatch(r.stderr, /fonts\.css names/, 'the unmanaged spelling does not refuse the cut');
+    assert.match(r.stderr, /FAIL no source is known for \/fonts\/zz\/unmanaged\.woff2/, 'the loop reports the unmanaged font');
+    assert.match(r.stderr, /FAIL missing uncut source/, 'the managed fonts reach the cut');
+    assert.match(r.stdout, /^done: 0 cut, \d+ failed$/m, 'a run that reaches the cut ends with its done line');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('treeHash changes for a changed, added or removed file and keeps its value for an untouched tree', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'font-tree-'));
+  try {
+    mkdirSync(join(dir, 'sub'), { recursive: true });
+    writeFileSync(join(dir, 'a.txt'), 'one');
+    writeFileSync(join(dir, 'sub', 'b.txt'), 'two');
+    const h0 = treeHash(dir);
+    assert.equal(treeHash(dir), h0, 'an untouched tree keeps its hash');
+    writeFileSync(join(dir, 'a.txt'), 'changed');
+    const h1 = treeHash(dir);
+    assert.notEqual(h1, h0, 'a changed file changes it');
+    writeFileSync(join(dir, 'c.txt'), 'new');
+    assert.notEqual(treeHash(dir), h1, 'an added file changes it');
+    rmSync(join(dir, 'c.txt'));
+    assert.equal(treeHash(dir), h1, 'the tree without the added file has the value it had');
+    rmSync(join(dir, 'sub', 'b.txt'));
+    assert.notEqual(treeHash(dir), h1, 'a removed file changes it');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the subsetter child has a heap cap and is killed with SIGKILL at its timeout, as the other children of this file are', () => {
+  const { args, options } = subsetChild('/x');
+  assert.ok(args.includes('--max-old-space-size=256'), 'a heap cap comes before the script');
+  assert.equal(options.killSignal, 'SIGKILL', 'the kill signal is SIGKILL');
+  assert.equal(typeof options.timeout, 'number', 'a kill timeout is set');
+});
+
+test('a percent-encoded spelling alone is refused, the decoded file is managed, and nothing is written or deleted', () => {
+  const dir = siteCopy();
+  try {
+    const cssPath = join(dir, 'web/fonts/fonts.css');
+    const css = readFileSync(cssPath, 'utf8');
+    const encoded = css.split("url('/fonts/thai/kw-sans-thai-400.").join("url('/fonts/thai/%2e/kw-sans-thai-400.");
+    assert.notEqual(encoded, css, 'the copy names the managed font with a percent-encoded dot');
+    writeFileSync(cssPath, encoded);
+    const before = treeHash(join(dir, 'web/fonts'));
+    const r = runSubset(dir);
+    assert.equal(r.status, 1, 'exit 1');
+    assert.match(r.stderr, /FAIL fonts\.css names \/fonts\/thai\/%2e\/kw-sans-thai-400\.7a93a32da9\.woff2 by a spelling that is not canonical \(write it as \/fonts\/thai\/kw-sans-thai-400\.7a93a32da9\.woff2\)/, 'the decoded file is managed, so its spelling is refused by name');
+    assert.equal(treeHash(join(dir, 'web/fonts')), before, 'nothing is written or deleted');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// encoded-spelling class: the percent-encoded dot and slash spellings of one managed file, each resolved to that file. Each is witnessed against each caller of the one decode-then-normalize.
+const DECODED_M = '/fonts/thai/kw-sans-thai-400.7a93a32da9.woff2';
+const ENCODED = [
+  ['%2e', '/fonts/thai/%2e/kw-sans-thai-400.7a93a32da9.woff2'],
+  ['%2E', '/fonts/thai/%2E/kw-sans-thai-400.7a93a32da9.woff2'],
+  ['%2e%2e', '/fonts/x/%2e%2e/thai/kw-sans-thai-400.7a93a32da9.woff2'],
+  ['%2f', '/fonts/thai%2fkw-sans-thai-400.7a93a32da9.woff2'],
+  ['%2F', '/fonts/thai%2Fkw-sans-thai-400.7a93a32da9.woff2'],
+];
+const faceCss = url => `@font-face{font-family:'KW Sans Thai';font-weight:400;src:url('${url}') format('woff2');unicode-range:U+0E01-0E5B;}\n`;
+
+test('encoded-spelling caller glyphSets: each encoded spelling of the managed font keys the one entry, by the decoded name', () => {
+  for (const [name, spelled] of ENCODED) {
+    const dir = mkdtempSync(join(tmpdir(), 'glyph-enc-'));
+    try {
+      mkdirSync(join(dir, 'fonts'));
+      writeFileSync(join(dir, 'fonts', 'fonts.css'), faceCss(spelled));
+      assert.deepEqual([...glyphSets(dir, new Map()).keys()], [DECODED_M], `${name}: one entry, keyed by the decoded name`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
+});
+
+test('encoded-spelling caller glyphSets, the 3,000-spelling bound: encoded spellings of one font give one entry with the needs of that one address', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'glyph-enc3000-'));
+  try {
+    mkdirSync(join(dir, 'fonts'));
+    const rules = Array.from({ length: 3000 }, (_, i) => "@font-face{font-family:'A';font-weight:400;src:url('/fonts/x/" + (i % 2 ? '%2e/' : '%2E/').repeat(i) + "a.0123456789.woff2') format('woff2');unicode-range:U+0000-FFFF;}").join('\n');
+    writeFileSync(join(dir, 'fonts', 'fonts.css'), rules);
+    const glyph = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), 'lib', 'font-coverage.mjs')).href;
+    const code = `import { glyphSets } from ${JSON.stringify(glyph)};
+const rendered = new Map(); for (let cp = 65; cp < 75; cp++) rendered.set(cp, new Set(['index.html']));
+const m = glyphSets(process.env.WEB, rendered);
+const needs = [...m.values()].reduce((n, f) => n + f.need.size, 0);
+const empty = glyphSets(process.env.WEB, new Map()).size;
+console.log('N ' + m.size + ' ' + needs + ' ' + empty);`;
+    const r = spawnSync(process.execPath, ['--max-old-space-size=256', '--input-type=module', '-e', code], { env: { ...process.env, WEB: dir }, encoding: 'utf8', timeout: 30000, killSignal: 'SIGKILL' });
+    assert.equal(r.signal, null, 'the child was killed');
+    assert.equal(r.stdout.trim(), 'N 1 14 1', 'one address for every encoded spelling, with the same fourteen needs: ' + (r.stderr || '').slice(0, 200));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('encoded-spelling caller fileUrlsOf (the test callers font-versions and font-coverage read through it): each encoded spelling names the one file by its decoded name', () => {
+  for (const [name, spelled] of ENCODED) {
+    const css = faceCss(spelled) + faceCss(DECODED_M);
+    assert.deepEqual(fontCoverage.fileUrlsOf(css), [DECODED_M], `${name}: one file, by its decoded name`);
+  }
+});
+
+test('encoded-spelling caller spellingProblems: each encoded spelling of the managed font is refused, against the canonical managed name only', () => {
+  for (const [name, spelled] of ENCODED) {
+    assert.deepEqual(fontSubset.spellingProblems(faceCss(spelled), new Set([DECODED_M])), [spelled], `${name}: refused`);
+  }
+});
+
+test('encoded-spelling caller refusalLine: each encoded spelling is refused with the decoded file in its hint', () => {
+  for (const [name, spelled] of ENCODED) {
+    assert.ok(fontSubset.refusalLine(spelled).endsWith(`(write it as ${DECODED_M}); nothing was cut, written or deleted`), `${name}: the hint names the decoded file`);
+  }
+});
+
+test('encoded-spelling caller main (the cut): an encoded spelling alone is refused before any file is attempted, and nothing is written or deleted', () => {
+  const dir = siteCopy();
+  try {
+    const cssPath = join(dir, 'web/fonts/fonts.css');
+    for (const [name, spelled] of ENCODED) {
+      writeFileSync(cssPath, faceCss(spelled));
+      const before = treeHash(join(dir, 'web/fonts'));
+      const r = runSubset(dir);
+      assert.equal(r.status, 1, `${name}: exit 1`);
+      assert.ok(r.stderr.includes(`FAIL fonts.css names ${spelled} by a spelling that is not canonical`), `${name}: refused`);
+      assert.ok(!r.stderr.includes('FAIL no source is known') && !r.stderr.includes('FAIL missing uncut source'), `${name}: no file attempted`);
+      assert.equal(treeHash(join(dir, 'web/fonts')), before, `${name}: nothing written or deleted`);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the derived set: the pages render these characters, the Thai block among them, and every one is a code point at or above U+0020', () => {
+  const seen = renderedChars(WEB);
+  assert.ok(seen.size > 100 && seen.size < 400, 'rendered code points: ' + seen.size);
+  assert.ok(seen.has(0x20) && seen.has(cp('K')) && seen.has(0x0e01), 'space, a Latin letter and a Thai letter');
+  assert.ok([...seen.keys()].every(c => c >= 0x20));
+  for (const pages of seen.values()) assert.ok([...pages].every(p => /^web\/(?:[a-z0-9-]+\/)*[a-z0-9-]+\.html$/.test(p)));
+});
+
+const ch = String.fromCodePoint;
+
+// var(): resolved one level. The strings of a custom property the style blocks define as plain string literals are read as if written in the content value.
+test('RED PROOF: content through var() is derived one level: a custom property defined as strings in the style blocks, in the same or another block, and a fallback string', () => {
+  const css = (...blocks) => cssContentOf(blocks.map(b => `<style>${b}</style>`).join(''));
+  const set = (...blocks) => css(...blocks).split(' ').filter(Boolean).sort().join(' '); // only the SET of strings matters to the font coverage, not their order
+  const BS = String.fromCharCode(92);
+  assert.equal(css(':root{--arrow:"' + BS + '2192"} a::after{content:var(--arrow)}'), ch(0x2192), 'the same block');
+  assert.equal(css(':root{--arrow:"' + BS + '2192"}', 'a::after{content:var(--arrow)}'), ch(0x2192), 'another block');
+  assert.equal(css(':root{--q:\'x\' \'y\'} a::after{content:var(--q)}'), 'x y', 'a value of several strings');
+  assert.equal(set('a::after{content:"a" var(--b) "c"} :root{--b:"b"}'), 'a b c', 'literals of the value and the resolved ones together');
+  assert.equal(css('a::after{content:var(--nope, "' + BS + '2192")}'), ch(0x2192), 'a fallback string of an undefined property');
+  assert.equal(set(':root{--arrow:"' + BS + '2192"} a::after{content:var(--arrow, "z")}'), 'z ' + ch(0x2192), 'the fallback is read too (an over-approximation)');
+  assert.equal(css('a::after{content:var(--nope)}'), '', 'an undefined property with no fallback draws nothing');
+  for (const notStrings of ['calc(1px + 2px)', '12px', 'var(--other)', '"a" 12px', 'attr(x)']) assert.equal(css(`:root{--x:${notStrings}; --other:"o"} a::after{content:var(--x)}`), '', 'not followed: ' + notStrings);
+  assert.equal(css(':root{--arrow:"' + BS + '2192"} a{x-content:var(--arrow)} .content{y:var(--arrow)}'), '', 'only a content declaration reads var()');
+  assert.equal(css('/* :root{--arrow:"x"} */ a::after{content:var(--arrow)}'), '', 'a definition inside a comment is no definition');
+  assert.equal(cssContentOf('<script>var s = "<style>:root{--a:\'x\'} b::after{content:var(--a)}</style>";</script>'), '', 'a <style> inside a script string is no style');
+});
+
+// Every definition of a custom property counts: the cascade is not modelled, so a property defined per theme, per language or per direction keeps the strings of ALL its definitions (a font cut errs only by keeping too much).
+test('RED PROOF: a custom property defined twice keeps the strings of every definition, in one block or across blocks, whichever selector holds it', () => {
+  const css = (...blocks) => cssContentOf(blocks.map(b => `<style>${b}</style>`).join(''));
+  const set = (...blocks) => css(...blocks).split(' ').filter(Boolean).sort().join(' ');
+  assert.equal(set(':root{--a:"' + ch(0x2192) + '"} .rtl{--a:"' + ch(0x2190) + '"} p::after{content:var(--a)}'), ch(0x2190) + ' ' + ch(0x2192), 'two selectors, one block');
+  assert.equal(set(':root{--a:"x"}', '.rtl{--a:"y"}', 'p::after{content:var(--a)}'), 'x y', 'three blocks');
+  assert.equal(set(':root{--a:"x"} .b{--a:"y"} .c{--a:"z"} p::after{content:var(--a)}'), 'x y z', 'three definitions');
+  assert.equal(set(':root{--a:"x"} .b{--a:12px} p::after{content:var(--a)}'), 'x', 'a later non-string definition does not take the earlier strings away');
+  assert.equal(set(':root{--a:"x"} .b{--a:12px} .c{--a:"y"} p::after{content:var(--a)}'), 'x y', 'a non-string definition between two string ones');
+});
+
+// Forms of a valid custom property that a browser resolves: `!important` is removed from the value, the function name `var(` is ASCII case-insensitive, and a name may hold a non-ASCII character or a CSS escape (custom property names are case-sensitive).
+test('RED PROOF: var() resolves a definition with !important, a function name in any case, and a custom property name with a non-ASCII character or an escape', () => {
+  const css = b => cssContentOf(`<style>${b}</style>`);
+  const BS = String.fromCharCode(92);
+  assert.equal(css(':root{--a:"' + ch(0x2192) + '" !important} p::after{content:var(--a)}'), ch(0x2192), '!important');
+  assert.equal(css(':root{--a:"x"!IMPORTANT} p::after{content:var(--a)}'), 'x', '!IMPORTANT without a space');
+  assert.equal(css(':root{--a:"x" ! important ;} p::after{content:var(--a)}'), 'x', 'spaces inside !important');
+  assert.equal(css(':root{--a:"x" !important 12px} p::after{content:var(--a)}'), '', '!important in the middle of a value is not a pure string value');
+  assert.equal(css(':root{--a:"' + ch(0x2192) + '"} p::after{content:VAR(--a)}'), ch(0x2192), 'VAR(');
+  assert.equal(css(':root{--a:"x"} p::after{content:Var( --a )}'), 'x', 'Var( with spaces');
+  const name = '--' + ch(0x77e2);
+  assert.equal(css(':root{' + name + ':"' + ch(0x2192) + '"} p::after{content:var(' + name + ')}'), ch(0x2192), 'a non-ASCII name');
+  assert.equal(css(':root{--a' + BS + '62:"x"} p::after{content:var(--ab)}'), 'x', 'an escaped name in the definition');
+  assert.equal(css(':root{--ab:"x"} p::after{content:var(--a' + BS + '62 )}'), 'x', 'an escaped name in the use, its hex escape ended by a space');
+  assert.equal(css(':root{--a' + BS + '62:"x"} p::after{content:var(--a' + BS + '62)}'), 'x', 'the same escaped name on both sides');
+  assert.equal(css(':root{--a:"x"} p::after{content:var(--A)}'), '', 'custom property names are case-sensitive');
+});
+
+// Behaviours of the custom property reader that no other test pins: each of these goes wrong silently (a character the page draws drops out of the derived set, or one it does not draw is added).
+test('RED PROOF: !important is removed only at the end of a value, two different properties are both read, a hex escape takes its ending space, an astral name resolves, and a seventh hex digit is a name character', () => {
+  const css = b => cssContentOf(`<style>${b}</style>`);
+  const set = b => css(b).split(' ').filter(Boolean).sort().join(' ');
+  const BS = String.fromCharCode(92);
+  assert.equal(css(':root{--a:"x" !important "y"} p::after{content:var(--a)}'), '', '!important between two strings is no end of a value: nothing is read');
+  assert.equal(set(':root{--a:"x";--b:"y"} p::after{content:var(--a) var(--b)}'), 'x y', 'two properties in one content value');
+  assert.equal(set(':root{--a:"x";--b:"y"} p::after{content:var(--a)} q::after{content:var(--b)}'), 'x y', 'two properties in two content declarations');
+  assert.equal(css(':root{--a' + BS + '62 c:"x"} p::after{content:var(--abc)}'), 'x', 'the ending space of a hex escape belongs to the escape: --a\\62 c is --abc');
+  const emoji = '--' + String.fromCodePoint(0x1f600);
+  assert.equal(css(':root{' + emoji + ':"x"} p::after{content:var(' + emoji + ')}'), 'x', 'an astral name');
+  assert.equal(css(':root{--' + BS + '000061' + '1:"x"} p::after{content:var(--a1)}'), 'x', 'six hex digits are the escape and a seventh is a name character: --\\0000611 is --a1');
+  assert.equal(set(':root{--a' + BS + '62:"x"} p::after{content:var(--a' + BS + '62,"y")}'), 'x y', 'a fallback after an escaped name');
+  assert.equal(css(':root{--a' + BS + String.fromCharCode(10) + 'b:"x"} p::after{content:var(--a)}'), '', 'a backslash and a line break is no escape: it ends the name');
+  assert.equal(css(':root{--a' + BS + String.fromCharCode(10) + 'b:"x"} p::after{content:var(--ab)}'), '', 'and the rest of the line is no part of any name');
+  assert.equal(css('p::after{content:"x content:' + "'y'" + '"}'), "x content:'y'", 'a content: inside the string of a content value is text, read once with the string');
+});
+
+// CSS comments are removed outside strings; a string that never closes is a bad string, which ends at its line break (CSS Syntax 3), so a `/*` inside it is text and one after the line break is a comment.
+test('RED PROOF: stripCssComments keeps strings whole, removes comments outside them, and ends a bad string at its line break', () => {
+  const BS = String.fromCharCode(92);
+  const LF = String.fromCharCode(10);
+  const Q = String.fromCharCode(34);
+  assert.equal(stripCssComments('a{content:' + Q + '/* x */' + Q + '}'), 'a{content:' + Q + '/* x */' + Q + '}', 'a comment inside a string is text');
+  assert.equal(stripCssComments('/* c */a'), ' a');
+  assert.equal(stripCssComments('a/* never closed'), 'a ', 'a comment that never closes runs to the end');
+  assert.equal(stripCssComments('a' + Q + 'b' + BS + Q + '/* c */' + Q + 'd/* e */f'), 'a' + Q + 'b' + BS + Q + '/* c */' + Q + 'd f', 'an escaped quote does not end the string');
+  assert.equal(stripCssComments("'a" + Q + "/*'/* b */c"), "'a" + Q + "/*' c", 'the other quote inside a string');
+  assert.equal(stripCssComments(Q + 'ab /* not a comment' + LF + 'b/* c */d'), Q + 'ab /* not a comment' + LF + 'b d', 'a bad string ends at its line break: what is inside it is text, what follows is read again');
+  assert.equal(stripCssComments('x' + Q + BS + LF + 'y /* c */' + Q + 'z'), 'x' + Q + BS + LF + 'y /* c */' + Q + 'z', 'a backslash before a line break continues the string');
+  assert.equal(stripCssComments(Q + 'never closed /* c */'), Q + 'never closed /* c */', 'a string cut off by the end of the text keeps what is inside it');
+});
+
+// The reader is linear: no input makes it super-linear. Each adversarial style block is built and read in a CHILD (heap cap, kill timeout, its own HOME and TEMP), so a reader that hangs fails this test and not the run.
+// Before the fix a name of n hex escapes with no colon took 3.4 s at n = 24 and never finished at n = 50,000 (an escape could be read whole or as a shorter escape and a name character: 2^n ways), and n repetitions of
+// an escaped space and `--a` took 5.7 s at n = 20,000 and were killed at n = 40,000 (a name that failed was tried again from every `--` inside it: n^2), and a string of n escaped quotes that never closes took 3.2 s at
+// n = 40,000 in the comment stripper (a string was tried again from every escaped quote inside it: n^2).
+// (Those three figures were recorded while #51 was written, against a reader that never reached main; they cannot be re-run from main.)
+// The test asserts NO time, only that the current reader finishes inside the kill timeout and returns the known length: a wall-clock figure on a loaded runner is flaky, a kill timeout is not. The sizes are
+// the recorded regressions scaled up (a quadratic input at n = 160,000 or 80,000 is 16 or 4 times the work of the sizes above), and the current reader takes about 0.1 to 0.3 s on each (measured 2026-10-22). What was
+// MEASURED against a reader from main: the reader before #51 (9aa8ff2~1, which had no custom property reading) is killed at 10 s on the escaped-quote string alone and finishes the other ten inputs in under 0.4 s,
+// so those ten are regression guards sized from the recorded figures, not inputs proven to hang a reader of main. The test proves completion and the result, not a speed.
+const CHILD_HOME = mkdtempSync(join(tmpdir(), 'fc-linear-'));
+test.after(() => rmSync(CHILD_HOME, { recursive: true, force: true }));
+const LINEAR_KILL_MS = 10000;
+const CHILD_CODE = `
+import { cssContentOf } from ${JSON.stringify(pathToFileURL(join(ROOT, 'scripts/lib/rendered-text.mjs')).href)};
+const BS = String.fromCharCode(92);
+const [kind, n] = JSON.parse(process.argv[1]);
+const GEN = {
+  'escapes, no colon': () => '<style>:root{--' + (BS + '61').repeat(n) + '}</style>',
+  'escapes inside var( --...)': () => '<style>p::after{content:var( --' + (BS + '61').repeat(n) + ')}</style>',
+  'escaped-space starts': () => '<style>:root{' + ('--a' + BS + ' ').repeat(n) + '}</style>',
+  'one long hex run': () => '<style>:root{--' + BS + 'a'.repeat(n) + '}</style>',
+  'many names, no colon': () => '<style>:root{' + '--a '.repeat(n) + '}</style>',
+  'many definitions': () => '<style>:root{' + '--a:"x";'.repeat(n) + '} p::after{content:var(--a)}</style>',
+  'unterminated strings': () => '<style>:root{' + ('--a:"x' + String.fromCharCode(10)).repeat(n) + '}</style>',
+  'var( and spaces': () => '<style>p::after{content:var(' + ' '.repeat(n) + '}</style>',
+  'a string of escaped quotes that never closes': () => '<style>:root{--a:' + String.fromCharCode(34) + (BS + String.fromCharCode(34)).repeat(n) + '}</style>',
+  'many content declarations': () => '<style>' + ('p::after{content:' + String.fromCharCode(34) + 'x' + String.fromCharCode(34) + '}').repeat(n) + '</style>',
+  'many var( uses': () => '<style>:root{--a:"x"} p::after{content:' + 'var( --a) '.repeat(n) + '}</style>',
+};
+const html = GEN[kind]();
+console.log(JSON.stringify({ len: cssContentOf(html).length }));
+`;
+const readInChild = (kind, n) => {
+  const env = { ...process.env, HOME: CHILD_HOME, USERPROFILE: CHILD_HOME, TEMP: CHILD_HOME, TMP: CHILD_HOME, TMPDIR: CHILD_HOME };
+  const r = spawnSync(process.execPath, ['--max-old-space-size=256', '--input-type=module', '-e', CHILD_CODE, JSON.stringify([kind, n])], { encoding: 'utf8', timeout: LINEAR_KILL_MS, env });
+  if (r.error) return { killed: true, why: `${kind} (n = ${n}) did not finish in ${LINEAR_KILL_MS} ms: ${r.error.code}` };
+  if (r.status !== 0) return { killed: true, why: `${kind} (n = ${n}) exited ${r.status}: ${r.stderr.slice(0, 200)}` };
+  return { killed: false, ...JSON.parse(r.stdout.trim().split('\n').pop()) };
+};
+test('RED PROOF: no adversarial style block makes the custom property reader slower than linear: hex escapes with no colon, repeated escaped spaces and names, and the other shapes that fail late', () => {
+  // the length of the content text each input yields, known by reading the inputs: a custom property with no value or no colon gives none, one definition-and-use gives the one `x`, and n declarations
+  // `content:"x"` give n x's joined by n - 1 spaces
+  const inputs = [['escapes, no colon', 50000, 0], ['escapes inside var( --...)', 50000, 0], ['escaped-space starts', 80000, 0], ['one long hex run', 50000, 0], ['many names, no colon', 50000, 0],
+    ['many definitions', 50000, 1], ['unterminated strings', 20000, 0], ['var( and spaces', 50000, 0], ['a string of escaped quotes that never closes', 160000, 0], ['many content declarations', 20000, 39999], ['many var( uses', 20000, 1]];
+  const failures = [];
+  for (const [kind, n, len] of inputs) {
+    const r = readInChild(kind, n);
+    if (r.killed) failures.push(r.why);
+    else if (r.len !== len) failures.push(`${kind} (n = ${n}) gave a content text of length ${r.len}, not ${len}`);
+  }
+  assert.deepEqual(failures, []);
+});
+
+// The noscript decision (the font coverage): what a visitor without script is shown must stay covered, so renderedChars reads <noscript> as markup (scripting off) while a visitor with script sees none of it.
+test('RED PROOF: text and content inside <noscript> are derived for the font coverage (a visitor without script draws them), though a visitor with script (the default view) draws none of it', () => {
+  const html = '<p>ok</p><noscript><p>' + ch(0x2030) + '</p><style>b::after{content:"' + ch(0x2122) + '"}</style></noscript>';
+  assert.ok(!textOf(html).includes(ch(0x2030)), 'scripting on: no text from a noscript');
+  assert.ok(textOf(html, { scripting: false }).includes(ch(0x2030)), 'scripting off: its text');
+  assert.equal(cssContentOf(html), '', 'scripting on: its style is not live');
+  assert.equal(cssContentOf(html, { scripting: false }), ch(0x2122), 'scripting off: its style is live');
+  const dir = webCopy(web => {
+    const f = join(web, 'index.html');
+    writeFileSync(f, readFileSync(f, 'utf8').replace('</body>', '<noscript><p>' + ch(0x2030) + '</p></noscript></body>'));
+  });
+  try {
+    assert.ok(renderedChars(join(dir, 'web')).get(0x2030)?.has('web/index.html'), 'the font set keeps a character only a no-script visitor sees');
+    assert.ok(coverageGaps(join(dir, 'web')).some(g => g.startsWith('U+2030 ') && g.includes('web/index.html')), 'and the coverage check judges it');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('character references are decoded as a browser decodes them: a numeric one without its semicolon too, a legacy named one without it (longest name first), and a reference once only', () => {
+  assert.equal(decodeEntities('&#255'), ch(0xff));
+  assert.equal(decodeEntities('&#xFF'), ch(0xff));
+  assert.equal(decodeEntities('&#XfF!'), ch(0xff) + '!');
+  assert.equal(decodeEntities('&#8240 x'), ch(0x2030) + ' x', 'the digits end at the first non-digit');
+  assert.equal(decodeEntities('&copy 2026'), ch(0xa9) + ' 2026');
+  assert.equal(decodeEntities('&copy;'), ch(0xa9));
+  assert.equal(decodeEntities('&notice'), ch(0xac) + 'ice', 'a legacy name is decoded inside a longer run of letters, as a browser does in text');
+  assert.equal(decodeEntities('&notin'), ch(0xac) + 'in', 'the longest legacy prefix wins, the rest stays');
+  assert.equal(decodeEntities('&notin;'), ch(0x2209), 'a terminated name is the whole name, not its legacy prefix');
+  assert.throws(() => decodeEntities('&notit;'), /unknown character reference &notit;/);
+  assert.equal(decodeEntities('&amp'), '&');
+  assert.equal(decodeEntities('&ampx'), '&x');
+  assert.equal(decodeEntities('R&D and AT&T and &#x and &# and &'), 'R&D and AT&T and &#x and &# and &', 'an ampersand that starts no reference is plain text');
+  assert.equal(decodeEntities('&#38;copy; &amp;#65;'), '&copy; &#65;', 'a decoded ampersand never starts a second decoding');
+  assert.throws(() => decodeEntities('&bogus;'), /unknown character reference &bogus;/);
+});
+
+// The WHATWG named character reference table, generated by `python -I -c "..."` over html.entities.html5 into scripts/lib/html-entities.json (the command is in rendered-text.mjs).
+test('the named references are the whole WHATWG table: names a page may use render as the browser draws them, including two code points, and the table file is what the generator wrote', () => {
+  assert.equal(decodeEntities('&mdash;'), ch(0x2014));
+  assert.equal(decodeEntities('&hellip; &rarr; &Aacute; &eacute;'), ch(0x2026) + ' ' + ch(0x2192) + ' ' + ch(0xc1) + ' ' + ch(0xe9));
+  assert.equal(decodeEntities('&nbsp;'), ch(0xa0));
+  assert.equal(decodeEntities('&NotEqual;'), ch(0x2260), 'NotEqual is one character, U+2260');
+  assert.equal(decodeEntities('&NotEqualTilde;'), ch(0x2242, 0x338), 'a reference that stands for two code points: U+2242 and the combining long solidus U+0338');
+  assert.equal(decodeEntities('&fjlig;'), 'fj');
+  assert.equal(decodeEntities('&apos;'), "'");
+  assert.equal(decodeEntities('&apos'), '&apos', 'apos has no semicolon-less form');
+  const table = JSON.parse(readFileSync(join(ROOT, 'scripts/lib/html-entities.json'), 'utf8'));
+  const names = Object.keys(table.named);
+  assert.ok(names.length > 2100 && table.legacy.length === 106, `the whole table: ${names.length} names, ${table.legacy.length} legacy`);
+  assert.ok(table.legacy.every(n => n in table.named), 'every legacy name is also a terminated name');
+  assert.ok(names.every(n => n.length >= 2), 'no reference is one character long');
+  for (const n of ['AMP', 'GT', 'amp', 'copy', 'eacute']) assert.ok(table.legacy.includes(n), n + ' is legacy');
+  for (const n of ['mdash', 'notin', 'apos']) assert.ok(!table.legacy.includes(n), n + ' needs its semicolon');
+  assert.ok(names.every(n => decodeEntities('&' + n + ';') === table.named[n]), 'every name decodes to its table value');
+  assert.ok(table.legacy.every(n => decodeEntities('&' + n) === table.named[n]), 'every legacy name decodes without its semicolon');
+});
+
+test('an ampersand that starts no reference is plain text (the WHATWG tokenizer: an ambiguous ampersand), and a terminated name no reference has throws', () => {
+  assert.equal(decodeEntities('a&b;c'), 'a&b;c', 'one letter is too short to be any reference');
+  assert.equal(decodeEntities('R&D; AT&T; &9;'), 'R&D; AT&T; &9;');
+  assert.equal(decodeEntities('x &zzzz y'), 'x &zzzz y', 'no semicolon, no legacy prefix');
+  assert.throws(() => decodeEntities('&bogus;'), /unknown character reference &bogus;/);
+  assert.throws(() => decodeEntities('a &xyz; b'), /unknown character reference &xyz;/);
+});
+
+test('numeric references follow the WHATWG replacement table: 0x80 to 0x9F draw the windows-1252 character, 0, a surrogate and a value above U+10FFFF become U+FFFD, decimal and hex, with and without the semicolon', () => {
+  const same = (src, expected, what) => assert.equal(decodeEntities(src), expected, what || src);
+  for (const [n, to] of [[0x80, 0x20ac], [0x82, 0x201a], [0x89, 0x2030], [0x8a, 0x160], [0x91, 0x2018], [0x96, 0x2013], [0x99, 0x2122], [0x9f, 0x178]]) {
+    same(`&#${n};`, ch(to)); same(`&#${n}`, ch(to)); same(`&#x${n.toString(16)};`, ch(to)); same(`&#x${n.toString(16)}`, ch(to)); same(`&#X${n.toString(16).toUpperCase()} x`, ch(to) + ' x');
+  }
+  for (const n of [0x81, 0x8d, 0x8f, 0x90, 0x9d]) same(`&#${n};`, ch(n), 'U+' + n.toString(16) + ' has no replacement and stays itself');
+  same('&#127;', ch(0x7f)); same('&#160;', ch(0xa0)); same('&#255;', ch(0xff)); same('&#x1F600;', ch(0x1f600));
+  for (const bad of ['&#0;', '&#0', '&#x0;', '&#xD800;', '&#xDFFF', '&#55296;', '&#1114112;', '&#x110000', '&#99999999999999999999999;', '&#xFFFFFFFFFFFFFFFFFFFFFFFF;']) same(bad, ch(0xfffd));
+  same('&#x10FFFF;', ch(0x10ffff), 'the last valid code point');
+});
+
+test('RED PROOF: a numeric character reference without its semicolon, rendered by a page, is judged like the character it draws', () => {
+  const dir = webCopy(web => {
+    const f = join(web, 'terms.html');
+    writeFileSync(f, readFileSync(f, 'utf8').replace('</body>', '<p>&#8240 x</p></body>'));
+  });
+  try {
+    const gaps = coverageGaps(join(dir, 'web'));
+    assert.ok(gaps.some(g => g.startsWith('U+2030 ') && g.includes('web/terms.html')), gaps.join(' | '));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('RED PROOF: a page that writes a C1 numeric reference and a named reference is judged by the characters a browser draws (the per mille sign and the em dash), and does not stop the check', () => {
+  const dir = webCopy(web => {
+    const f = join(web, 'refund.html');
+    writeFileSync(f, readFileSync(f, 'utf8').replace('</body>', '<p>&#137; &#x89 &mdash; &hellip;</p></body>'));
+  });
+  try {
+    const seen = renderedChars(join(dir, 'web'));
+    for (const c of [0x2030, 0x2014, 0x2026]) assert.ok(seen.get(c).has('web/refund.html'), 'U+' + c.toString(16));
+    assert.ok(coverageGaps(join(dir, 'web')).some(g => g.startsWith('U+2030 ') && g.includes('web/refund.html')), 'the per mille sign is not in the cut');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('RED PROOF: a page in a subfolder of web/ is read too, and a character only it renders that the cut lacks fails the check naming that page', () => {
+  const dir = webCopy(web => {
+    // web/th already exists in the copy (the real Thai pages), so the folder is made only if missing (ORDER 1017j)
+    mkdirSync(join(web, 'th'), { recursive: true });
+    writeFileSync(join(web, 'th', 'index.html'), '<!doctype html><html lang="th"><head><title>x</title></head><body><p>' + ch(0x2030) + '</p></body></html>');
+  });
+  try {
+    const gaps = coverageGaps(join(dir, 'web'));
+    assert.ok(gaps.some(g => g.startsWith('U+2030 ') && g.includes('rendered by web/th/index.html')), gaps.join(' | '));
+    assert.ok(renderedChars(join(dir, 'web')).get(0x2030).has('web/th/index.html'));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// A one-table WOFF2 file holding a cmap with one format-12 subtable (Windows, Unicode full repertoire), built by hand so a test can set the start glyph of a group, which the real fonts never put at 0.
+const base128 = n => { const out = [n & 0x7f]; for (n = Math.floor(n / 128); n > 0; n = Math.floor(n / 128)) out.unshift((n & 0x7f) | 0x80); return Buffer.from(out); };
+function cmap12Font(groups) {
+  const sub = Buffer.alloc(16 + groups.length * 12);
+  sub.writeUInt16BE(12, 0); sub.writeUInt32BE(sub.length, 4); sub.writeUInt32BE(groups.length, 12);
+  groups.forEach(([b, e, g], i) => { sub.writeUInt32BE(b, 16 + i * 12); sub.writeUInt32BE(e, 20 + i * 12); sub.writeUInt32BE(g, 24 + i * 12); });
+  const table = Buffer.concat([Buffer.from([0, 0, 0, 1, 0, 3, 0, 10, 0, 0, 0, 12]), sub]);
+  const body = brotliCompressSync(table);
+  const head = Buffer.alloc(48);
+  head.write('wOF2', 0, 'latin1'); head.writeUInt16BE(1, 12); head.writeUInt32BE(body.length, 20);
+  return Buffer.concat([head, Buffer.from([0]), base128(table.length), body]);
+}
+const mapped = (...groups) => [...woff2Cmap(cmap12Font(groups))].sort((a, b) => a - b);
+
+test('cmap format 12: a group maps each character to its start glyph plus its offset in the group, so a start glyph of 0 leaves only the first character on .notdef (OpenType cmap, format 12)', () => {
+  assert.deepEqual(mapped([0x41, 0x42, 5]), [0x41, 0x42], 'control: a group at glyph 5 maps both characters');
+  assert.deepEqual(mapped([0x4b, 0x4c, 0]), [0x4c], 'K lands on glyph 0, L on glyph 1');
+  assert.deepEqual(mapped([0, 1, 0]), [1], 'U+0000 lands on glyph 0, U+0001 on glyph 1');
+  assert.deepEqual(mapped([0x4b, 0x4b, 0], [0x50, 0x52, 7]), [0x50, 0x51, 0x52], 'a group that is all .notdef adds nothing');
+});
+
+test('the WOFF2 reader: a font file names glyphs for the characters it carries and for no other, and a file that is not WOFF2 is refused', () => {
+  const thai = fontFiles().find(u => u.includes('/thai/'));
+  const map = woff2Cmap(readFileSync(join(WEB, thai)));
+  assert.ok(map.has(0x0e01) && map.has(cp('K')) && map.has(0x20), 'a Thai letter, a Latin letter, space');
+  assert.ok(!map.has(0x00ff) && !map.has(0x0416), 'neither y-diaeresis nor a Cyrillic letter is in the cut');
+  assert.throws(() => woff2Cmap(Buffer.from('not a font at all, not a font at all, not a font at all, ok')), /not a WOFF2 file/);
+});
+
+test('every font file carries every character the pages render inside its unicode-range, and the Thai shaping set when it serves Thai', () => {
+  assert.deepEqual(coverageGaps(WEB), []);
+  const sets = glyphSets(WEB);
+  assert.equal(sets.size, 6, 'six font files');
+  for (const file of sets.values()) {
+    const isThai = file.url.includes('/thai/');
+    for (const c of THAI_SHAPING) assert.equal(file.need.has(c), isThai, `${file.url}: shaping set ${c.toString(16)}`);
+    assert.ok(file.cps.length > 50, file.url + ': a derived set, not an empty one');
+  }
+});
+
+// A copy of web/ in a temp folder, with a function to edit it. The copy shares no file with the real tree.
+function webCopy(edit) {
+  const dir = mkdtempSync(join(tmpdir(), 'font-coverage-'));
+  cpSync(WEB, join(dir, 'web'), { recursive: true });
+  edit(join(dir, 'web'));
+  return dir;
+}
+
+test('RED PROOF: a page that renders a character the cut files dropped fails the check naming the character, the face and the page', () => {
+  const dir = webCopy(web => {
+    const f = join(web, 'index.html');
+    writeFileSync(f, readFileSync(f, 'utf8').replace('</body>', '<p>\u00ff</p></body>'));
+  });
+  try {
+    const gaps = coverageGaps(join(dir, 'web'));
+    assert.ok(gaps.length >= 2, 'the Sans Thai files and the Mono files each lack it: ' + gaps.join(' | '));
+    assert.ok(gaps.every(g => g.startsWith('U+00FF "\u00ff" is not in ')), gaps.join(' | '));
+    assert.ok(gaps.some(g => /KW Sans Thai/.test(g)) && gaps.some(g => /KW Mono/.test(g)), 'both families named');
+    assert.ok(gaps.every(g => g.includes('rendered by web/index.html')), 'the page is named');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('RED PROOF: a Latin-range character the cut dropped (the per mille sign), a character from a CSS content string and one from a script string each fail the check', () => {
+  const missingThai = 0x2030; // the per mille sign: inside the declared Sans Latin range, not in the baseline, and rendered by no page
+  const dir = webCopy(web => {
+    const f = join(web, 'pricing.html');
+    let html = readFileSync(f, 'utf8');
+    html = html.replace('</body>', '<p>' + String.fromCodePoint(missingThai) + '</p></body>').replace('</style>', 'p::before{content:"\\00ff"}</style>').replace('</body>', '<script>var x = "\\u0416";</script></body>');
+    writeFileSync(f, html);
+  });
+  try {
+    const gaps = coverageGaps(join(dir, 'web'));
+    assert.ok(gaps.some(g => g.startsWith('U+2030 ') && /KW Sans Thai/.test(g)), 'the per mille sign: ' + gaps.join(' | '));
+    assert.ok(gaps.some(g => g.startsWith('U+00FF ')), 'the CSS content character');
+    assert.ok(!gaps.some(g => g.startsWith('U+0416')), 'a Cyrillic letter is outside every declared range, so another check (not this one) judges it');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the check judges the file, not the manifest: a manifest range widened over a character the file lacks fails', () => {
+  const dir = webCopy(web => {
+    const f = join(web, 'fonts/fonts.css');
+    // U+0416 is outside every declared range (the manifest already covers U+00FF), so only the edit below brings it under a face's duty
+    const before = readFileSync(f, 'utf8');
+    const after = before.replace(/(font-family: 'KW Mono';[^}]*unicode-range: )/, '$1U+0416, ');
+    assert.notEqual(after, before, 'the KW Mono range was widened');
+    writeFileSync(f, after);
+    const idx = join(web, 'index.html');
+    writeFileSync(idx, readFileSync(idx, 'utf8').replace('</body>', '<p>\u0416</p></body>'));
+  });
+  try {
+    const gaps = coverageGaps(join(dir, 'web'));
+    assert.ok(gaps.length > 0 && gaps.every(g => g.startsWith('U+0416 ') && /KW Mono/.test(g)), gaps.join(' | '));
+    assert.ok(!gaps.some(g => /KW Sans Thai/.test(g)), 'only the widened face is judged');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the cut files carry the new family name and no "Plex" in the name records that present a name to users; copyright, trademark and licence records are kept', () => {
+  for (const url of fontFiles()) {
+    const names = woff2Names(readFileSync(join(WEB, url)));
+    const get = id => names.filter(n => n.id === id).map(n => n.text);
+    const family = url.includes('/thai/') ? 'KW Sans Thai' : 'KW Mono';
+    for (const id of [1, 3, 4, 6, 16, 17]) for (const t of get(id)) assert.ok(!/plex/i.test(t), `${url}: name ID ${id} has no reserved name: ${t}`);
+    for (const t of get(1)) assert.ok(t.startsWith(family), `${url}: family ${t}`);
+    for (const t of get(4)) assert.ok(t.startsWith(family), `${url}: full name ${t}`);
+    for (const t of get(6)) assert.ok(/^KW(SansThai|Mono)/.test(t), `${url}: PostScript name ${t}`);
+    assert.ok(get(0).length > 0 && get(0).every(t => /IBM Corp/.test(t)), url + ': the copyright record is IBM\'s, unchanged');
+    assert.ok(get(7).every(t => /Plex/.test(t)) && get(7).length > 0, url + ': the trademark record is kept');
+    assert.ok(get(13).length > 0 && get(13).every(t => /SIL Open Font License/.test(t)) && get(14).length > 0, url + ': the licence records are kept');
+  }
+});
+
+test('the pages ask for no OpenType layout feature, so the features the cut dropped are unreachable; a page that asks for one is caught', () => {
+  for (const page of htmlPages(WEB)) assert.ok(!asksForLayoutFeature(readFileSync(join(WEB, page), 'utf8')), page + ' asks for a layout feature');
+  assert.ok(asksForLayoutFeature('<style>h1{font-variant-numeric:slashed-zero}</style>'));
+  assert.ok(asksForLayoutFeature("<p style=\"font-feature-settings:'zero'\">x</p>"));
+  assert.ok(!asksForLayoutFeature('<style>h1{font-weight:600}</style>'));
+});
+
+// ── the cut keeps a baseline beyond what the pages render today, so one new letter does not force a re-cut ────────────────────────────────────────────────
+test('the cut set is the derived set plus the baseline: all printable ASCII and the house punctuation in both families, the whole declared Thai range in Sans Thai only', () => {
+  const sets = [...glyphSets(WEB).values()];
+  const sans = sets.find(f => f.url.includes('/thai/')), mono = sets.find(f => f.url.includes('/mono/'));
+  const sansCut = new Set(cutSet(sans)), monoCut = new Set(cutSet(mono));
+  for (const c of [...Array(0x7e - 0x20 + 1).keys()].map(i => i + 0x20)) assert.ok(sansCut.has(c) && monoCut.has(c), 'ASCII ' + c.toString(16));
+  for (const c of [0x2013, 0x2014, 0x2018, 0x2019, 0x201c, 0x201d, 0xa9, 0xb7, 0xd7, 0xa0]) assert.ok(sansCut.has(c) && monoCut.has(c), 'punctuation ' + c.toString(16));
+  for (let c = 0x0e01; c <= 0x0e3a; c++) assert.ok(sansCut.has(c) && !monoCut.has(c), 'Thai ' + c.toString(16));
+  for (let c = 0x0e3f; c <= 0x0e5b; c++) assert.ok(sansCut.has(c) && !monoCut.has(c), 'Thai ' + c.toString(16));
+  for (const c of THAI_SHAPING) assert.ok(sansCut.has(c) && !monoCut.has(c), 'shaping ' + c.toString(16));
+  for (const c of sans.cps) assert.ok(sansCut.has(c), 'derived ' + c.toString(16));
+  assert.ok(!sansCut.has(0x00ff) && !monoCut.has(0x0416), 'nothing else: no y-diaeresis, no Cyrillic');
+  assert.deepEqual(BASELINE.ascii, [0x20, 0x7e]);
+});
+
+test('the cut files carry every code point of the cut set (the baseline reached the files, not only the script)', () => {
+  for (const f of glyphSets(WEB).values()) {
+    const cmap = woff2Cmap(readFileSync(join(WEB, f.url)));
+    assert.deepEqual(cutSet(f).filter(c => !cmap.has(c)), [], f.url + ' lacks a baseline or derived code point');
+  }
+});

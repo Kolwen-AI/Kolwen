@@ -1,0 +1,3 @@
+# Tokenizer library for the VM run only. It is NOT installed on the local box.
+# tokenizers 0.23.3: PyPI JSON read 2026-11-23 by the reviewer (uploaded 2026-10-09, Python >=3.10). Confirm on the VM before the run.
+tokenizers==0.23.3
