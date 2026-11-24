@@ -1,0 +1,1305 @@
+// Kolwen surface check — the room's own laws, mechanised.
+//
+// This repo's risk is not broken code: one zero-dependency generator is the only executable of
+// consequence. Its risk is a FALSE PUBLIC CLAIM. Every assertion below is a rule the room
+// already holds and has already caught a violation of. Zero dependencies, Node built-ins only.
+//
+// Declared reason (over the 800-line review signal): every rule reports through one failure list,
+// the scope predicates the rules use are defined once here, and the numbered rules in this file are
+// the list of record that docs/TRUST.md and governance/policies.md point at. Helpers can move to
+// scripts/lib/; the rules stay in one entry script, so there is one list and not two.
+import { readFileSync, existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { resolve, posix } from 'node:path';
+import { blankSvgs } from './lib/svg-blank.mjs';
+
+const fail = [];
+const note = (f, msg) => fail.push(`${f}: ${msg}`);
+
+// A tracked file the gate cannot read (deleted from the disk, or without read permission) is named here and left out of the list, so the rules after it still run.
+// Before this, the first bare read threw and the whole gate stopped with a stack trace.
+const unreadable = []; // tracked files the disk does not hold, so no rule reads them
+const tracked = execSync('git ls-files', { encoding: 'utf8' }).split('\n').filter(Boolean).filter(f => {
+  try { readFileSync(f); return true; }
+  catch (e) { unreadable.push(f); note(f, `could not be read (${e.code || e.message}), so the rules that read it do not check it`); return false; }
+});
+
+// Binary only. SVG is TEXT — hand-editable XML, tracked, and served at kolwen.com/favicon.svg,
+// so it is exactly the kind of file a path or a private name gets pasted into. The dot is
+// escaped: unescaped, the class also swallowed any name merely ENDING in those letters.
+const isBinary = f => /\.(png|jpe?g|ico|woff2?|ttf)$/i.test(f);
+
+// SCOPE. These rules police PUBLISHED CLAIMS — what a reader of the site, the README, the brand
+// doc or the PyPI page sees. One exclusion, load-bearing: a checker must be able to NAME the
+// strings it forbids, and scanning itself makes every rule its own violation.
+const SELF = 'scripts/surface-check.mjs';
+const isText = f => !isBinary(f);
+const PUBLISHED = f => isText(f) && f !== SELF && !f.startsWith('.github/') && !f.startsWith('scripts/');
+const SCANNABLE = f => isText(f) && f !== SELF;   // leak rules run wider than claim rules
+const read = f => readFileSync(f, 'utf8');
+
+// ── 1. Trademark: FILED, never registered ────────────────────────────────────
+for (const f of tracked.filter(PUBLISHED)) {
+  const s = read(f);
+  if (s.includes('®')) note(f, 'contains the registered-trademark symbol — the mark is FILED');
+  // "not yet registered" is the CORRECT claim — flag an AFFIRMATIVE assertion only.
+  for (const m of s.matchAll(/(.{0,24})\bregistered\b/gi)) {
+    if (!/(not|never|yet)\s*(yet\s*)?$/i.test(m[1])) note(f, 'asserts the mark is registered — it is FILED');
+  }
+  // Thai gets a PATTERN, not one literal: several phrasings assert the same false status.
+  if (/จดทะเบียน(แล้ว|เรียบร้อย|สมบูรณ์)|ได้รับการจดทะเบียน/.test(s)) note(f, 'claims in Thai that the mark is already registered');
+}
+
+// ── 2. No trademark filing identifier on a published surface ─────────────────
+// STRUCTURAL, and deliberately so: naming the identifiers here would publish them in this very
+// file, in a public permanent repo — the defect this rule exists to prevent. A long digit run
+// has no legitimate use on any published surface in this repo (verified: zero occurrences), so
+// the shape is the rule. It also catches identifiers nobody thought to tell this checker about.
+// A content digest is not an identifier: a sha256 is 64 hex characters and, by chance, carries a run
+// of nine or more decimal digits in roughly one digest in four (3 of the 16 in the pinned requirements
+// file, LWK-177, had one, of 10, 14 and 15 digits). Publishing that file reddened the required
+// surface job on a hash, and every re-pin would have done it again.
+// So a digest is removed BEFORE the digit-run test, and only a digest: an algorithm prefix followed
+// by EXACTLY that algorithm's length in hex characters, and nothing hex after it. Lengths are fixed
+// by the algorithms, not chosen here. The first version accepted "32 or more" behind any prefix,
+// which stripped a filing identifier padded with hex filler to 32+ characters, whole, before the
+// test ever saw it (LWK-184, final inspect R1). A bare 9+ digit run anywhere else, one glued to a
+// short prefix, and one behind the WRONG length for its prefix all still trip the rule.
+// HONEST LIMIT of any shape-based strip: a payload padded to exactly the algorithm's length is
+// indistinguishable from a real digest by shape alone. That needs deliberate construction, and the
+// accident this rule guards against never arrives dressed that way; it is named here rather than
+// left for the next reader to discover.
+const DIGEST_HEX = { md5: 32, sha1: 40, sha224: 56, sha256: 64, sha384: 96, sha512: 128 };
+const DIGEST = new RegExp('\\b(?:' + Object.entries(DIGEST_HEX).map(([a, n]) => `${a}:[0-9a-f]{${n}}`).join('|') + ')(?![0-9a-f])', 'gi');
+for (const f of tracked.filter(PUBLISHED)) {
+  const runs = read(f).replace(DIGEST, '').match(/\d{9,}/g);
+  if (runs) note(f, `contains a ${runs[0].length}-digit identifier-shaped number — filing identifiers are owner-deferred from every public surface`);
+}
+
+// ── 3. No kitchen leakage ────────────────────────────────────────────────────
+// NO leading \b: it is a word-boundary assertion, and against a branch beginning with "." it can
+// never hold at a whitespace or line start — which silently disabled the .claude/ branch, the
+// single most common internal prefix in this flock. Each branch is distinctive on its own.
+const KITCHEN = /(coalkiln|LLMWorks\/|_work\/|\.claude\/|scratchpad\/|agent-memory\/)/i;
+// LICENSE files are EXEMPT for the brand-name rule ONLY: a trademark-reservation clause must
+// name the names it reserves. That is the clause's whole function.
+const RESERVATION_EXEMPT = new Set(['LICENSE', 'py/LICENSE']);
+// .gitignore must NAME the paths it fences — the fence is not a leak.
+const PATH_EXEMPT = new Set(['.gitignore']);
+for (const f of tracked.filter(SCANNABLE)) {
+  const s = read(f);
+  if (!PATH_EXEMPT.has(f) && KITCHEN.test(s)) note(f, 'contains an internal path or private-repo reference');
+  if (!RESERVATION_EXEMPT.has(f) && /\bBankfire\b/.test(s)) note(f, 'names the private repo outside a licence reservation clause');
+  // LWK-168: this was `[A-Za-z]:\Users\|...` — `\U` is an identity escape and `\|` a LITERAL pipe,
+  // so there was no alternation at all and the pattern matched a string no file contains. The rule
+  // was published as enforced and could never fire. Backslashes are doubled so the Windows branch
+  // means a real backslash, and the `|` is a real alternation between the Windows and macOS homes.
+  if (/[A-Za-z]:\\Users\\|\/Users\/[a-z0-9]+\//i.test(s)) note(f, 'contains an absolute local path');
+}
+
+// ── 4. Thai orthography ──────────────────────────────────────────────────────
+// The prose of a Markdown file, for the character references GitHub decodes: fenced code blocks (a run of at least three backticks or tildes, closed by a run of the same character at least as long),
+// inline code spans (a run of backticks closed by a run of the same length, found left to right and never opened by an escaped backtick) and HTML comments are blanked, a backslash-escaped ampersand is blanked, the rest is kept as written.
+function markdownProse(s) {
+  // fenced code blocks, line by line
+  const lines = [];
+  let fence = null;
+  for (const line of s.split('\n')) {
+    const m = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (fence) {
+      if (m && m[1][0] === fence[0] && m[1].length >= fence.length && /^[ \t\r]*$/.test(line.slice(m[0].length))) fence = null;
+      lines.push('');
+    } else if (m && !(m[1][0] === '`' && line.slice(m[0].length).includes('`'))) {
+      fence = m[1];
+      lines.push('');
+    } else lines.push(line);
+  }
+  // inline, left to right in one pass: a backslash before ASCII punctuation makes that character literal (so an escaped backtick opens no code span, and an escaped ampersand starts no reference);
+  // a run of N backticks opens a code span that a later run of exactly N closes (no escape works inside it); `<!--` opens a comment that `-->` closes. A delimiter with no closer is text, and
+  // once one run length has no closer a later run of the same length has none either, so each failed search is made once per length and the pass is linear.
+  const t = lines.join('\n'), n = t.length, noSpan = new Set();
+  let out = '', i = 0, noComment = false;
+  while (i < n) {
+    const c = t[i];
+    if (c === '\\' && i + 1 < n && /[!-/:-@[-`{-~]/.test(t[i + 1])) {
+      out += t[i + 1] === '&' ? ' ' : c + t[i + 1];
+      i += 2;
+    } else if (c === '`') {
+      let j = i;
+      while (t[j] === '`') j++;
+      const len = j - i;
+      let close = -1;
+      for (let k = noSpan.has(len) ? -1 : t.indexOf('`', j); k !== -1;) {
+        let e = k;
+        while (t[e] === '`') e++;
+        if (e - k === len) { close = e; break; }
+        k = t.indexOf('`', e);
+      }
+      if (close === -1) { noSpan.add(len); out += t.slice(i, j); i = j; } else { out += ' '; i = close; }
+    } else if (c === '<' && !noComment && t.startsWith('<!--', i)) {
+      const e = t.indexOf('-->', i + 4);
+      if (e === -1) { noComment = true; out += c; i++; } else { out += ' '; i = e + 3; }
+    } else { out += c; i++; }
+  }
+  return out;
+}
+const MD_NBSP = /^&(?:nbsp|NonBreakingSpace|#0*160|#[xX]0*[aA]0);$/;
+for (const f of tracked.filter(PUBLISHED)) {
+  const s = read(f);
+  if (/ํา/.test(s)) note(f, 'decomposed SARA AM (U+0E4D U+0E32) — must be U+0E33');
+  // An invisible character is any space separator (Unicode category Zs: U+00A0, U+202F, U+2007, U+3000 ...), line or paragraph separator (Zl, Zp: U+2028, U+2029), default-ignorable code point
+  // (U+200B to U+200D, U+2060, U+00AD, U+180E, U+FEFF ...) or the braille pattern blank U+2800 (a symbol that draws nothing) except the plain space. Two are allowed: the one no-break space U+00A0 the Thai
+  // typography row puts before the repetition mark U+0E46 (build-qc.md W-I18N-12, kept by the catalogue lint), and the emoji presentation selectors U+FE0E and U+FE0F, which the published text carries
+  // after a symbol (the warning sign in PRIVACY.md and brand/README.md). Every other one is a finding, named once per file. In a page the character references are decoded first, so `&#8239;`, `&shy;` or
+  // `&ZeroWidthSpace;` is found as the character it makes; the no-break space written as a reference has its own finding below.
+  // THE NEXT LANGUAGE: the refused set includes characters some scripts need (U+3000 in Japanese typography, U+200E and U+200F in Arabic and Hebrew, U+200C in Persian and Hindi). A catalogue that takes
+  // such a language names its exception HERE, by file and by code point, in the same unit as the language (build-qc.md C-I18N-03); until then each is refused.
+  const NBSP_MARK = String.fromCharCode(0xa0, 0xe46), MARK = String.fromCharCode(0xe46), BRAILLE_BLANK = 0x2800;
+  const named = new Set();
+  const scan = (text, how) => {
+    for (const ch of text.split(NBSP_MARK).join(MARK)) {
+      const cp = ch.codePointAt(0);
+      if (cp === 0x20 || cp === 0xfe0e || cp === 0xfe0f || (how && cp === 0xa0) || named.has(cp) || !(cp === BRAILLE_BLANK || /[\p{Zs}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/u.test(ch))) continue;
+      named.add(cp);
+      note(f, `invisible character U+${cp.toString(16).toUpperCase()}${how}`);
+    }
+  };
+  scan(s, '');
+  if (f.endsWith('.html')) {
+    // The library is imported on its own: a failure to load names the library, while a reference the library refuses (an unknown name) is a finding about this page.
+    let decoded = null, decodeEntities = null;
+    try { decodeEntities = (await import(pathToFileURL(resolve('scripts/lib/rendered-text.mjs')).href)).decodeEntities; }
+    catch (e) { note(f, `scripts/lib/rendered-text.mjs could not be loaded (${String(e.message).slice(0, 100)}), so rule 4 does not read this page's character references and its invisible characters are not all checked`); }
+    if (decodeEntities) {
+      try { decoded = decodeEntities(s); }
+      catch (e) { note(f, `has a character reference rule 4 cannot read (${String(e.message).slice(0, 100)}), so its invisible characters are not all checked`); }
+    }
+    if (decoded !== null && decoded !== s) scan(decoded, ' (written as a character reference)');
+    // The no-break space written as a reference, read where a browser decodes it (WHATWG, character reference state): in text, a title or a textarea the legacy name `&nbsp` needs no semicolon and any
+    // character may follow it; in an ATTRIBUTE VALUE a legacy name followed by a letter, a digit or `=` is not decoded (a query string `?a=1&nbspx=2` is a URL), while a numeric reference and a name with its
+    // semicolon are; a comment, and the body of a script or a style, are not decoded at all. A digit after the number is another character (`&#1600;`), and a named reference is case-sensitive (`&NBSP;` is none).
+    const NUMERIC_NBSP = '&#0*160(?![0-9])|&#[xX]0*[aA]0(?![0-9a-fA-F])';
+    const NBSP_IN_TEXT = new RegExp('&nbsp|&NonBreakingSpace;|' + NUMERIC_NBSP), NBSP_IN_ATTRIBUTE = new RegExp('&nbsp(?![A-Za-z0-9=])|&NonBreakingSpace;|' + NUMERIC_NBSP);
+    let writtenNbsp = false;
+    try {
+      const { htmlTokens } = await import(pathToFileURL(resolve('scripts/lib/html-tokens.mjs')).href);
+      for (const t of htmlTokens(s, { scripting: false })) {
+        if (t.type === 'text' && NBSP_IN_TEXT.test(t.text)) writtenNbsp = true;
+        else if (t.type === 'tag' && !t.closing) for (const v of t.attrs.values()) if (NBSP_IN_ATTRIBUTE.test(v)) writtenNbsp = true;
+      }
+    } catch (e) { writtenNbsp = NBSP_IN_TEXT.test(s); note(f, `scripts/lib/html-tokens.mjs could not be loaded (${String(e.message).slice(0, 100)}), so rule 4 reads this page's no-break space references over the whole source`); }
+    if (writtenNbsp) note(f, 'invisible character U+A0 written as an entity (&nbsp;); a page uses a no-break space only before the Thai repetition mark, as the character');
+  } else if (f.endsWith('.md')) {
+    // A Markdown file is drawn by GitHub's renderer, which decodes entity references outside code (CommonMark: only a TERMINATED reference, a name it knows or a number of at most 7 digits, 6 hex digits;
+    // anything else is text). So the prose of the file (fenced blocks, inline code spans and comments taken out) has its terminated references decoded and read as a page's are. A reference that is no
+    // reference to CommonMark (an unknown name, no semicolon) is text and no finding. STATED LIMITS: an indented code block (four spaces) is read as prose, so a reference shown there is a loud
+    // false positive; a code span or fence that the real renderer closes differently (a span across a paragraph break) is read as the spec reads it, not as an old renderer might; raw HTML
+    // inside a Markdown file is read as prose, and the body of a script or style there is not decoded by a browser but is here. A backslash before ASCII punctuation makes it literal (an escaped backtick opens no code span, an escaped ampersand starts no reference); a code span, a comment and the failed search for a closer are scanned once, so the pass is linear in the file.
+    const prose = markdownProse(s);
+    let writtenNbsp = false, decodeMd = m => m;
+    try { decodeMd = (await import(pathToFileURL(resolve('scripts/lib/rendered-text.mjs')).href)).decodeEntities; }
+    catch (e) { note(f, `scripts/lib/rendered-text.mjs could not be loaded (${String(e.message).slice(0, 100)}), so rule 4 does not read this file's character references and its invisible characters are not all checked`); }
+    const decoded = prose.replace(/&(?:#[xX][0-9a-fA-F]{1,6}|#[0-9]{1,7}|[A-Za-z][A-Za-z0-9]{1,31});/g, m => {
+      if (MD_NBSP.test(m)) writtenNbsp = true;
+      try { return decodeMd(m); } catch { return m; }
+    });
+    if (decoded !== prose) scan(decoded, ' (written as a character reference)');
+    if (writtenNbsp) note(f, 'invisible character U+A0 written as an entity (&nbsp;); a published document uses a no-break space only before the Thai repetition mark, as the character');
+  }
+  if (s.includes('…')) note(f, 'U+2026 ellipsis — use three ASCII dots');
+}
+
+// ── 5. web/index.html integrity + bilingual STRUCTURE ────────────────────────
+// Named "structure", not "parity": these assert that both language blocks exist and that the
+// right one is default-visible. They do NOT compare the two blocks claim-for-claim. A real
+// parity assertion is a separate unit; until it exists the weaker name is the true one.
+// The page-claims library is loaded above section 5, because the balance count reads the same walk the page rules read; the readers further down use this import.
+let pageClaims = null;
+try { pageClaims = await import(pathToFileURL(resolve('scripts/lib/page-claims.mjs')).href); }
+catch (e) { note('scripts/lib/page-claims.mjs', 'could not be loaded, so the balance count and rules 5, 15, 16 and 17a could not read the pages (' + (e.code || 'import failed') + ')'); }
+const BALANCED = ['html', 'head', 'body', 'main', 'nav', 'footer', 'div', 'span', 'p', 'h1', 'h2', 'a', 'button', 'script', 'style', 'noscript', 'svg'];
+if (existsSync('web/index.html')) {
+  const s = read('web/index.html');
+  // Counted at markup level by the shared walk: a tag inside a comment, a script or style body, a title or a textarea is no opener and no closer, and an end tag
+  // may carry white space or attributes ("</script >", "</SCRIPT>"), which HTML allows.
+  const counted = pageClaims ? pageClaims.tagCountsOf(s, BALANCED).counts : new Map();
+  for (const t of BALANCED) {
+    const c = counted.get(t);
+    if (c && c.opens !== c.closes) note('web/index.html', `unbalanced <${t}>: ${c.opens} open, ${c.closes} close`);
+  }
+  // The structured-data blocks are read by the shared reader, as rule 13 reads a page's scripts: a commented-out copy is no element, and only `</script`
+  // followed by a delimiter closes one. Without the library the rule has nothing to read, and the library's own note above names that.
+  if (pageClaims) {
+    const ldBlocks = pageClaims.elementsOf(s, /<(script)\b/gi).elements.filter(e => /^application\/ld\+json$/i.test(((e.tag.text.match(/\btype\s*=\s*["']?([^"'\s>]+)/i) || [])[1] || '')));
+    if (ldBlocks.length === 0) note('web/index.html', 'structured-data block missing');
+    for (const b of ldBlocks) { try { JSON.parse(b.body); } catch (e) { note('web/index.html', 'ld+json does not parse: ' + e.message); } }
+  }
+  if (!/<html lang="en"(?: data-job="[a-z]+")?>/.test(s)) note('web/index.html', 'default document language is not English');
+  // One language per file (ORDER 1017j): the English page holds no Thai block, and the Thai page (web/th/index.html) is English-free in its language attribute.
+  if (/id="doc-(en|th)"/.test(s)) note('web/index.html', 'carries a language block (doc-en or doc-th); each language is its own file now, so the English page holds English only');
+  // A Thai page the gate cannot read is named once, in the unreadable list above; this rule reads it inside its own try so the rules after it still run (CodeRabbit 4601272506)
+  if (existsSync('web/th/index.html')) {
+    let thIndex = null;
+    try { thIndex = read('web/th/index.html'); }
+    catch (e) { if (!unreadable.includes('web/th/index.html')) note('web/th/index.html', `could not be read (${e.code || e.message}), so the language check on it does not run`); }
+    if (thIndex !== null && !/<html lang="th"/.test(thIndex)) note('web/th/index.html', 'default document language is not Thai (<html lang="th">)');
+  }
+  if (!/mailto:info@kolwen\.com/.test(s)) note('web/index.html', 'the published contact channel is missing');
+}
+
+// ── 6. Every contrast ratio in the brand doc recomputes from its own hex pair ─
+if (existsSync('brand/README.md')) {
+  const lin = c => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
+  const L = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b); };
+  const ratio = (a, b) => { const [x, y] = [L(a), L(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+  const PAIRS = [['#e8833a','#15130f'],['#A65A19','#ffffff'],['#e8833a','#ffffff'],['#A65A19','#15130f'],['#A65A19','#ece4d9'],['#A65A19','#f1f1f1']];
+  const THRESHOLDS = new Set(['3', '4.5', '7']);   // WCAG's own bars, not measurements of a pair
+  const doc = read('brand/README.md');
+  const stated = [...new Set(doc.match(/\b\d+(?:\.\d+)?:1/g) || [])].map(t => t.slice(0, -2)).filter(t => !THRESHOLDS.has(t));
+  // LWK-168: a doc that states no measured ratio (the figures deleted, or written in a shape the
+  // pattern above no longer reads) made this loop run over nothing and the rule pass silently.
+  // LWK-183: the message names what the READER of a red run can do. It used to tell them to
+  // "retire the rule", which a contributor who only edits docs cannot; the maintainer can.
+  if (stated.length === 0) note('brand/README.md', 'states no measured contrast ratio (n:1), so rule 6 recomputed nothing — this CHECK is now empty, not the brand doc\'s colours proven. Restore the ratio table in brand/README.md (each figure written as n:1); if the figures were removed on purpose, ask the maintainer to retire rule 6 in scripts/surface-check.mjs');
+  for (const t of stated) {
+    // <= : a correctly-rounded 2-decimal figure sits at most 0.005 from its true value, so a
+    // strict < reds a correct document at exactly the rounding boundary.
+    const ok = PAIRS.some(([a, b]) => Math.abs(ratio(a, b) - Number(t)) <= 0.005);
+    if (!ok) note('brand/README.md', `states ${t}:1, which no documented colour pair produces`);
+  }
+} else {
+  // The brand authority doc is this room's own law (CLAUDE.md); a missing one used to switch the
+  // whole contrast rule off without a word.
+  note('brand/README.md', 'is missing — rule 6 (contrast ratios) has nothing to check, so this CHECK is now empty, not the colours proven. Restore brand/README.md; if it was removed on purpose, ask the maintainer to retire rule 6 in scripts/surface-check.mjs');
+}
+
+// ── 7. The publish root ships only shipped assets ────────────────────────────
+// `wrangler.jsonc` publishes ./web wholesale as `assets.directory`, so EVERY path under web/
+// is a live URL on kolwen.com. A scratch tree once sat at web/scratchpad/design/kolwen-ds
+// (empty, so nothing ever leaked) — an invitation to save a working file into the publish root.
+//
+// HONEST SCOPE, because the two deploy paths differ and only one of them any CI can see:
+// Workers Builds clones the REPO, so it ships tracked files only — which is exactly what this
+// allowlist governs. A manual local `wrangler deploy` uploads the local DIRECTORY, untracked
+// files included, and no check running in CI can see those. That half is closed by the scratch
+// tree no longer existing under web/, not by this rule.
+const SHIPPED = new Set([
+  'web/index.html', 'web/robots.txt', 'web/sitemap.xml', 'web/ic.json',
+  // The two decorative bands, BY NAME: the 404 page's and the home page's `<img>` (alt="", so no visible string). Each is a new shipped asset, declared here, not waved through.
+  'web/band-404.svg', 'web/band-home.svg',
+  // Added BY NAME, never by widening the glob — the point of the list is that a new path under
+  // web/ is a deliberate act. `404.html` is served for an unmatched request (not_found_handling:
+  // 404-page). `_headers` is PARSED by Workers and, per Cloudflare's own docs, "will not itself
+  // be served as a static asset" — shipped but never fetchable, which post-deploy-check must
+  // also know.
+  'web/404.html', 'web/_headers',
+  // The status page: unannounced (no link, not in the sitemap), a PRODUCTION page read by the rules that read every page. Its URL is live, so it is declared by name here.
+  'web/status.html',
+  // The subprocessor page: unannounced, no link, not in the sitemap; listed like the status page.
+  'web/subprocessors.html',
+  // The legal page: unannounced: no link, not in the sitemap, and noindex by name in rule 16.
+  'web/legal.html',
+  // The accessibility page: a LIVE reading page, indexable and in the sitemap.
+  'web/accessibility.html',
+  // `_redirects` is parsed by Workers and not served either (same docs page family); rule 18 holds its lines.
+  'web/_redirects',
+  // The pricing page (first published as /plans): a PRODUCTION page (US prices, every buy button disabled), read by the rules that read every page.
+  'web/pricing.html',
+  // The three legal pages (rendered from TERMS.md, PRIVACY.md and legal/thai-7day-clause.md by scripts/legal-pages.mjs): PRODUCTION pages, read by every rule that reads a page.
+  'web/terms.html', 'web/privacy.html', 'web/refund.html',
+  // The changelog page (rendered from CHANGELOG.md by the same script): a PRODUCTION page.
+  'web/changelog.html',
+  // The Thai pages (ORDER 1017j, one language per file): each page above has its Thai twin under web/th/, the same rules, the same exemptions by name.
+  'web/th/index.html', 'web/th/pricing.html', 'web/th/404.html', 'web/th/status.html', 'web/th/subprocessors.html', 'web/th/legal.html',
+  'web/th/accessibility.html', 'web/th/terms.html', 'web/th/privacy.html', 'web/th/refund.html', 'web/th/changelog.html',
+  // The plain-text guide for language models (llmstxt.org shape); it states only what the pages state and is not in the sitemap.
+  'web/llms.txt',
+  'web/favicon.svg', 'web/favicon-32.png', 'web/apple-touch-icon.png', 'web/og.jpg',
+  // The self-hosted fonts, BY NAME like everything above (a new face or a new script is a deliberate act here, with its OFL.txt beside it): the one manifest every page
+  // links, and the WOFF2 files and licence texts of KW Sans Thai (a folder per script) and KW Mono, which are subsets of IBM Plex Sans Thai and IBM Plex Mono renamed under OFL-1.1. The WOFF2 names carry a hash of their bytes (scripts/font-subset.mjs writes them, and prints these lines); fonts.test.mjs and font-versions.test.mjs hold name and bytes together. post-deploy-check lists web/ recursively, so these are checked when deployed.
+  'web/fonts/fonts.css',
+  'web/fonts/thai/kw-sans-thai-400.7a93a32da9.woff2', 'web/fonts/thai/kw-sans-thai-500.bab87050a2.woff2', 'web/fonts/thai/kw-sans-thai-600.4e5f5074ff.woff2', 'web/fonts/thai/kw-sans-thai-700.b87d41e0f9.woff2', 'web/fonts/thai/OFL.txt',
+  'web/fonts/mono/kw-mono-400.e8d30e29b8.woff2', 'web/fonts/mono/kw-mono-500.78ee778fb0.woff2', 'web/fonts/mono/OFL.txt',
+]);
+for (const f of tracked.filter(f => f.startsWith('web/'))) {
+  if (!SHIPPED.has(f)) note(f, 'is tracked under the publish root but is not a declared shipped asset — every path under web/ is a live URL');
+}
+for (const f of SHIPPED) {
+  if (!existsSync(f)) note(f, 'is declared a shipped asset but is missing from the publish root');
+}
+
+
+// The Wrangler key reader is loaded like the other libraries: a library that will not load is a finding, and block 8 skips only its own check.
+let wranglerJsonc = null;
+try { wranglerJsonc = await import(pathToFileURL(resolve('scripts/lib/wrangler-jsonc.mjs')).href); }
+catch (e) { note('scripts/lib/wrangler-jsonc.mjs', 'could not be loaded, so upload_source_maps is not checked (' + (e && e.code ? e.code : 'error') + ')'); }
+
+// ── 8. The wrangler values this checker depends on are CONFIRMED, not assumed ─────────────
+// Rule 7 governs `web/` because wrangler publishes it, and post-deploy-check reads the same
+// directory. Until now both facts lived only in a COMMENT: a one-word config change could
+// falsify three artefacts with every gate still green (the r17 finding). Now the file is read.
+{
+  const w = read('wrangler.jsonc');
+  // JSONC: comments make JSON.parse unsafe for assets.directory and not_found_handling, so those two are matched as TEXT. A
+  // duplicate key, or the same text inside a comment, would defeat those two — stated rather than
+  // pretended away; this guards against silent drift, not against a hostile edit. upload_source_maps is read by
+  // scripts/lib/wrangler-jsonc.mjs, which strips comments and trailing commas, then parses.
+  if (!/"directory"\s*:\s*"\.\/web"/.test(w)) {
+    note('wrangler.jsonc', 'assets.directory is not "./web" — surface-check rule 7 and post-deploy-check both assume it is');
+  }
+  const nf = w.match(/"not_found_handling"\s*:\s*"([^"]+)"/);
+  if (!nf) {
+    note('wrangler.jsonc', 'assets.not_found_handling is absent — the behaviour of an unmatched path is then undeclared');
+  } else if (!['404-page', 'single-page-application'].includes(nf[1])) {
+    note('wrangler.jsonc', `assets.not_found_handling is "${nf[1]}", which is not one of the two documented values`);
+  }
+  const sourceMaps = wranglerJsonc ? wranglerJsonc.sourceMapsProblem(w) : null;
+  if (sourceMaps) note('wrangler.jsonc', sourceMaps);
+}
+
+// ── 9. Nothing retypes the IC label ──────────────────────────────────────────
+// docs/NEVER-A-CLONE.md: `web/ic.json` is the ONE source of truth, and "nothing retypes these
+// values anywhere" — a retyped label can disagree with the file the day the IC is swapped. That
+// sentence had no machine behind it. The values are read from the file at run time, never pasted
+// here: a copy in this checker would be the very retype it forbids, and this file is scanned too.
+if (existsSync('web/ic.json')) {
+  let ic = null;
+  try { ic = JSON.parse(read('web/ic.json')); } catch (e) { note('web/ic.json', 'does not parse: ' + e.message); }
+  // LWK-182: the SCHEMA is declared in the file, and this rule asserts what the file declares --
+  // never a key list of its own. `$required_text` names the keys that must always hold non-empty
+  // text. Before it existed the rule could only guard whichever keys happened to be non-empty, so
+  // emptying ONE label left the other guarding and the emptied one silently unguarded; and a rule
+  // enforcing a schema nobody had written down would have been an invention, not a check.
+  // An unparseable file is already a finding, above.
+  let labels = [];
+  if (ic) {
+    const req = ic.$required_text;
+    if (!Array.isArray(req) || req.length === 0 || !req.every(k => typeof k === 'string' && k)) {
+      note('web/ic.json', 'does not declare `$required_text` (a non-empty list of the keys that must hold text), so rule 9 has no schema to assert — an undeclared schema is a finding, not a pass');
+    } else {
+      for (const k of req) {
+        if (typeof ic[k] !== 'string' || !ic[k].trim()) note('web/ic.json', `declares "${k}" as required text, but it is empty or missing — the product would show no label, and a retype of the old one would pass unseen`);
+      }
+      labels = req.map(k => ic[k]).filter(v => typeof v === 'string' && v.trim());
+    }
+  }
+  for (const f of tracked.filter(f => isText(f) && f !== 'web/ic.json')) {
+    const s = read(f);
+    if (labels.some(v => s.includes(v))) note(f, 'retypes the IC label from web/ic.json — read it from that file, never copy it');
+  }
+}
+
+// ── 10. Every legal GAP in a legal draft carries its counsel-pending marker ──
+// LWK-168 (re-inspect M1), extended to TERMS.md by LWK-185. The draft privacy notice and the draft
+// terms are published as DRAFTS precisely because clauses that need a lawyer carry a
+// `[pending legal review]` marker instead of an answer. The check every seat ran was a single-line
+// grep for that marker: it returned 5 against a real 6, because GAP 3's marker wraps across a line
+// break. Delete that marker and the grep still said 5 -- a legal gap lost the mark saying counsel
+// had not cleared it and every instrument reported clean.
+//
+// So this COUNTS AND ASSERTS, and it asserts against each document's own GAPs, never a fixed
+// number (which rots the day a gap is added or closed): every distinct `GAP n` the document names
+// must have the marker beside it, whitespace and line breaks inside the marker allowed. It names
+// WHICH gap lost one. A document that names no GAP is a finding, not a pass -- the rule would be
+// empty -- and so is a missing one. Only a document's LABELLED gaps bind: a prose sentence that
+// merely describes what the marker means (a draft header) is not a gap and is never counted as one.
+// The Thai marker is deliberately NOT asserted per gap (the Thai rides as short blockquotes, not a
+// parallel legal text); it is only counted wrap-aware and reported.
+const LEGAL_DRAFTS = ['PRIVACY.md', 'TERMS.md', 'legal/thai-7day-clause.md'];
+const gapNotes = [];
+for (const doc of LEGAL_DRAFTS) {
+  if (!existsSync(doc)) {
+    note(doc, `is missing — rule 10 (legal-gap markers) has nothing to check, so this CHECK is now empty, not the gaps proven. Restore ${doc}; if it was removed on purpose, ask the maintainer to take it out of rule 10 in scripts/surface-check.mjs`);
+    continue;
+  }
+  const s = read(doc);
+  const gaps = [...new Set([...s.matchAll(/\bGAP\s+(\d+)\b/g)].map(m => m[1]))];
+  if (gaps.length === 0) note(doc, `names no "GAP n", so rule 10 checked nothing — this CHECK is now empty, not the gaps proven. Restore the "GAP n" labels beside the counsel-pending clauses; if they were renumbered or reworded on purpose, ask the maintainer to update rule 10 in scripts/surface-check.mjs`);
+  for (const n of gaps) {
+    // The class between label and marker admits a backtick: a literal token in markdown is
+    // written `[pending legal review]`, and this instrument must not dictate how a published legal
+    // sentence is typeset. (LWK-184 T1: without it a correct, backticked marker went red with a
+    // message claiming the marker was MISSING.)
+    if (!new RegExp('GAP\\s+' + n + '[\\s`—–:*.-]*\\[pending\\s+legal\\s+review\\]').test(s)) {
+      note(doc, `GAP ${n} has no [pending legal review] marker beside it — counsel has not cleared it, and the document no longer says so`);
+    }
+  }
+  const en = (s.match(/\[pending\s+legal\s+review\]/g) || []).length;
+  const th = (s.match(/\[\s*รอ\s*ที่ปรึกษา\s*กฎหมาย\s*\]/g) || []).length;
+  gapNotes.push(`${doc} ${gaps.length} named GAPs (markers, wrap-aware: ${en} English, ${th} Thai)`);
+}
+const gapNote = gapNotes.length ? ' · ' + gapNotes.join(' · ') : '';
+
+// ── 11. A job-level `permissions:` block that checks out states `contents` ───
+// LWK-190. A job-level `permissions:` block REPLACES the workflow-level one rather than merging
+// with it: a job that checks the repository out and declares its own block without `contents`
+// reads `contents: none` inside that job. This has hit three workflows so far (`publish-pypi.yml`,
+// `codeql.yml`, `scorecard.yml`), every one found and fixed by a HAND-RUN structural scan, which
+// is not a gate. This is that gate: a tiny structural reader, not a YAML library (a `jobs:`
+// top-level entry at 2-space indent starts a job; a `permissions:` key at 4-space indent under it
+// is that job's own block; its members sit past 4-space indent). A job with NO block of its own
+// inherits the workflow-level one and is not checked — that is correct, not a hole.
+//
+// Non-vacuity, the same discipline rules 6/9/10 already carry, and PER FILE (LWK-190 F1): a
+// workflow with zero jobs is invalid to GitHub, so a file this reader parses to zero jobs is a
+// finding naming THAT file, never folded into one global note that a single parseable workflow
+// elsewhere would silence. `.yaml` is read alongside `.yml` (F2) — GitHub reads both, and a file
+// this reader never even opens cannot become an F1 finding either; the two cures are independent.
+// The block scan skips blank and comment lines while looking for `contents:` and a `#`-led line is
+// never read as a real `uses: actions/checkout@` (F4) — a checker must not flag a document for its
+// OWN formatting choices, the exact class this room already hardened rule 10 against. `{}` reads as
+// an empty block (no contents, same as the bare-word class); `read-all`/`write-all` read as
+// granting contents, per GitHub's own docs (F3).
+//
+// FAIL CLOSED, for the structure this reader reads: a job key line, a member line of a job (at the indent of the job's first member line), and the lines of a permissions: block.
+// A job key with text after its colon (a trailing comment is not text) or a key that is not a plain name is named, and the job is still opened: its members are read with
+// it, never handed to the job above. A member line that is not a plain
+// `name:` key (a quoted or spaced key, a flow mapping) is named, and its job is not passed. A permissions value other than an empty block, `{}`, `read-all` or `write-all` (a flow mapping,
+// an anchor, an alias) is named as unread. A uses: line is read with its quotes stripped. NOT CLAIMED: the body of a block scalar below a job's members (a `run: |` script, for
+// example) is never read for a uses: line, and a step item is read for one only when it is a `uses:` at a step's key indent or after a `- ` marker, because a line reader cannot tell free text from structure without a YAML parser; a composite or reusable workflow step
+// (`uses: ./.github/actions/x`) is never read as a checkout -- scoped to `actions/checkout@`
+// on purpose; this repo has no composite actions today.
+{
+  const WF_DIR = '.github/workflows';
+  const wfFiles = tracked.filter(f => f.startsWith(WF_DIR + '/') && (f.endsWith('.yml') || f.endsWith('.yaml')));
+  if (wfFiles.length === 0) {
+    note(WF_DIR, 'has no tracked *.yml or *.yaml workflow, so rule 11 (job-level permissions) checked nothing');
+  } else {
+    for (const f of wfFiles) {
+      const lines = read(f).split(/\r?\n/);
+      let inJobs = false, cur = null, blockIndent = -1; // blockIndent: the indent of the key whose block scalar's body the reader is in, -1 outside one
+      const jobs = [];
+      const flush = () => { if (cur) jobs.push(cur); };
+      // FAIL CLOSED, for the structure read: a plain job key with nothing after its colon, a permissions: key whose value is an empty block, {}, read-all or write-all, and a uses: of
+      // actions/checkout, bare or quoted. Anything else on those structures is named at its own line, and its job is not passed.
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        if (/^jobs:\s*$/.test(l)) { inJobs = true; continue; }
+        if (/^\S/.test(l) && !/^#/.test(l)) { if (inJobs) flush(); inJobs = false; cur = null; continue; } // a top-level key after jobs: ends the jobs block
+        if (!inJobs || /^\s*$/.test(l) || /^\s*#/.test(l)) continue;
+        const key = l.match(/^  (\S[^:]*):(.*)$/);
+        if (key) {
+          flush();
+          const name = key[1].trim(), rest = key[2].replace(/(^|\s)#.*$/, '').trim(); // a trailing comment is not text after the colon
+          cur = { name, hasBlock: false, checkout: false, contents: false, unreadPerm: false, indent: 0 };
+          blockIndent = -1;
+          if (rest !== '') note(f, `line ${i + 1}: job "${name}" has text after its colon, so this reader cannot read this job`);
+          else if (!/^[A-Za-z0-9_.-]+$/.test(name)) note(f, `line ${i + 1}: job "${name}" is not a plain key name, so this reader cannot read its job`);
+          continue;
+        }
+        if (!cur) continue;
+        // A job's members sit at the indent its first member line sets, as valid YAML lets them sit at any indent, so a job at 6 or 3 spaces is read as a job at 4 is. A line
+        // deeper than the members is their own content (a step item, a block scalar), read only for a uses: line.
+        const ind = l.length - l.trimStart().length;
+        if (!cur.indent && ind > 2) cur.indent = ind;
+        // A block scalar's body (a `run: |` script, say) is text, never a step: every line indented past the key that opens it belongs to it, and a uses: line
+        // there is not read. A step is a uses: line at a step's key indent or after a `- ` item marker.
+        if (blockIndent >= 0 && (/^\s*$/.test(l) || ind > blockIndent)) { /* the body of the block scalar */ }
+        else {
+          // On a `- key: |` line the block belongs to the key, so its indent is the key's column, past the dash: the sibling keys of the step sit at that column.
+          blockIndent = /:\s*[|>][-+0-9]*\s*(#.*)?$/.test(l) ? /^\s*(-\s+)?/.exec(l)[0].length : -1;
+          if (/^\s*(-\s+)?uses:\s*["']?actions\/checkout@/.test(l)) cur.checkout = true;
+        }
+        if (cur.indent !== ind) continue;
+        const perm = l.match(new RegExp('^' + ' '.repeat(cur.indent) + 'permissions:(.*)$'));
+        if (perm) {
+          const v = perm[1].replace(/\s+#.*$/, '').trim(); // a trailing comment is not the value
+          if (v === '') {
+            cur.hasBlock = true;
+            for (let k = i + 1; k < lines.length; k++) {
+              const m = lines[k];
+              if (/^\s*$/.test(m)) continue;                     // blank line inside the block: keep scanning
+              const trimmed = m.replace(/^\s+/, '');
+              if (trimmed.startsWith('#')) continue;              // a comment at ANY indent: keep scanning
+              const indent = m.length - trimmed.length;
+              if (indent <= cur.indent) break;                    // back to job level or the next key
+              if (/^[A-Za-z0-9_-]+:/.test(trimmed)) { if (/^contents:/.test(trimmed)) cur.contents = true; }
+              else { note(f, `line ${k + 1}: a line inside permissions: is not a key: value line this reader reads, so the job's permissions cannot be checked`); cur.unreadPerm = true; break; }
+            }
+          } else if (/^\{\s*\}$/.test(v)) {
+            cur.hasBlock = true;                                  // `{}` -- nothing specified, contents: none
+          } else if (v === 'read-all' || v === 'write-all') {
+            cur.hasBlock = true; cur.contents = true;             // the whole-set inline forms grant contents
+          } else {
+            note(f, `line ${i + 1}: permissions: value "${v}" is not one this reader reads (an empty block, {}, read-all or write-all), so the job's permissions cannot be checked`);
+            cur.unreadPerm = true;
+          }
+        }
+        // A `- ` step item at a member's indent (the indentless form of a steps: sequence, valid YAML) is a member of the key above it, read for its uses: line.
+        if (!perm && !/^[A-Za-z0-9_-]+:/.test(l.trimStart()) && !/^-(\s|$)/.test(l.trimStart())) { note(f, `line ${i + 1}: a line at job-member indent in job "${cur.name}" is not a plain key: value line this reader reads (a quoted or spaced key, or a flow mapping), so the job cannot be checked`); cur.unreadPerm = true; }
+      }
+      flush();
+      if (jobs.length === 0) {
+        note(f, 'parsed to zero jobs under this reader\'s narrow job-key shape (exactly 2-space indent, an unquoted key, nothing after the colon) -- rule 11 could not check any job in this file');
+        continue;
+      }
+      for (const j of jobs) {
+        if (j.hasBlock && j.checkout && !j.contents && !j.unreadPerm) {
+          note(f, `job "${j.name}" declares its own permissions: block and checks the repository out, but does not state contents: -- contents reads none inside that job`);
+        }
+      }
+    }
+  }
+}
+// ── 12. The retired contact address never returns to a published file ──────
+// LWK-209. The role addresses replaced one address at this domain as the published contact; that
+// address is retired, and the published channels are the role addresses.
+// Rule 5 only EXPECTS the page's info@ link, which proves nothing about the retired address coming
+// back. This bans it outright, with ZERO allowlist: no published file has a legitimate reason to
+// carry it, so the ban itself is the proof it cannot return.
+//
+// SET: SCANNABLE, the same wide set rule 3 uses for leaks -- every tracked text file except this one,
+// so `.github/`, `scripts/`, `docs/`, `governance/`, the root documents and the text under `web/`
+// are all in scope. Wider than PUBLISHED on purpose: this is a leak, not a claim, and the repo is
+// public whatever folder a file sits in.
+//
+// The pattern is built from FRAGMENTS, and no message prints a match: this file is scanned by
+// nothing, but it is itself published, and a CI log is public.
+//
+// Spellings caught (case-insensitive): plain, full-width (U+FF20), percent-encoded, HTML numeric and
+// named entities, a JS/JSON escape, and the `[at]` / `(at)` word with spaces or tabs around it.
+//
+// NON-VACUITY, three parts, because this room's scar is a gate that lies: (a) every spelling above is
+// run through its own pattern AT RUN TIME, so a pattern that cannot fire fails the build by name;
+// (b) a set of near-misses must NOT match, so an over-broad pattern fails the same way; (c) an empty
+// scanned set, or one that lacks any of five anchor files (three a reader meets, two outside the
+// PUBLISHED set), is a finding, not a pass.
+//
+// STATED LIMITS, not fixed here: an IMAGE of the address (png/jpg/ico/font files are never read, og.jpg
+// included); an address split across two lines (the bracket form tolerates spaces and tabs only);
+// the local part or the domain obfuscated (`[dot]`, entity-encoded letters, a string assembled by
+// concatenation in script); double encoding (`%2540`); base64 or any other wrapper; any surface
+// outside this repository (registry metadata, a dashboard, an edge rule); and git HISTORY: the rule
+// reads the tree, and the address stays in commits made before it was retired. A different address
+// at another host, or a subdomain of this one, is a different address and is deliberately not matched.
+//
+// CODEQL (js/regex/missing-regexp-anchor, alert on the HOST fragment, LWK-209 bounce 1). The query
+// treats a constant string that ends in a top-level domain as a hostname pattern and fires when no
+// `^` or `$` appears anywhere in it; it reads each constant fragment that flows into a RegExp on its
+// own, and this fragment is a hostname by construction. This is a detector, not a URL validator, but
+// the alert is fixed rather than dismissed, by ANCHORING it in the form the query recognises: the
+// fragment now ends `(?:$|...)`. The `$|` branch is semantically redundant (a negative lookahead
+// already holds at the end of the input, and there is no `m` flag), and is there so the fragment
+// carries an explicit end anchor. Read at the query source (github/codeql main, 2026-09-25); NOT
+// verified by running CodeQL here, so the PR's own CodeQL run is the verification.
+{
+  const LOCAL = 'con' + 'tact';
+  // Start of the local part: not preceded by a character of an address's own alphabet (a longer
+  // local part is a different address), EXCEPT right after an escape, whose last character is
+  // alphanumeric: `%20`, `%3A`, a backslash then n, r or t, a backslash-u and four hex digits.
+  const START = '(?:(?<![A-Za-z0-9._%+-])|(?<=%[0-9A-Fa-f]{2})|(?<=\\\\[nrt])|(?<=\\\\u[0-9A-Fa-f]{4}))';
+  // End of the domain: the end of the input, or not followed by a longer domain (`-x`, `x`) and not
+  // followed by a dot and more label characters (`.au`), while a sentence-final dot is still a match.
+  const HOST = 'kol' + 'wen\\.' + 'com' + '(?:$|(?![A-Za-z0-9-])(?!\\.[A-Za-z0-9]))';
+  const SEPARATORS = {
+    'plain @': '@',
+    'full-width @ (U+FF20)': '＠',
+    'percent-encoded @': '%40',
+    'HTML numeric entity for @': '&#0*64;?|&#x0*40;?',
+    'HTML named entity for @': '&commat;?',
+    'JS/JSON escape for @': '\\\\u0*40|\\\\x40',
+    '[at] / (at) word': '[ \\t]*[\\[(][ \\t]*at[ \\t]*[\\])][ \\t]*',
+  };
+  // START stops a longer local part (a different address) matching; HOST's tail stops a longer
+  // domain doing the same.
+  const FORMS = Object.entries(SEPARATORS).map(([label, sep]) => [
+    label,
+    new RegExp(START + LOCAL + '(?:' + sep + ')' + HOST, 'i'),
+  ]);
+
+  // Fixtures use their OWN fragments, not LOCAL/HOST above: a fixture derived from the same constant as the
+  // pattern would pass with the pattern wrong (a typo in both), which is the circular self-check this avoids.
+  const LF = 'cont' + 'act';
+  const H = 'kol' + 'wen.com';
+  const SHOULD_MATCH = [
+    ['plain @', `${LF}@${H}`],
+    ['plain @', `<a href="mailto:${LF}@${H}">`],
+    ['plain @', `${LF.toUpperCase()}@${H.toUpperCase()}`],
+    ['full-width @ (U+FF20)', `${LF}${String.fromCodePoint(0xFF20)}${H}`],
+    ['percent-encoded @', `mailto:${LF}%40${H}`],
+    ['HTML numeric entity for @', `${LF}&#64;${H}`],
+    ['HTML numeric entity for @', `${LF}&#x40;${H}`],
+    ['HTML numeric entity for @', `${LF}&#X0040;${H}`],
+    ['HTML named entity for @', `${LF}&commat;${H}`],
+    ['JS/JSON escape for @', `"${LF}\\u0040${H}"`],
+    ['[at] / (at) word', `${LF}[at]${H}`],
+    ['[at] / (at) word', `${LF} (at) ${H}`],
+    ['[at] / (at) word', `${LF}[ AT ]${H}`],
+    // After an escape whose last character is alphanumeric, and at a sentence end or end of input.
+    ['percent-encoded @', `mailto:%20${LF}%40${H}`],
+    ['plain @', `?body=Write%20to%20${LF}@${H}`],
+    ['plain @', `"x\\n${LF}@${H}"`],
+    ['plain @', `"x\\u0020${LF}@${H}"`],
+    ['plain @', `write to ${LF}@${H}.`],
+    ['plain @', `${LF}@${H}. Next sentence`],
+  ];
+  const SHOULD_NOT_MATCH = [
+    `info@${H}`, `security@${H}`, `privacy@${H}`,
+    `${LF}@example.com`, `${LF}@${H}any`, `re${LF}@${H}`, `${LF}@mail.${H}`,
+    `${LF}${H}`, `hello (at) ${H}`, `${LF} at ${H}`,
+    // A longer domain behind a dot, and an escape-lookalike that is a longer local part.
+    `${LF}@${H}.au`, `${LF}@${H}.co.uk`, `%2${LF}@${H}`, `\\x${LF}@${H}`,
+  ];
+  const cannotFire = new Set(), overBroad = new Set();
+  for (const [label, sample] of SHOULD_MATCH) {
+    const re = FORMS.find(([l]) => l === label)?.[1];
+    if (!re || !re.test(sample)) cannotFire.add(label);
+  }
+  for (const sample of SHOULD_NOT_MATCH) {
+    const hit = FORMS.find(([, re]) => re.test(sample));
+    if (hit) overBroad.add(hit[0]);
+  }
+  for (const label of cannotFire) note(SELF, `rule 12 self-check: the "${label}" pattern does not match its own fixture, so it could never fire — a ban that cannot fire is not a ban`);
+  for (const label of overBroad) note(SELF, `rule 12 self-check: the "${label}" pattern matches a near-miss that is not the banned address, so it is over-broad`);
+
+  const scanned = tracked.filter(SCANNABLE);
+  if (scanned.length === 0) {
+    note('git ls-files', 'lists no scannable text file, so rule 12 checked nothing — this CHECK is now empty, not the surface proven clean');
+  }
+  // The first three are PUBLISHED files a reader meets. The last two sit OUTSIDE the PUBLISHED set
+  // (`.github/`, `scripts/`), so narrowing the scan to PUBLISHED fails here instead of passing silently.
+  for (const anchor of ['web/index.html', 'README.md', 'CHANGELOG.md', '.github/workflows/ci.yml', 'scripts/post-deploy-check.mjs']) {
+    if (!scanned.includes(anchor)) note(anchor, 'is not among the files rule 12 scans (missing, untracked or excluded), so this CHECK does not cover a surface a reader meets');
+  }
+  for (const f of scanned) {
+    const s = read(f);
+    for (const [label, re] of FORMS) {
+      const m = re.exec(s);
+      if (m) note(f, `line ${s.slice(0, m.index).split('\n').length}: the retired contact address appears (${label}) — use a role address`);
+    }
+  }
+}
+
+// ── 13. The CSP admits exactly the inline code the served pages carry ───────
+// LWK-211. `web/_headers` admits the page's one inline script, and its inline styles, by `sha256-`
+// hash. A hash is a claim about bytes: change one byte of the script and the browser silently refuses
+// to run it, the language toggle dies, and every other check stays green. So the hashes are RECOMPUTED
+// here from the served HTML and compared, both ways: a missing hash breaks the page, and an extra one is
+// a stale hash that admits nothing, which reads as coverage.
+//
+// It also refuses a policy that has lost its floor: `'unsafe-inline'` or `'unsafe-eval'` in `script-src`
+// (or in `default-src`, which `script-src` falls back to if it is ever deleted), a missing
+// `default-src 'self'` / `object-src 'none'` / `base-uri 'self'` / `frame-ancestors 'none'`, the CSP on
+// more than one rule (Cloudflare JOINS a header set twice, so two policies would be served), the CSP on
+// any path but `/*` (the 404 served for an unmatched path is not `/404.html`), a Referrer-Policy other than
+// strict-origin-when-cross-origin, a missing Permissions-Policy, a CSP set in a `<meta>` tag, an origin
+// the HTML loads a stylesheet or script from that the policy does not name, and an inline event handler
+// or `style=` attribute, which this policy blocks silently. Cloudflare's caps on the file are checked too
+// (100 rules, 2,000 characters a line).
+//
+// NON-VACUITY: no `_headers`, no CSP in it, no inline script or no inline style found in the served HTML,
+// or a served page the rule was written around missing, is a finding, never a pass. The script and style
+// counts are printed in the pass line, so a run that hashed nothing cannot read as a run that did.
+//
+// The tags are read by the shared bounded reader (scripts/lib/page-claims.mjs): a tag ends at its real `>` within a bound, and an element's body is read to its own closer. A tag the
+// reader cannot end, or an element with no closer, is a finding that names its page, so an unreadable page is never a pass. A page with an unclosed <style> is not hashed (see the rule), and its
+// stale-hash check for styles is skipped with it.
+//
+// STATED LIMITS, not fixed here: the walk reads markup at the level the HTML tokenizer does, with these exceptions. (1) A script body ends at its first `</script` followed
+// by white space, `/` or `>`; the script-data escape states (a `<!--` inside a script keeps a later `</script` from ending it) are not modelled, so such a page is read with the
+// earlier end. (2) A <noscript> body is read as markup, the scripting-off model its <style> is hashed for; a browser with scripting on reads it as text. (3) An inline SVG's
+// <style> and <title> are read as the HTML parser reads a style and a title, which differs inside `<svg>`; no shipped page holds one. (4) Character references and CDATA are
+// not decoded in any body. (5) A comment, title, textarea, plaintext, or other raw body with no end is a finding at its line, and the walk reads on past its opener, so no
+// finding hides the markup after it. `font-src` is held to 'self' alone
+// and every url() of a tracked stylesheet (the font manifest) must be a file of this site that rule 7 declares, but a stylesheet the edge or a
+// browser extension adds is not in the repo and not seen; `style-src` carrying `'unsafe-inline'` is not refused (a hash makes browsers
+// ignore it); nothing the edge injects into the response is in the repo, so nothing here can see it (the
+// post-deploy check reads the served headers, and `_headers` says what the edge adds); and whether the
+// served response really carries these headers is the post-deploy check's job, not this rule's. An SVG under web/ at any depth is read for its <style> as a page is,
+// and a <script> in one is a finding of its own (the SVG loop above).
+const CSP_STATS = { scripts: 0, styles: 0 };
+{
+  const HEADERS = 'web/_headers';
+  const ANCHOR_PAGES = ['web/index.html', 'web/404.html'];
+  const DATA_TYPES = new Set(['application/ld+json', 'application/json']);
+  const EXEC_TYPES = new Set(['', 'text/javascript', 'application/javascript', 'module']);
+  const htmlFiles = tracked.filter(f => f.startsWith('web/') && f.endsWith('.html'));
+  for (const p of ANCHOR_PAGES) if (!htmlFiles.includes(p)) note(p, 'is not a tracked HTML page, so rule 13 has nothing to hash for it — this CHECK is now empty for that page, not the page proven covered');
+
+  // The hash routine and the inline-style pattern are scripts/lib/csp-hashes.mjs's, shared with scripts/legal-pages.mjs, which keeps the style-src
+  // hashes of web/_headers in step with the pages; this rule recomputes them from the served HTML all the same, so a hash that is wrong either way is caught here.
+  let hashes = null;
+  try { hashes = await import(pathToFileURL(resolve('scripts/lib/csp-hashes.mjs')).href); }
+  catch (e) { note('scripts/lib/csp-hashes.mjs', 'could not be loaded, so rule 13 could not hash the inline blocks (' + (e.code || 'import failed') + ')'); }
+  const sha256 = text => (hashes ? hashes.cspHash(text) : '');
+  const want = { script: new Set(), style: new Set() };
+  const origins = { script: new Set(), style: new Set() };
+  // The tags and the elements of each page are read by the shared reader (scripts/lib/page-claims.mjs): a tag ends at the first `>` the HTML tokenizer reads as its end, within a bound, and an
+  // element's body is read to its own closer. A tag or an element the reader cannot finish is a finding, never a pass (the patterns this replaced scanned to the end of the page from
+  // every unclosed opener). The reader is imported here, not taken from rule 15's import below, which runs later in this file.
+  let reader = null;
+  try { reader = await import(pathToFileURL(resolve('scripts/lib/page-claims.mjs')).href); }
+  catch (e) { note('scripts/lib/page-claims.mjs', 'could not be loaded, so rule 13 could not read the tags of the pages (' + (e.code || 'import failed') + ')'); }
+  // A page with an unclosed <style> keeps its style hashes unchecked: the hash routine (scripts/lib/csp-hashes.mjs) scans to the end from such an opener, so it is not run on that page,
+  // and then the stale-hash check for styles is not run either (a hash of an unread page would read as stale). The same holds when a page or a reader this check
+  // needs cannot be read at all: its hashes are unjudged, so no stale-hash line and no empty-check advice is given for them, and the advice would name a cause that is not there.
+  const unreadWeb = unreadable.some(f => f.startsWith('web/') && f.endsWith('.html'));
+  // An unreadable SVG under web/ takes its <style> hash with it, so the style side is switched off by it too.
+  const unreadSvg = unreadable.some(f => f.startsWith('web/') && f.endsWith('.svg'));
+  let styleIncomplete = !reader || !hashes || unreadWeb || unreadSvg;
+  let scriptIncomplete = !reader || !hashes || unreadWeb;
+  for (const f of htmlFiles) {
+    if (!reader) break;
+    const s = read(f).replace(/\r\n/g, '\n');
+    const lineAt = i => s.slice(0, i).split('\n').length;
+    const unreadNote = (at, what) => { if (at.length) note(f, `has ${at.length} ${what} the reader cannot read to its end (first at line ${lineAt(at[0])}), so rule 13 cannot check it`); };
+    // A data body that never ends (a comment, a title, a textarea, plaintext): the browser reads the rest of the page as that data, so the rules cannot read past it. One finding per kind.
+    const hiddenNote = at => { const seen = new Set(); for (const h of at) { if (seen.has(h.kind)) continue; seen.add(h.kind); note(f, h.kind === 'comment' ? `line ${lineAt(h.index)}: has an unclosed comment, so the page rules cannot read the markup after it` : h.kind === 'plaintext' ? `line ${lineAt(h.index)}: has a <plaintext> element, whose body is the rest of the page, so the page rules cannot read past it` : `line ${lineAt(h.index)}: has an unclosed <${h.kind}>, so the page rules cannot read the markup after it`); } };
+    // The <script> elements: a code block is hashed, a data block is not, and an element with no closer is a finding.
+    const scripts = reader.elementsOf(s, /<(script)\b/gi);
+    unreadNote(scripts.unread, '<script> tag(s)');
+    if (scripts.unread.length || scripts.unclosed.length) scriptIncomplete = true;
+    hiddenNote(scripts.hidden);
+    if (scripts.unclosed.length) note(f, `has ${scripts.unclosed.length} <script> element(s) with no closer (first at line ${lineAt(scripts.unclosed[0])}), so rule 13 cannot read their bodies`);
+    for (const e of scripts.elements) {
+      const attrs = e.tag.text.slice('<script'.length, -1);
+      const src = (attrs.match(/\bsrc\s*=\s*["']?([^"'\s>]+)/i) || [])[1];
+      if (src) { const o = src.match(/^https?:\/\/[^/]+/i); if (o) origins.script.add(o[0].toLowerCase()); continue; }
+      const type = ((attrs.match(/\btype\s*=\s*["']?([^"'\s>]+)/i) || [])[1] || '').toLowerCase();
+      if (DATA_TYPES.has(type)) continue;
+      if (!EXEC_TYPES.has(type)) { note(f, `has an inline <script type="${type}"> that rule 13 cannot classify as code or data, so its CSP admission is unchecked`); continue; }
+      want.script.add(sha256(e.body)); CSP_STATS.scripts++;
+    }
+    // The <style> elements: each body is hashed as the reader gives it (the routine page-sync uses reads the same walk), but only when every <style> opener has its closer.
+    const styles = reader.elementsOf(s, /<(style)\b/gi);
+    unreadNote(styles.unread, '<style> tag(s)');
+    if (styles.unclosed.length) note(f, `has ${styles.unclosed.length} <style> element(s) with no closer (first at line ${lineAt(styles.unclosed[0])}), so rule 13 cannot read their bodies`);
+    if (styles.unread.length || styles.unclosed.length) styleIncomplete = true;
+    else if (hashes) for (const e of styles.elements) { want.style.add(sha256(e.body)); CSP_STATS.styles++; }
+    // The <link> stylesheets name their origins.
+    const links = reader.startTagsOf(s, /<(link)\b/gi);
+    unreadNote(links.unread, '<link> tag(s)');
+    for (const t of links.tags) {
+      if (!/\brel\s*=\s*["']?[^"'>]*\bstylesheet\b/i.test(t.text)) continue;
+      const o = (t.text.match(/\bhref\s*=\s*["']?(https?:\/\/[^/"'\s>]+)/i) || [])[1];
+      if (o) origins.style.add(o.toLowerCase());
+      // A stylesheet from this site (the font manifest, linked by a path) is admitted by 'self', which style-src must therefore name.
+      else if (/\bhref\s*=\s*["']?(?![a-z][a-z0-9+.-]*:|\/\/)[^"'\s>]/i.test(t.text)) origins.style.add("'self'");
+    }
+    // An event handler or a style attribute on any element, which this policy blocks without saying so; the attribute names are not case-sensitive.
+    const every = reader.startTagsOf(s, /<([a-zA-Z][^\s/>]*)/g); // the group is the whole tag name, as the tokenizer reads it
+    unreadNote(every.unread, 'start tag(s)');
+    if (every.tags.some(t => t.attrs.some(a => a.valued && (/^on[a-z]+$/.test(a.name) || a.name === 'style')))) note(f, 'has an inline event handler or style="" attribute, which the CSP blocks without saying so — move it into the hashed script or style');
+    // A CSP set in a <meta> tag.
+    const meta = reader.metaTagsOf(s);
+    unreadNote(meta.unread, '<meta> tag(s)');
+    if (meta.tags.some(t => /http-equiv\s*=\s*["']?content-security-policy/i.test(t.text))) note(f, 'sets a CSP in a <meta> tag — headers are set at the host, and frame-ancestors has no meta form');
+  }
+  // An SVG under web/ is a document the same policy governs, so its <style> is hashed like a page's: a shipped SVG whose <style> the policy does not admit
+  // is drawn black by a browser that applies the policy to it. Its <style> is read by the shared reader as a page's is: an unread or unclosed one is a finding and
+  // turns the style check off, as it does on a page. A <script> in an SVG under web/, at any depth, is a finding: the policy admits no script in an SVG.
+  for (const f of tracked.filter(f => f.startsWith('web/') && f.endsWith('.svg'))) {
+    if (!reader) break;
+    const s = read(f).replace(/\r\n/g, '\n');
+    const lineAt = i => s.slice(0, i).split('\n').length;
+    const styles = reader.elementsOf(s, /<(style)\b/gi);
+    if (styles.unread.length) note(f, `has ${styles.unread.length} <style> tag(s) the reader cannot read to their end (first at line ${lineAt(styles.unread[0])}), so the style check cannot read them`);
+    if (styles.unclosed.length) note(f, `has ${styles.unclosed.length} unclosed <style> element(s) (first at line ${lineAt(styles.unclosed[0])}), so rule 13 cannot read their bodies`);
+    if (styles.unread.length || styles.unclosed.length) styleIncomplete = true;
+    else if (hashes) for (const e of styles.elements) { want.style.add(sha256(e.body)); CSP_STATS.styles++; }
+    const scripts = reader.startTagsOf(s, /<(script)\b/gi);
+    if (scripts.unread.length) note(f, `has ${scripts.unread.length} <script> tag(s) the reader cannot read to their end (first at line ${lineAt(scripts.unread[0])})`);
+    if (scripts.tags.length) note(f, `has ${scripts.tags.length} <script> element(s), first at line ${lineAt(scripts.tags[0].index)}, which the policy admits in no SVG`);
+  }
+  if (CSP_STATS.scripts === 0 && !scriptIncomplete) note('web/index.html', 'has no inline script for rule 13 to hash, so this CHECK is now empty, not the CSP proven exact. If the page\'s script was removed on purpose, remove its hash from web/_headers and ask the maintainer to retire the script half of rule 13');
+  if (CSP_STATS.styles === 0 && !styleIncomplete) note('web/index.html', 'has no inline style for rule 13 to hash, so this CHECK is now empty for styles, not the CSP proven exact');
+
+  let lib = null;
+  try { lib = await import(pathToFileURL(resolve('scripts/lib/headers-file.mjs')).href); }
+  catch (e) { note('scripts/lib/headers-file.mjs', 'could not be loaded, so rule 13 could not read web/_headers (' + (e.code || 'import failed') + ')'); }
+  if (!existsSync(HEADERS)) note(HEADERS, 'is missing, so no response carries a CSP from this repo — rule 13 has nothing to check. Restore it; if it was removed on purpose, ask the maintainer to retire rule 13');
+  else if (lib) {
+    const text = read(HEADERS);
+    const rules = lib.parseHeadersFile(text);
+    // The header floor: a detach line (`! Name`) for any of these names removes a header the floor needs on every response. Case-insensitive, as HTTP names are.
+    const FLOOR_HEADER_NAMES = new Set(['content-security-policy', 'referrer-policy', 'cross-origin-opener-policy', 'cross-origin-resource-policy', 'permissions-policy']);
+    for (const r of rules) for (const x of r.removes) if (FLOOR_HEADER_NAMES.has(x.name.toLowerCase())) note(HEADERS, 'line ' + x.line + ': removes ' + x.name + ' on ' + r.pattern + ' (a detach line); the header floor needs it on every response');
+    if (rules.length > 100) note(HEADERS, `has ${rules.length} rules; Cloudflare allows 100`);
+    text.split(/\r?\n/).forEach((l, i) => { if (l.length > 2000) note(HEADERS, `line ${i + 1} is ${l.length} characters; Cloudflare allows 2,000 per line`); });
+    const csp = lib.declarations(rules, 'Content-Security-Policy');
+    if (csp.length === 0) note(HEADERS, 'declares no Content-Security-Policy, so rule 13 checked nothing — this CHECK is now empty, not the CSP proven');
+    else {
+      if (csp.length > 1) note(HEADERS, `sets Content-Security-Policy on ${csp.length} rules (lines ${csp.map(c => c.line).join(', ')}); Cloudflare joins a header set twice with a comma, so the served value would no longer be one policy`);
+      const { pattern, value, line } = csp[0];
+      if (pattern !== '/*') note(HEADERS, `line ${line}: the CSP is on "${pattern}", not "/*" — the 404 served for an unmatched path would not carry it`);
+      const { dirs, repeats } = lib.parsePolicy(value);
+      for (const r of new Set(repeats)) note(HEADERS, `line ${line}: the CSP names ${r} twice; a browser keeps only the first`);
+      const exact = { 'default-src': ["'self'"], 'object-src': ["'none'"], 'base-uri': ["'self'"], 'frame-ancestors': ["'none'"], 'form-action': ["'self'"], 'font-src': ["'self'"] };
+      for (const [d, toks] of Object.entries(exact)) {
+        const got = dirs.get(d);
+        if (!got || got.join(' ') !== toks.join(' ')) note(HEADERS, `line ${line}: the CSP floor needs ${d} ${toks.join(' ')}, found ${got ? got.join(' ') : 'nothing'}`);
+      }
+      for (const d of ['script-src', 'script-src-elem', 'default-src']) {
+        for (const bad of ["'unsafe-inline'", "'unsafe-eval'"]) if ((dirs.get(d) || []).includes(bad)) note(HEADERS, `line ${line}: ${d} carries ${bad}`);
+      }
+      // LWK-223: the Web Analytics beacon is admitted by ONE slash-terminated source. Without the slash CSP
+      // path matching is exact and the edge-injected, versioned beacon path is blocked (analytics goes blind);
+      // the bare host would admit every script that host serves. The served CSP is compared with the declared
+      // one, so an edit to the declaration moves both and only this check holds the string.
+      const BEACON_SRC = 'https://static.cloudflareinsights.com/beacon.min.js/';
+      const scriptToks = dirs.get('script-src') || [];
+      if (!scriptToks.includes(BEACON_SRC)) note(HEADERS, `line ${line}: script-src needs the source ${BEACON_SRC} (trailing slash included), found ${scriptToks.filter(t => /cloudflareinsights/i.test(t)).join(' ') || 'none'}`);
+      for (const t of scriptToks) if (/cloudflareinsights/i.test(t) && t !== BEACON_SRC) note(HEADERS, `line ${line}: script-src carries ${t}; the only cloudflareinsights source allowed is ${BEACON_SRC}`);
+      // The beacon is a <script src>, so a script-src-elem directive, when the policy has one, is what admits it.
+      const elemToks = dirs.get('script-src-elem');
+      if (elemToks && !elemToks.includes(BEACON_SRC)) note(HEADERS, `line ${line}: script-src-elem is the directive a browser applies to the beacon <script> and needs the source ${BEACON_SRC} (trailing slash included)`);
+      for (const t of elemToks || []) if (/cloudflareinsights/i.test(t) && t !== BEACON_SRC) note(HEADERS, `line ${line}: script-src-elem carries ${t}; the only cloudflareinsights source allowed is ${BEACON_SRC}`);
+      // A browser applies script-src-elem to <script> blocks and style-src-elem to <style> blocks and stylesheet links when the policy has one (CSP3:
+      // the -elem directive falls back to script-src / style-src, then default-src, only when it is absent). So the EFFECTIVE directive is judged:
+      // the base directive when there is no -elem one, and when there is one BOTH, because the base one is what the sync keeps exact and the -elem
+      // one is what the browser applies. Directives are read by name from the parsed policy, never found by a pattern in the line.
+      for (const [kind, base] of [['script', 'script-src'], ['style', 'style-src']]) {
+        // Without the hash routine no hash is computed, so none can be compared: the library is named above, and an empty hash is never a finding.
+        if (!hashes) continue;
+        if (!dirs.get(base) && !dirs.get(base + '-elem')) { if (want[kind].size) note(HEADERS, `line ${line}: the CSP has no ${base} (and no ${base}-elem), but the served HTML has inline ${kind}s that need admitting`); continue; }
+        for (const dir of [base, base + '-elem']) {
+          const toks = dirs.get(dir);
+          if (!toks) continue;
+          const have = new Set(toks.filter(t => /^'sha256-/.test(t)));
+          for (const t of toks) if (/^'sha(?:384|512)-/.test(t)) note(HEADERS, `line ${line}: ${dir} uses ${t.slice(0, 11)}…, which rule 13 does not recompute; use sha256`);
+          for (const h of want[kind]) if (!have.has(h)) note(HEADERS, `line ${line}: ${dir} does not admit the inline ${kind} whose hash is ${h} — the browser will refuse it`);
+          for (const h of have) if (!want[kind].has(h) && !(kind === 'style' ? styleIncomplete : scriptIncomplete)) note(HEADERS, `line ${line}: ${dir} admits ${h}, which matches no inline ${kind} in the served HTML${kind === 'style' ? ' or SVG' : ''} (a stale hash)`);
+          for (const o of origins[kind]) if (!toks.map(t => t.toLowerCase()).includes(o)) note(HEADERS, `line ${line}: the HTML loads a ${kind === 'style' ? 'stylesheet' : 'script'} from ${o}, which ${dir} does not name`);
+        }
+      }
+      const block = rules.find(r => r.pattern === pattern);
+      const ref = lib.declarations([block], 'Referrer-Policy')[0];
+      if (!ref || ref.value !== 'strict-origin-when-cross-origin') note(HEADERS, `the "${pattern}" rule needs Referrer-Policy: strict-origin-when-cross-origin, found ${ref ? ref.value : 'none'}`);
+      for (const [h, v] of [['Cross-Origin-Opener-Policy', 'same-origin'], ['Cross-Origin-Resource-Policy', 'same-origin']]) {
+        const d = lib.declarations([block], h)[0];
+        if (!d || d.value !== v) note(HEADERS, `the "${pattern}" rule needs ${h}: ${v}, found ${d ? d.value : 'none'}`);
+      }
+      const pp = lib.declarations([block], 'Permissions-Policy')[0];
+      if (!pp || !/\w+=\(\)/.test(pp.value)) note(HEADERS, `the "${pattern}" rule needs a Permissions-Policy that disables features (name=()), found ${pp ? 'none that does' : 'none'}`);
+    }
+  }
+}
+
+// ── 13b. The font manifest loads this site's own declared files and nothing else ──────────────
+// The fonts are self-hosted, so `font-src 'self'` (rule 13) is only true if the stylesheet that names the font files names this site's files. Every tracked stylesheet under
+// web/ is read: each url() must be a path on this site (no scheme, no //) that exists and that rule 7 declares, and an @import is refused because it is not followed.
+// NON-VACUITY: no tracked stylesheet at all is a finding, not a pass. STATED LIMIT: the CSS is read as text, so a url() inside a comment is counted (it fails safe).
+{
+  const sheets = tracked.filter(f => f.startsWith('web/') && f.endsWith('.css'));
+  if (sheets.length === 0) note('web/fonts/fonts.css', 'is not tracked: no stylesheet under web/ for the font manifest rule to read, so this CHECK is empty, not the fonts proven self-hosted');
+  for (const f of sheets) {
+    const s = read(f);
+    if (/@import/i.test(s)) note(f, 'uses @import, which this rule does not follow; link each stylesheet from the page instead');
+    for (const m of s.matchAll(/url\(\s*(["']?)([^"')\s]+)\1\s*\)/gi)) {
+      const u = m[2];
+      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(u)) { note(f, `loads ${u}, which is not on this site; font-src is 'self'`); continue; }
+      const target = (u.startsWith('/') ? 'web' + u : posix.normalize(posix.join(posix.dirname(f), u))).replace(/[?#].*$/, '');
+      if (!existsSync(target)) note(f, `url(${u}) points at ${target}, which does not exist`);
+      else if (!SHIPPED.has(target)) note(f, `url(${u}) points at ${target}, which is not a declared shipped asset (rule 7)`);
+    }
+  }
+}
+
+// ── 15. The dropped "no trackers" claim stays off every production page (LWK-273) ──
+// kolwen.com runs Cloudflare Web Analytics, so the footer's "no trackers" (and its Thai twin) was dropped
+// (`94b9415`). Counsel's analytics sentence has not landed, so until it does no page the site serves may say
+// it again.
+//
+// SCOPE: EVERY tracked `web/*.html` page (WEB_PAGES: home, 404, any preview page, and any page added later). A
+// preview page is not exempt from this rule: the claim is false on a preview page too, and nothing a preview page
+// legitimately says needs the phrase. PREVIEW_EXEMPT, below, does not narrow this rule; it names the pages that a
+// preview rule holds INSTEAD of rule 16 (a preview page has to ask search engines to skip it, which rule 16 forbids
+// on a production page). It is empty while no tracked page is a preview page.
+// NON-VACUITY: a repo with no tracked HTML page is a finding, never a pass.
+// STATED LIMITS, not fixed here: two phrasings only, `no trackers` (any case, any run of whitespace, so a wrapped
+// line still matches) and `ไม่มีตัวติดตาม`; another wording of the same claim ("tracker-free", "ไม่ติดตามคุณ", an HTML
+// entity inside the phrase) passes, and so does the claim in a file that is not a page (PRIVACY.md is held by
+// its own pending-review labels, not by this rule). The HTML is read as text, so the phrase inside a comment counts.
+const PREVIEW_EXEMPT = new Set();
+const WEB_PAGES = tracked.filter(f => f.startsWith('web/') && f.endsWith('.html'));
+// HISTORY_PINS: web/changelog.html renders the repository's own CHANGELOG.md word for word, so it QUOTES claims the repository withdrew ("no trackers",
+// a Free plan). Rules 15 and 17(a) read that page like every other. The hits that exist on it today are exactly the passages pinned below, each by a
+// fingerprint of its normalized text (tags removed, whitespace collapsed, sha256, the first 16 hex characters) with its reason. A hit in any other
+// passage fires, and a pin that matches no passage of the page is STALE and fires, so the list cannot go on excusing text that is gone. A pin also
+// carries `count`, the number of times its passage appears on the page (1: each page holds one language, the English document is its own file, web/th/ holds the Thai one); while the page holds any other number
+// of copies (a pinned passage pasted into a new entry) the pin exempts none of them and a finding names the count, so a copy cannot ride on a pin.
+// STATED LIMITS: a pin compares text, not meaning. Editing a pinned passage changes its fingerprint and fires both a new hit and a stale pin, so a person
+// re-confirms the pin; and it holds only the rendered page, not CHANGELOG.md itself (where the same words are history).
+// A pin excuses a passage's WORDS only: a claim inside a tag, an attribute of the passage's own opener or of a nested tag, is reported (LWK2-080).
+const HISTORY_PINS = [
+  { file: 'web/changelog.html', fp: '518613b551644633', start: "The home page footer no longer says \"no trackers ...\"", count: 1, reason: 'a record of a withdrawn claim' },
+  { file: 'web/changelog.html', fp: '510c767ab5d9bc0c', start: "Rule 17 of scripts/surface-check.mjs, on the web pages", count: 1, reason: 'a record of a withdrawn claim' },
+  { file: 'web/changelog.html', fp: '5a476948bbcbd9d8', start: "Two more rules in scripts/surface-check.mjs, both about the web pages", count: 1, reason: 'a record of a withdrawn claim' },
+];
+// The Thai changelog renders the same CHANGELOG.md passages (one language per file), so each pin also holds for web/th/changelog.html.
+HISTORY_PINS.push(...HISTORY_PINS.filter(p => p.file === 'web/changelog.html').map(p => ({ ...p, file: 'web/th/changelog.html' })));
+// The readers of rules 15 and 16 (metaTagsOf, isRobotsNoindex, passagesOf, pinnedHitter) live in scripts/lib/page-claims.mjs, one linear pass each, and that library is loaded
+// above section 5 with the balance count. A gate imports only Node builtins at the top level; a library that will not load is a finding.
+const PRODUCTION_PAGES = WEB_PAGES.filter(f => !PREVIEW_EXEMPT.has(f));
+const lineOf = (s, i) => s.slice(0, i).split('\n').length;
+{
+  const CLAIMS = [/\bno\s+trackers\b/gi, /ไม่มีตัวติดตาม/g];
+  // NON-VACUITY per scope: the pages that carry no pin are the ones where any hit is a live claim; if none is tracked the rule read pinned text only.
+  const PINNED_FILES = new Set(HISTORY_PINS.map(p => p.file));
+  if (WEB_PAGES.filter(f => !PINNED_FILES.has(f)).length === 0) note('web/', 'has no tracked HTML page outside the pinned changelog, so rule 15 read only pinned text — this CHECK is now empty, not the claim proven absent');
+  for (const f of pageClaims ? WEB_PAGES : []) {
+    const s = read(f);
+    const pinned = pageClaims.pinnedHitter(f, s, HISTORY_PINS);
+    for (const re of CLAIMS) {
+      for (const m of s.matchAll(re)) {
+        if (pinned(m.index)) continue;
+        note(f, `line ${lineOf(s, m.index)}: says "${m[0].replace(/\s+/g, ' ')}", a claim the site no longer makes (it runs Cloudflare Web Analytics); keep it off until counsel's analytics wording lands`);
+      }
+    }
+  }
+}
+
+// ── 16. No production page asks search engines to skip it (LWK-271) ─────────
+// Production kolwen.com must be indexable. Only the preview host says noindex, and it says it in a response
+// header (web/_headers, the absolute-URL rule on `*.previews.kolwen.com`), never in a page. So: no tracked production page
+// (the home page included) carries a robots `noindex` meta, and no `web/_headers` rule on a production path sets
+// an X-Robots-Tag with noindex. The reviewer's mutant I1 (a noindex meta on the home page) passed every gate
+// before this rule.
+//
+// What counts: a `<meta>` whose `name` is `robots` and whose `content` holds `noindex` or `none` (robots `none` means
+// noindex plus nofollow), in any attribute order, any case, double, single or no quotes. In `_headers`, an
+// X-Robots-Tag value holding `noindex` or `none` on any rule whose pattern is not an absolute URL whose host is one label, or one placeholder, before `.previews.kolwen.com`.
+// SCOPE: PRODUCTION_PAGES, every tracked page except those in PREVIEW_EXEMPT (rule 15 names why that set exists).
+// NON-VACUITY: rule 15's empty-scope finding covers the page list, and a list that is empty only because every page
+// is exempt is a finding here; a `_headers` that cannot be read is rule 13's finding.
+// STATED LIMITS, not fixed here: engine-specific names (`googlebot`, `bingbot`, a `user-agent:` prefix in the header
+// value) and directives such as `unavailable_after` are not read; a meta inside an HTML comment counts (it fails
+// safe); and a `*.previews.kolwen.com` pattern is trusted to be a preview host, and a workers.dev host is not (the workers.dev previews are retired, so no
+// rule of web/_headers names one); an attribute name written with an entity (`na&#109;e`)
+// is not read; a `name=` or `content=` text sitting inside ANOTHER attribute's quoted value is still seen as the
+// attribute. A meta tag is read as the HTML tokenizer reads a start tag (scripts/lib/page-claims.mjs, `tagEnd`): a
+// quote opens a value only after the `=` of an attribute, so a stray quote in an attribute name or an unquoted value
+// is plain text. A tag that does not end within META_MAX (4096) characters, an unclosed quote among them, is NOT
+// passed over: it is a finding, one per page.
+{
+  // The meta tags are read by metaTagsOf and the robots test by isRobotsNoindex (scripts/lib/page-claims.mjs): a tag ends at the first `>` outside a quoted value, the attribute name must be the
+  // whole name (`data-content` is not `content`), and the `name` value exactly `robots`.
+  // ONE NAMED EXEMPTION: web/404.html already carries `noindex` on purpose. It answers an unmatched path with
+  // HTTP 404, which search engines drop on their own, so the tag decides nothing about any page of the site. Its
+  // `X-Robots-Tag` header is still refused below. Anything else carrying the tag is a finding.
+  // The exemption covers the unread-tag finding too, not only the noindex finding. That finding exists to prove a production
+  // page free of a noindex, and this page is exempt from the claim it proves: its noindex is intended, so no proof of its
+  // absence is owed, and an unclosed meta tag on it changes nothing a visitor or a crawler sees.
+  // The unread-tag finding below is safe only while rule 13's file set stays a superset of this rule's pages: rule 13 reads the markup of every page
+  // this rule reads, so a page whose tags rule 13 cannot read is named there. Keep that superset when either list changes.
+  // subprocessors: unannounced until its first row takes effect; the switch that removes the noindex, adds the link and the sitemap entry is a later change
+const NOINDEX_META_OK = new Set(['web/404.html', 'web/subprocessors.html', 'web/legal.html', 'web/th/404.html', 'web/th/subprocessors.html', 'web/th/legal.html']);
+  if (WEB_PAGES.length > 0 && PRODUCTION_PAGES.length === 0) note('web/', 'has tracked HTML pages but every one is in PREVIEW_EXEMPT, so rule 16 checked nothing — this CHECK is now empty, not the noindex meta proven absent');
+  for (const f of PRODUCTION_PAGES.filter(f => !NOINDEX_META_OK.has(f))) {
+    if (!pageClaims) break;
+    const s = read(f);
+    const { tags, unread } = pageClaims.metaTagsOf(s);
+    for (const t of tags) {
+      if (pageClaims.isRobotsNoindex(t.text)) note(f, `line ${lineOf(s, t.index)}: carries a robots noindex meta tag; production pages must stay indexable (only the preview host says noindex, in a response header)`);
+    }
+    // a tag that does not end within META_MAX characters is not read, so the page is not proven free of a noindex: one finding per page names the first and the count
+    if (unread.length) note(f, `line ${lineOf(s, unread[0])}: a <meta tag that does not end within ${pageClaims.META_MAX} characters was not read by the robots check (${unread.length} such tag(s) on the page), so the page is not proven free of a robots noindex; close the tag`);
+  }
+  let headersLib = null;
+  try { headersLib = await import(pathToFileURL(resolve('scripts/lib/headers-file.mjs')).href); }
+  catch (e) { note('scripts/lib/headers-file.mjs', 'could not be loaded, so rule 16 could not read web/_headers (' + (e.code || 'import failed') + ')'); }
+  if (headersLib && existsSync('web/_headers')) {
+    for (const r of headersLib.parseHeadersFile(read('web/_headers'))) {
+      for (const h of r.headers) {
+        if (h.name.toLowerCase() !== 'x-robots-tag' || !/\b(?:noindex|none)\b/i.test(h.value)) continue;
+        if (/^https:\/\/(?::[A-Za-z]\w*|[a-z0-9-]+)\.previews\.kolwen\.com(?:\/|$)/i.test(r.pattern)) continue;
+        note('web/_headers', `line ${h.line}: sets X-Robots-Tag "${h.value}" on "${r.pattern}", a production path; noindex belongs only to the preview-host rule (an absolute URL whose host is ONE label, or one placeholder, before \`.previews.kolwen.com\`)`);
+      }
+    }
+  }
+}
+
+// ── 17. A production page names no Free plan and sells nothing yet ──────────────
+// Until a plan can be bought and the lawyer's words are in, kolwen.com shows prices and cannot take an order. Two
+// things hold that on the page itself, and each is its own clause so a mutant can remove one at a time.
+//
+// (a) FREE: no web page, preview or production, names a "Free" plan or a free tier, in either language, until
+// that plan exists to be named. This is the preview rule's Free check read over EVERY tracked page (WEB_PAGES), so a
+// production page cannot carry what a preview page may not.
+// (b) NOTHING TO BUY: no production page (PRODUCTION_PAGES, rule 15's list minus PREVIEW_EXEMPT) carries a control that
+// can start a purchase. A <button> must be disabled (the language-switch buttons the shared header and footer render, matched byte for byte and only inside those blocks, are the one allowance);
+// no <form> and no submit/button/image/reset <input>; no link that reads as a buy control, by its text, its aria-label or title, or the alt of an image inside it (buy, purchase, subscribe,
+// checkout, order, pay, upgrade, sign up, and the Thai for buy, subscribe and pay) or has role=button; no <script src> from
+// a Paddle host and no Paddle global in an inline script; no URL attribute (href, action, src, formaction, data-*)
+// naming a Paddle host, a checkout path or a _ptxn query (a <script src> belongs to the payment-script clause alone,
+// so each shape has exactly one clause that owns it).
+//
+// NON-VACUITY: if no production page holds any <button> at all the button check read nothing (the header's
+// language buttons are the standing sample), and that is a finding, not a pass. STATED LIMITS: a button or a form inside an
+// HTML comment counts (it fails safe). A link is a FAIL-OPEN, not yet fixed: the HTML is read as markup inside a <script> or <style> body, an HTML comment, a
+// <title> or a <textarea>, so an <a> written inside one can swallow the real link after it and hide its role, aria-label and title from this check; "disabled" is read as a bare attribute, so a button the page's own
+// script enables at run time is not seen; the language-switch allowance is the exact button and its place, so a live button must be
+// byte for byte one of SWITCH_BUTTONS inside the header or footer block; a link that sells without saying so ("Continue", a bare arrow), a payment script served from the site's own
+// origin, a checkout URL on another word, a custom element and an onclick handler are not read (rule 13 already refuses
+// inline handlers and any script origin the CSP does not name); a link named only by aria-labelledby, or by CSS content, is not read. Clause (a) reads the capitalised word Free (so
+// Free-form counts and freedom does not), free plan / free tier / free version in any case, and the Thai word for
+// free, and nothing else; style, script and svg text is skipped.
+{
+  const lineAt = (s, i) => s.slice(0, i).split('\n').length;
+  // Attribute VALUES out, quoted or not, so neither title="disabled" nor data-state=disabled is the attribute `disabled`.
+  const bare = attrs => attrs.replace(/=\s*(?:"[^"]*"|'[^']*'|[^\s"'`=>]+)/g, '=""');
+  // The backslashes are doubled: in a plain string '\w' is just 'w', which made `notdisabled` and `disabledx` read as disabled.
+  const hasAttr = (attrs, name) => new RegExp('(?<![\\w-])' + name + '(?![\\w-])', 'i').test(bare(attrs));
+  const LABEL_ATTR = /(?<![\w-])(?:aria-label|title)\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/gi; // what a link is called besides its text
+  const ALT_ATTR = /(?<![\w-])alt\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/gi;
+  // The one live button the site allows is the language switch, and it is allowed NARROWLY: the button's whole text must be one of the strings the shared render writes (SWITCH_BUTTONS in
+  // scripts/lib/legal-render.mjs) and it must sit between the markers of the synced header or footer block. An attribute alone allows nothing.
+  let SWITCH = [], SHARED_BLOCKS = [];
+  try {
+    const lib = await import(pathToFileURL(resolve('scripts/lib/legal-render.mjs')).href);
+    SWITCH = lib.SWITCH_BUTTONS;
+    SHARED_BLOCKS = lib.SYNC_BLOCKS.filter(b => b.shared === 'header' || b.shared === 'footer');
+  } catch (e) { note('scripts/lib/legal-render.mjs', 'could not be loaded, so rule 17 allows no live button at all (' + (e.code || 'import failed') + ')'); }
+  const isSwitchButton = (s, at) => {
+    const outer = s.slice(at, s.indexOf('</button>', at) + '</button>'.length);
+    return SWITCH.includes(outer) && SHARED_BLOCKS.some(b => { const i = s.indexOf(b.begin), j = s.indexOf(b.end); return i >= 0 && j > i && at > i && at < j; });
+  };
+  const SUBMITTY = /(?<![\w-])type\s*=\s*["']?\s*(?:submit|button|image|reset)\b/i;
+  const BUY_WORDS = /\b(?:buy|purchase|subscribe|checkout|check\s+out|order|pay|upgrade|sign\s+up)\b|ซื้อ|สมัคร|ชำระ|จ่ายเงิน/i;
+  const PAY_HOST = /paddle\.com|paddle\.js|paddlejs/i;
+  const PAY_URL = /paddle\.com|paddlejs|checkout|[?&]_ptxn=/i;
+  const URL_ATTR = /(?<![\w-])(href|action|src|formaction|data-[\w-]+)\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/gi;
+  let buttonsSeen = 0;
+  /* FREE_ALL:begin */
+  // Without the library no pin is read, so the pinned Free-plan passage on the changelog would be named: the import note is the finding, and the page scan waits for the library.
+  for (const f of pageClaims ? WEB_PAGES : []) {
+    const s = read(f);
+    // The end tag may carry whitespace or attributes ("</script >"), which the HTML parser still closes on (as rule 13's own pattern allows).
+    // Comments, and the script and style elements, are not visible text: the shared walk names their ranges. An inline svg is not an HTML data element, so its pattern stays.
+    const blank = (text, a, b) => text.slice(0, a) + text.slice(a, b).replace(/[^\n]/g, ' ') + text.slice(b);
+    let visible = s;
+    if (pageClaims) for (const sp of pageClaims.dataSpansOf(s)) if (sp.kind === 'comment' || sp.kind === 'script' || sp.kind === 'style') visible = blank(visible, sp.start, sp.end);
+    visible = blankSvgs(visible);
+    const seenAt = new Set(); // "Free plan" matches two patterns at one place: one finding
+    const pinned = pageClaims ? pageClaims.pinnedHitter(f, s, HISTORY_PINS) : () => false;
+    for (const re of [/\b(?:Free|FREE)\b/g, /\bfree\s+(?:plan|tier|version)\b/gi, /ฟรี/g]) {
+      for (const m of visible.matchAll(re)) if (!seenAt.has(m.index) && !pinned(m.index)) seenAt.add(m.index), note(f, 'line ' + lineOf(s, m.index) + ': says "' + m[0].replace(/\s+/g, ' ') + '", a Free plan or a free tier; no page names a Free plan until it exists to be named');
+    }
+  }
+  /* FREE_ALL:end */
+  // A pin that matches no passage of its page is stale (rules 15 and 17a share the list). Without the library no pin is read at all, so none is stale: the import note above is the finding.
+  for (const p of pageClaims ? HISTORY_PINS : []) {
+    const n = tracked.includes(p.file) ? pageClaims.passagesOf(read(p.file)).filter(x => x.fp === p.fp).length : 0;
+    if (n === 0) note(p.file, `pinned passage ${p.fp} (${p.start}) matches no passage of the page, so the pin excuses nothing: remove it, or re-pin the passage if its words changed`);
+    else if (n !== p.count) note(p.file, `pinned passage ${p.fp} (${p.start}) appears ${n} time(s) on the page, the pin allows ${p.count}: a copy of a withdrawn quote is a new occurrence, so the pin exempts none of them until the extra copy is removed or the count is re-confirmed`);
+  }
+  // The start tags, the <a> elements and the <script> bodies of each production page are read by the shared walk (scripts/lib/page-claims.mjs), as rule 13 reads them: markup is read
+  // at markup level, so a tag inside a comment, a script or style body, a title or a textarea is no tag; a tag or an element the reader cannot finish is a finding, never a pass. The line of a hit is counted only when a
+  // hit is reported, so a page of many tags costs one pass, not one line count per tag.
+  for (const f of PRODUCTION_PAGES) {
+    const s = read(f);
+    const tagsRead = pageClaims ? pageClaims.startTagsOf(s, /<([a-zA-Z][^\s/>]*)/g) : { tags: [], unread: [] }; // the group is the whole tag name, as the tokenizer reads it
+    if (tagsRead.unread.length) note(f, `has ${tagsRead.unread.length} start tag(s) the reader cannot read to their end (first at line ${lineAt(s, tagsRead.unread[0])}), so the buy-control and payment checks cannot read them`);
+    const scriptBodies = new Map(pageClaims ? pageClaims.elementsOf(s, /<(script)\b/gi).elements.map(e => [e.tag.index, e.body]) : []);
+    for (const t of tagsRead.tags) {
+      const tag = t.name.toLowerCase(), attrs = t.text.slice(1 + t.name.length, -1);
+      if (tag === 'button') {
+        buttonsSeen++;
+        /* BUY_BTN:begin */
+        if (!hasAttr(attrs, 'disabled') && !isSwitchButton(s, t.index)) note(f, 'line ' + lineAt(s, t.index) + ': has a button that is not disabled; a production page sells nothing yet, so every buy button stays disabled');
+        /* BUY_BTN:end */
+      }
+      /* BUY_FORM:begin */
+      if (tag === 'form' || (tag === 'input' && SUBMITTY.test(attrs) && !hasAttr(attrs, 'disabled'))) note(f, 'line ' + lineAt(s, t.index) + ': has a form or a submit-type input; a production page sells nothing yet, so it takes no order');
+      /* BUY_FORM:end */
+      /* PAY_SCRIPT:begin */
+      if (tag === 'script') {
+        const src = (attrs.match(/(?<![\w-])src\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/i) || [])[1] || '';
+        const body = scriptBodies.get(t.index) || '';
+        if (PAY_HOST.test(src) || /\bPaddle\s*[.=(]|\bpaddle_billing\b/.test(body)) note(f, 'line ' + lineAt(s, t.index) + ': carries a payment script (a Paddle host or the Paddle global); no payment code ships until a plan can be bought');
+      }
+      /* PAY_SCRIPT:end */
+      /* PAY_URL:begin */
+      for (const u of attrs.matchAll(URL_ATTR)) if (!(tag === 'script' && u[1].toLowerCase() === 'src') && PAY_URL.test(u[2])) note(f, 'line ' + lineAt(s, t.index) + ': has a checkout or payment URL (' + u[2].replace(/^["']|["']$/g, '').slice(0, 60) + '); no checkout is open yet');
+      /* PAY_URL:end */
+    }
+    /* BUY_LINK:begin */
+    const anchors = pageClaims ? pageClaims.elementsOf(s, /<(a)\b/gi) : { elements: [], unclosed: [], unread: [] };
+    if (anchors.unread.length) note(f, `has ${anchors.unread.length} link tag(s) the reader cannot read to their end (first at line ${lineAt(s, anchors.unread[0])}), so the buy-link check cannot read them`);
+    if (anchors.unclosed.length) note(f, `has ${anchors.unclosed.length} <a> element(s) with no closer (first at line ${lineAt(s, anchors.unclosed[0])}), so the buy-link check cannot read their text`);
+    for (const e of anchors.elements) {
+      const attrs = e.tag.text.slice(2, -1);
+      let label = '';
+      /* BUY_LABEL:begin */
+      for (const a of attrs.matchAll(LABEL_ATTR)) label += ' ' + a[1].replace(/^["']|["']$/g, '');
+      for (const a of e.body.matchAll(ALT_ATTR)) label += ' ' + a[1].replace(/^["']|["']$/g, '');
+      /* BUY_LABEL:end */
+      const text = e.body.replace(/<[^>]*>/g, ' ') + label;
+      if (BUY_WORDS.test(text) || /(?<![\w-])role\s*=\s*["']?button\b/i.test(attrs)) note(f, 'line ' + lineAt(s, e.tag.index) + ': has a link that reads as a buy control ("' + text.replace(/\s+/g, ' ').trim().slice(0, 40) + '"); a production page sells nothing yet');
+    }
+    /* BUY_LINK:end */
+  }
+  if (PRODUCTION_PAGES.length > 0 && buttonsSeen === 0) note('web/', 'holds no <button> on any production page, so the buy-button check read nothing — this CHECK is now empty, not the pages proven free of live buy controls');
+}
+
+// ── 18. The redirects point at pages we ship, and hide none ─────────────────────
+// web/_redirects (Workers static assets; syntax in scripts/lib/redirects-file.mjs, from Cloudflare's Redirects page) moved
+// the pricing page's first address to its canonical one. Cloudflare follows a redirect "regardless of whether or not an asset
+// matches", so a wrong line is not a harmless typo: a destination that is no page serves a 404 to everyone who followed the old
+// link, a source that is a live page hides that page, and a sitemap URL that redirects tells crawlers to index a hop.
+// One clause per marker, so a mutant can remove one at a time:
+//   R18_SYNTAX  two or three fields; source and destination start with "/" (a destination may also be an https URL);
+//               status one of 301 302 303 307 308; at most 1,000 characters a line; no splat or placeholder (not read here)
+//   R18_DEST    a relative destination is a tracked page or file under web/ ("/" is index.html, "/x" is x.html or x)
+//   R18_SHADOW  a source is not a tracked page (the redirect would hide it)
+//   R18_CHAIN   no redirect to itself and no destination that is another redirect's source
+//   R18_MAP     no sitemap URL is a redirect source
+// NON-VACUITY: a tracked web/_redirects that holds no redirect is a finding (rule 18 read nothing).
+// STATED LIMITS: only static redirects are read (a splat or placeholder is refused, not interpreted); a destination on the site's own
+// origin is read as a local path, and the site's origins are those its sitemap lists (no sitemap, no absolute destination is local); that the edge answers
+// as the file says is post-deploy-check's probe, not this rule's; a destination is checked to exist, not to be the page
+// the author meant; the 2,000-redirect and 100-dynamic-redirect caps are not counted (the file holds a handful).
+{
+  const REDIRECTS = 'web/_redirects';
+  if (tracked.includes(REDIRECTS) && existsSync(REDIRECTS)) {
+    let rl = null;
+    try { rl = await import(pathToFileURL(resolve('scripts/lib/redirects-file.mjs')).href); }
+    catch (e) { note('scripts/lib/redirects-file.mjs', 'could not be loaded, so rule 18 could not read web/_redirects (' + (e.code || 'import failed') + ')'); }
+    if (rl) {
+      const rules = rl.parseRedirectsFile(read(REDIRECTS));
+      if (rules.length === 0) note(REDIRECTS, 'holds no redirect, so rule 18 read nothing — remove the file, or restore the redirect it was shipped for');
+      const CONTROL_FILES = new Set(['_redirects', '_headers']);
+      const served = p => {
+        const clean = p.split(/[?#]/)[0];
+        // Cloudflare parses these two files and never serves them, so a redirect to one leads to the 404 page (docs: "will not itself be served as a static asset").
+        if (CONTROL_FILES.has(clean.split('/').pop())) return null;
+        if (clean === '/') return 'web/index.html';
+        const rel = 'web' + clean.replace(/\/+$/, '');
+        return [rel + '.html', rel, rel + '/index.html'].find(f => tracked.includes(f)) || null;
+      };
+      const norm = p => (p.length > 1 ? p.replace(/\/+$/, '') : p);
+      const sources = new Set(rules.map(r => norm(r.source)));
+      const sitemap = existsSync('web/sitemap.xml') ? read('web/sitemap.xml') : '';
+      // The site's own origins are the ones its sitemap names; a destination on one of them is a LOCAL path (the same checks
+      // apply), and one on any other origin is left alone. A query or fragment never changes which page is meant.
+      const siteOrigins = new Set();
+      for (const m of sitemap.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)) { try { siteOrigins.add(new URL(m[1]).origin); } catch { /* not a URL */ } }
+      const target = d => {
+        if (d.startsWith('/')) return d.split(/[?#]/)[0];
+        try { const u = new URL(d); return siteOrigins.has(u.origin) ? u.pathname : null; } catch { return null; }
+      };
+      for (const r of rules) {
+        const dest = r.dest === undefined ? null : target(r.dest); // a one-field line has no destination (R18_SYNTAX reports it)
+        /* R18_SYNTAX:begin */
+        if (r.fields < 2 || r.fields > 3) { note(REDIRECTS, 'line ' + r.line + ': has ' + r.fields + ' fields, expected a source, a destination and an optional status'); continue; }
+        if (!r.source.startsWith('/')) note(REDIRECTS, 'line ' + r.line + ': the source "' + r.source + '" does not start with "/"');
+        if (!(r.dest.startsWith('/') || /^https:\/\//i.test(r.dest))) note(REDIRECTS, 'line ' + r.line + ': the destination "' + r.dest + '" is neither a "/" path nor an https URL');
+        if (!rl.REDIRECT_STATUSES.has(r.status)) note(REDIRECTS, 'line ' + r.line + ': the status is not one of 301 302 303 307 308');
+        if (r.length > 1000) note(REDIRECTS, 'line ' + r.line + ': is ' + r.length + ' characters; Cloudflare allows 1,000 per redirect');
+        if (rl.isDynamic(r)) note(REDIRECTS, 'line ' + r.line + ': is a dynamic redirect (a splat or placeholder), which rule 18 does not read — state it in the rule before shipping it');
+        /* R18_SYNTAX:end */
+        /* R18_DEST:begin */
+        if (dest !== null && !served(dest)) note(REDIRECTS, 'line ' + r.line + ': the destination ' + r.dest + ' is no page under web/, so everyone who follows ' + r.source + ' would get a 404');
+        /* R18_DEST:end */
+        /* R18_SHADOW:begin */
+        if (r.source.startsWith('/') && served(r.source)) note(REDIRECTS, 'line ' + r.line + ': the source ' + r.source + ' is a live page (' + served(r.source) + '), and a redirect is followed whether or not an asset matches, so it would hide that page');
+        /* R18_SHADOW:end */
+        /* R18_CHAIN:begin */
+        if (dest === null) { /* another origin: not a hop of ours */ }
+        else if (norm(r.source) === norm(dest)) note(REDIRECTS, 'line ' + r.line + ': redirects ' + r.source + ' to itself');
+        else if (sources.has(norm(dest))) note(REDIRECTS, 'line ' + r.line + ': the destination ' + r.dest + ' is itself a redirect source, a chain of hops');
+        /* R18_CHAIN:end */
+      }
+      /* R18_MAP:begin */
+      for (const m of sitemap.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)) {
+        let p = null;
+        try { p = norm(new URL(m[1]).pathname); } catch { /* an unparsable loc is not this rule's */ }
+        if (p && sources.has(p)) note('web/sitemap.xml', 'lists ' + m[1] + ', which web/_redirects redirects: the sitemap names the destination, never the old address');
+      }
+      /* R18_MAP:end */
+    }
+  } else if (tracked.includes(REDIRECTS)) note(REDIRECTS, 'is tracked but cannot be read, so rule 18 checked nothing');
+}
+
+// ── 19. The Thai 7-day clause in TERMS.md agrees with the legal-state record ──
+// The clause is in TERMS.md only while legal/legal-state.json says a legal trigger has been met (incorporation, direct-marketing
+// registration, or a revenue crossing that stands); the block between the two legal-state markers is a pure function of the
+// record and legal/thai-7day-clause.md, rendered by scripts/legal-state.mjs --write and never edited by hand. A clause that shows
+// while the record says it is not in force, or is missing once it is, would put a false legal statement on a public page.
+// One clause per marker, so a mutant can remove one at a time:
+//   L19_RECORD   the record is valid JSON of the fixed shape: exact keys, values null or a real date (a registration number, a tax
+//                identification number, a revenue figure or any owner identifier CANNOT be stored there), a company trigger needs a
+//                company seller, a veto sits inside 14 calendar days of its crossing; a missing file is a finding
+//   L19_MARKERS  TERMS.md holds exactly one begin and one end marker
+//   L19_SYNC     the block equals the rendering of (record, clause file)
+// STATED LIMITS: the one-way latch and the 14-day veto TIMING cannot be seen in one snapshot (git history is the audit log; a
+// veto inside the window is accepted whenever it is committed); that the trigger date is true is the owner's dated commit, not
+// this rule's; revenue is measured by a billing system that does not exist yet (legal/README.md holds the design); the rule reads
+// the English and Thai clause because the clause file carries both, and holds nothing about their legal wording.
+{
+  let ls = null;
+  try { ls = await import(pathToFileURL(resolve('scripts/lib/legal-state.mjs')).href); }
+  catch (e) { note('scripts/lib/legal-state.mjs', 'could not be loaded, so rule 19 could not read the legal-state record (' + (e.code || 'import failed') + ')'); }
+  if (ls) {
+    const text = p => (existsSync(p) ? read(p) : null);
+    const fs19 = ls.findings({ record: text(ls.STATE_FILE), clause: text(ls.CLAUSE_FILE), terms: text(ls.TERMS_FILE) });
+    /* L19_RECORD:begin */
+    for (const x of fs19.filter(x => x.kind === 'record')) note(ls.STATE_FILE, x.msg);
+    /* L19_RECORD:end */
+    /* L19_MARKERS:begin */
+    for (const x of fs19.filter(x => x.kind === 'markers')) note(ls.TERMS_FILE, x.msg);
+    /* L19_MARKERS:end */
+    /* L19_SYNC:begin */
+    for (const x of fs19.filter(x => x.kind === 'sync')) note(ls.TERMS_FILE, x.msg);
+    /* L19_SYNC:end */
+  }
+}
+
+// ── 20. The domain seams: groups, legal pages, CSP per zone, host-only cookies, a catalogue with no host key ──
+// web-src/seams.json maps every served page to one group (today the company site), so a group can move to its own host by a web/_redirects change.
+// The five seams and their stated limits are in scripts/lib/domain-seams.mjs, and scripts/domain-seams.test.mjs plants a defect in each. Nothing is bought and nothing moves: the rule only
+// keeps the site able to. A map that is missing or malformed is one finding and the other four seams are not read, since a page cannot be judged against no map.
+{
+  let ds = null;
+  try { ds = await import(pathToFileURL(resolve('scripts/lib/domain-seams.mjs')).href); }
+  catch (e) { note('scripts/lib/domain-seams.mjs', 'could not be loaded, so rule 20 could not check the domain seams (' + (e.code || 'import failed') + ')'); }
+  if (ds) {
+    try { for (const p of ds.seamProblems(ds.snapshotOf(tracked, read))) note(p.file, p.msg); }
+    catch (e) { note('scripts/lib/domain-seams.mjs', 'rule 20 could not complete (' + String(e.message || e).slice(0, 160) + ')'); }
+  }
+}
+
+// ── 21. The layout tokens hold: rem type, no bare viewport type, the viewport meta of the formula ──
+// build-qc.md W-I18N-10 and W-FMT-11, on every tracked page under web/ (and the font manifest it links): every font-size is rem, or a clamp() that carries a rem term, so the visitor's own
+// text size scales it (SC 1.4.4, failure F94); the viewport meta has width=device-width, initial-scale=1 and viewport-fit=cover and nothing that blocks zoom. The rules and their stated limits
+// are in scripts/lib/type-lint.mjs, and scripts/type-lint.test.mjs plants each defect. NON-VACUITY: no tracked page is a finding.
+{
+  let tl = null;
+  try { tl = await import(pathToFileURL(resolve('scripts/lib/type-lint.mjs')).href); }
+  catch (e) { note('scripts/lib/type-lint.mjs', 'could not be loaded, so rule 21 could not check the type sizes (' + (e.code || 'import failed') + ')'); }
+  if (tl) {
+    const pages21 = tracked.filter(f => /^web\/.*\.html$/.test(f));
+    if (pages21.length === 0) note('web/', 'has no tracked HTML page, so rule 21 checked nothing');
+    const fontCss = tracked.includes('web/fonts/fonts.css') ? [read('web/fonts/fonts.css')] : [];
+    // every page is its own item: a page that cannot be read (a tracked page deleted from the working tree before the deletion is staged) or cannot be checked is one FAIL line naming it, and the
+    // other pages are still checked
+    for (const f of pages21) {
+      try { for (const why of tl.pageTypeProblems(read(f), fontCss)) note(f, why); }
+      catch (e) { note(f, 'rule 21 could not check this page (' + (e.code || e.message || 'error') + ')'); }
+    }
+  }
+}
+
+// ── 22. The reading theme holds its contrast, in both colour schemes ──
+// build-qc.md W-A11Y-05, W-FMT-12 (WCAG 2.2 SC 1.4.3, 1.4.11): every text/ground pair of the reading theme (scripts/lib/layout-tokens.mjs READING_PAIRS, the header and the footer colours
+// included) is computed in the light scheme and in the dark one, each on its own, and a pair under its floor (4.5:1 for text, 3:1 for a graphic or the border of a control) is a finding. The
+// colours of the pages as a browser computes them are measured by the rendered check (scripts/rendered-check.mjs, the `contrast` check). NON-VACUITY: a theme with no pair is a finding.
+{
+  let ct = null;
+  try { ct = await import(pathToFileURL(resolve('scripts/lib/contrast.mjs')).href); }
+  catch (e) { note('scripts/lib/contrast.mjs', 'could not be loaded, so rule 22 could not measure the reading theme (' + (e.code || 'import failed') + ')'); }
+  if (ct) {
+    const rows22 = ct.readingContrast();
+    if (rows22.length === 0) note('scripts/lib/layout-tokens.mjs', 'lists no reading-theme pair, so rule 22 measured nothing');
+    for (const r of rows22.filter(r => !r.ok)) note('scripts/lib/layout-tokens.mjs', `reading theme, ${r.scheme} scheme: ${r.fg} on ${r.bg} (${r.what}) is ${r.ratio === null ? 'not a measurable pair' : r.ratio.toFixed(2) + ':1'}, under the floor of ${r.floor}:1`);
+  }
+}
+
+// The exit code is set, never forced: process.exit() can drop writes to stdout or stderr that are still pending, and a pipe is asynchronous on POSIX, so a long findings list could be cut short there.
+if (fail.length) {
+  console.error('surface check FAILED:\n' + fail.map(f => '  - ' + f).join('\n'));
+  process.exitCode = 1;
+} else {
+  console.log(`surface check passed — ${tracked.length} tracked files, ${tracked.filter(SCANNABLE).length} scanned · CSP hashes recomputed for ${CSP_STATS.scripts} inline script(s) and ${CSP_STATS.styles} inline style(s)${gapNote}`);
+}

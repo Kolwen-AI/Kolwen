@@ -1,0 +1,331 @@
+{
+  "home": {
+    "mark": {
+      "reading": "โคลเวน"
+    },
+    "hero": {
+      "title": "A {#hl}verifiable{/hl} AI assistant—every answer will ship with its sources and a confidence level.",
+      "sub": "Answers that can’t be verified will be flagged, never hidden."
+    },
+    "origin": "Made in Thailand · {#th}สร้างในประเทศไทย{/th}",
+    "disclosure": "In development · not yet available—this is Kolwen’s official page until it launches.",
+    "channels": {
+      "title": "Official channels",
+      "email": "info@kolwen.com"
+    },
+    "warn": "{#b}Beware of impersonators:{/b} Kolwen has no official accounts other than the channels on this page. We will never message you asking for personal details, a one-time code, or money.",
+    "meta": {
+      "title": "Kolwen—verifiable AI, made in Thailand · in development",
+      "description": "Kolwen (โคลเวน) — a verifiable AI assistant made in Thailand. In development, not yet available. Answers will ship with sources and a confidence level.",
+      "og-description": "In development, not yet available. Every answer will ship with its sources and a confidence level; answers that cannot be verified will be flagged, never hidden."
+    },
+    "ld": {
+      "description": "A verifiable AI assistant made in Thailand. Every answer will ship with its sources and a confidence level - answers that cannot be verified will be flagged, never hidden."
+    }
+  },
+  "pricing": {
+    "title": "Plans",
+    "intro": "How Kolwen plans will be priced. Nothing here can be bought yet.",
+    "plans": {
+      "title": "Plans",
+      "names": "The plans are named Lite, Standard, Premium and Exclusive.",
+      "billing": "Billing: Monthly, or Yearly (pay for ten months, get twelve)."
+    },
+    "billing": {
+      "label": "Billing",
+      "monthly": "Monthly",
+      "yearly": "Yearly"
+    },
+    "plan": {
+      "lite": "Lite",
+      "standard": "Standard",
+      "premium": "Premium",
+      "exclusive": "Exclusive"
+    },
+    "status": {
+      "later": "Opens later",
+      "first": "Opens first"
+    },
+    "lite": {
+      "price-monthly": "$8 {#small}a month{/small}",
+      "price-yearly": "$80 {#small}a year{/small}",
+      "quota": "0.4x the token quota of Standard",
+      "usage": "A usage view that will show how much of each usage window you have used, in percent",
+      "price-lock": "Your price stays the same while your subscription stays live",
+      "cancel": "Cancel anytime",
+      "export": "Export your data"
+    },
+    "soon": "Coming soon",
+    "standard": {
+      "price-monthly": "$20 {#small}a month{/small}",
+      "price-yearly": "$200 {#small}a year{/small}",
+      "includes": "Everything in Lite, plus:",
+      "quota": "1x the token quota of Standard (the base)"
+    },
+    "premium": {
+      "price-monthly": "$100 {#small}a month{/small}",
+      "price-yearly": "$1,000 {#small}a year{/small}",
+      "includes": "Everything in Standard, plus:",
+      "quota": "5x the token quota of Standard"
+    },
+    "exclusive": {
+      "price-monthly": "$200 {#small}a month{/small}",
+      "price-yearly": "$2,000 {#small}a year{/small}",
+      "includes": "Everything in Premium, plus:",
+      "quota": "10x the token quota of Standard"
+    },
+    "yearly": {
+      "explain": "Yearly costs ten times the monthly price, so two months are not charged. Lite: $80 a year, where two months at $8 is $16 and twelve months at $8 is $96. Standard: $200 a year, where two months at $20 is $40 and twelve months is $240. Premium: $1,000 a year, where two months at $100 is $200 and twelve months is $1,200. Exclusive: $2,000 a year, where two months at $200 is $400 and twelve months is $2,400. US prices, before tax.",
+      "howto": "To get the yearly price, choose yearly billing for the plan. [pending legal review] The start and end dates of this yearly price and the other conditions of the offer are not set yet."
+    },
+    "soon-note": "Every plan: Coming soon. No quota amount is shown yet.",
+    "tax-note": "US prices are before tax. Outside the US the price shown is the total, tax included. A live subscription keeps its price.",
+    "compare": {
+      "title": "Compare plans",
+      "caption": "Compare plans",
+      "feature": "Feature",
+      "quota-row": "Usage: token quota against Standard",
+      "percent-row": "Usage: shown in percent of each window",
+      "export-row": "Data: export your data",
+      "billing-row": "Billing: monthly and yearly"
+    },
+    "multiple": {
+      "lite": "0.4x",
+      "standard": "1x",
+      "premium": "5x",
+      "exclusive": "10x"
+    },
+    "yes": "Yes",
+    "faq": {
+      "title": "Questions",
+      "usage-q": "How does usage work?",
+      "usage-a": "Each plan has a token quota, shown against Standard. A usage view will show how much of each usage window you have used, in percent. No quota amount is shown yet.",
+      "limit-q": "What happens at the limit?",
+      "limit-a": "[pending legal review] The owner has decided this order: Kolwen uses your plan's usage allowance first, then your prepaid credits, oldest credit first. Kolwen draws on your credits past a plan limit only if you have turned on that setting, which is off until you turn it on. This is preliminary until counsel reads the Terms.",
+      "refund-q": "Can I get a refund?",
+      "refund-a": "See the {#refund}refund page{/refund}. Refund terms are a draft.",
+      "tax-q": "What about taxes and regional prices?",
+      "tax-a": "Outside the US the price shown is the total, tax included. In the US prices are shown before tax. Regional prices follow."
+    },
+    "buy": {
+      "title": "Ways to buy",
+      "shapes": "Three product shapes. None can be bought yet.",
+      "draft": "These purchase terms are a draft and are pending legal review.",
+      "subscription": "{#strong}Subscription.{/strong} Monthly or yearly, renewing until you cancel. It starts at once on your consent. [pending legal review] The refund rule for a subscription is waiting for review.",
+      "key": "{#strong}Time key.{/strong} Prepaid, bought once, for 7, 30, 90 or 365 days. A key gives exactly what a subscriber of the same plan has for the same number of days.",
+      "key-time": "A key adds time to your account, up to 36 months.",
+      "key-refund": "An unredeemed key is refundable in full within 14 days of purchase, and expires 12 months after purchase. [pending legal review]",
+      "key-limits": "2 keys per order, and 4 per account per sale window or per rolling 30 days.",
+      "key-bind": "A key is non-transferable and binds to your account when you activate it. [pending legal review]",
+      "credits": "{#strong}Usage credits.{/strong} Prepaid units of Kolwen’s own metered service. They are used only at Kolwen and cannot be moved to anyone else or cashed out. [pending legal review] The owner has decided that credit bought with money does not expire and carries no dormancy fee (a fee because credit or an account is unused). The owner has also decided that, within 14 days of buying credit, you can ask for a refund of the part you have not used, at the price you paid; credit you have used and promotional credit are not refunded. After 14 days, credit is refunded only if Kolwen closes your account or shuts the service down. This is preliminary until counsel reads the Terms."
+    },
+    "setting": {
+      "title": "How prices are set",
+      "formula": "{#code}price(country, tier) = tier_ratio × 0.358% × mean monthly wage{/code}, rounded.",
+      "axis": "Plans differ on one capacity axis: token quota. Against Standard, Lite carries 0.4x, Standard 1x, Premium 5x and Exclusive 10x. No quota amount is shown yet.",
+      "tax": "Outside the US, the price shown is the total, tax included. In the US, prices are shown before tax.",
+      "keeps": "A live subscription keeps its price.",
+      "regional": "Regional prices follow."
+    },
+    "meta": {
+      "title": "Kolwen plans and prices (US$): none can be bought yet",
+      "description": "Kolwen plans and US prices. Nothing can be bought yet: every buy button is disabled until the plans open.",
+      "og-description": "Kolwen plans and US prices. Nothing can be bought yet: every buy button is disabled until the plans open."
+    }
+  },
+  "notfound": {
+    "title": "This page does not exist.",
+    "body": "Nothing is hidden here and nothing was moved — the address simply has no page behind it.",
+    "home": "Go to the Kolwen home page",
+    "meta": {
+      "title": "Not found — Kolwen",
+      "description": "The page you asked for is not on kolwen.com. The links below lead to the pages that are."
+    }
+  },
+  "status": {
+    "title": "Status",
+    "intro": "Kolwen checks its public pages every 15 minutes. The last check is shown here.",
+    "none": "No stored check result is available yet.",
+    "markok": "OK",
+    "markfail": "FAIL",
+    "ok": "The public pages answered as expected at the last check.",
+    "failing": "At least one public page did not answer as expected at the last check.",
+    "unavailable": "The status could not be loaded. Try again later.",
+    "probes": "Pages checked",
+    "meta": {
+      "title": "Kolwen status: the last health check of the public pages",
+      "description": "Kolwen checks its public pages every 15 minutes; this page shows the last stored check result.",
+      "og-description": "Kolwen checks its public pages every 15 minutes; this page shows the last stored check result."
+    }
+  },
+  "subprocessors": {
+    "meta": {
+      "title": "Subprocessors — Kolwen",
+      "description": "The providers that process data for Kolwen, what each one does and where."
+    },
+    "title": "Subprocessors",
+    "intro": "These are the providers that process personal data of Kolwen's customers on Kolwen's behalf: what each one does, where it processes the data, the basis for any transfer abroad, and the data processing agreement it is under. Paddle is listed for transparency: it acts as its own controller for purchase data. Each row takes effect on the day that row's provider first holds a customer's data. Until then the row says so.",
+    "columns": {
+      "provider": "Provider",
+      "purpose": "Purpose",
+      "data": "Personal data",
+      "where": "Where it is processed",
+      "basis": "Transfer basis",
+      "retention": "How long it is kept",
+      "dpa": "Data processing agreement",
+      "from": "From"
+    },
+    "row1": {
+      "provider": "Cloudflare",
+      "purpose": "Serving the site and the service: hosting, Workers and their storage, and logs.",
+      "data": "Requests made to the site, as Cloudflare handles them to serve it.",
+      "where": "Cloudflare's network, and sub-processors outside the European Economic Area, Switzerland and the United Kingdom, in countries the agreement does not name.",
+      "basis": "EU Standard Contractual Clauses (Module Two and Module Three); the UK Addendum; the Swiss addendum; the EU-U.S. Data Privacy Framework where Cloudflare is certified under it.",
+      "retention": "Kept until the main agreement ends or the processing is no longer needed. After that, Cloudflare deletes or returns the data at the customer's choice, except where the law requires it to keep it. The agreement states no fixed number of days. Workers Logs, the Worker's own log lines, are kept 3 days on the Workers plan Kolwen uses at present (7 days on the paid Workers plan) until 30 November 2026, per Cloudflare's Workers pricing page, read 2026-11-08; from 1 December 2026 Workers Logs move to Cloudflare Observability pricing, and which retention applies after that date is not stated here.",
+      "dpa": "Customer DPA, Version 6.4, effective 3 April 2026.",
+      "from": "from the day it first holds customer data."
+    },
+    "row2": {
+      "provider": "Supabase",
+      "purpose": "Account sign-in, and the service's database.",
+      "data": "Account identity (name and e-mail address) and password hashes.",
+      "where": "The project's region, chosen when the account is created, from the regions Supabase lists. The project's database and sign-in are hosted in that region. Supabase's agreement says covered data may be processed anywhere Supabase or its sub-processors maintain facilities, and its regional commitment gives way where the law or the requested service requires it. Account and support data are covered data under that rule. Service telemetry goes to systems segregated from customer projects; the agreement names no region for it.",
+      "basis": "EU Standard Contractual Clauses (Module Two and Module Three), with the UK and Swiss addenda, where data leaves the EEA, the United Kingdom or Switzerland.",
+      "retention": "A copy may be requested within 30 days after the agreement expires; after that the data is deleted, including copies held by sub-processors. The agreement states no number of days for completing the deletion.",
+      "dpa": "Data Processing Agreement, Version 1, 1 August 2026; accepted before the account holds customer data.",
+      "from": "from the day it first holds customer data."
+    },
+    "row3": {
+      "provider": "Paddle",
+      "purpose": "Merchant of record for purchases: payment and tax. Paddle acts as its own controller for purchase data.",
+      "data": "The buyer's name, e-mail address, and payment and tax data.",
+      "where": "Paddle's controller entities in the United Kingdom, the United States, Ireland and Canada; its processors anywhere in the world.",
+      "basis": "EU Standard Contractual Clauses (Module One, controller to controller), and the UK Approved Addendum, for transfers from the United Kingdom or the EEA to countries without an adequacy decision.",
+      "retention": "No fixed period. Kept while the customer relationship continues or as the law requires, and for the limitation period and a short administrative period after it. Kept also while a claim, investigation or dispute is open.",
+      "dpa": "None as a processor: Paddle acts as its own controller under its Data Sharing Addendum.",
+      "from": "from the day it first holds customer data."
+    },
+    "row4": {
+      "provider": "Resend",
+      "purpose": "Sending Kolwen's service e-mail.",
+      "data": "E-mail address, message content and message metadata.",
+      "where": "The United States, where Resend's primary processing takes place, and its sub-processors there.",
+      "basis": "EU Standard Contractual Clauses (Module Two and Module Three); the UK SCCs; the EU SCCs as adapted for Switzerland; the EU-U.S. Data Privacy Framework, under which Resend states it complies.",
+      "retention": "Deleted within 90 days of account termination. The agreement states no period for message content or logs.",
+      "dpa": "Data Processing Addendum, updated 31 December 2025.",
+      "from": "from the day it first holds customer data."
+    },
+    "row5": {
+      "provider": "An off-provider backup store (named before the first customer data is stored there).",
+      "purpose": "Encrypted backup copies of account and billing records.",
+      "data": "As held in those records, encrypted.",
+      "where": "stated when named.",
+      "basis": "stated when named.",
+      "retention": "stated when named.",
+      "dpa": "stated when named.",
+      "from": "from the day it first holds customer data."
+    },
+    "changes": {
+      "title": "Changes",
+      "line": "31 October 2026: this list was created."
+    }
+  },
+  "legal": {
+    "meta": {
+      "title": "Legal: Kolwen",
+      "description": "The legal pages Kolwen publishes today."
+    },
+    "title": "Legal",
+    "intro": "The legal pages published today:",
+    "item": {
+      "terms": {
+        "name": "Terms",
+        "text": ": the licence to use Kolwen and Kolwen's own policies."
+      },
+      "privacy": {
+        "name": "Privacy",
+        "text": ": what kolwen.com does with data today, and which parts change when the assistant ships."
+      },
+      "refund": {
+        "name": "Refunds",
+        "text": ": an unredeemed key is refunded in full within 14 days of purchase."
+      },
+      "accessibility": {
+        "name": "Accessibility",
+        "text": ": how the site is built and checked, and how to report a problem."
+      }
+    }
+  },
+  "accessibility": {
+    "meta": {
+      "title": "Kolwen accessibility: how the site is checked and its limits",
+      "description": "How Kolwen's website is built and checked for accessibility, what it does not yet cover, and how to report a problem.",
+      "og-description": "How Kolwen's website is built and checked for accessibility, what it does not yet cover, and how to report a problem."
+    },
+    "title": "Accessibility",
+    "intro": "This page is Kolwen's accessibility statement for the website at kolwen.com. It is dated 1 November 2026.",
+    "h": {
+      "what": "What this site is",
+      "commitment": "Our commitment",
+      "target": "The standard we aim for",
+      "checked": "What is checked on every change",
+      "limits": "Known limits",
+      "prereq": "What you need",
+      "report": "Report a problem",
+      "date": "Date of this statement"
+    },
+    "what": "Kolwen's website describes a chatbot product that is still in development. No product ships yet, and the home page says so. The site is a set of static pages in English and Thai, which a visitor reads in a browser.",
+    "commitment": "Kolwen aims to make the website usable by people with disabilities, and to fix a problem that a visitor reports.",
+    "target": "Kolwen's own target is WCAG 2.2 level AA. It is a target Kolwen set for itself. It is not a legal test, and this statement does not claim that the site meets it.",
+    "checked": "The repository runs these checks in its continuous integration on each pull request and each push to main, and a failed check fails the change. A headless browser checks every page, in English and Thai: text reflows at 320 CSS pixels wide without sideways scrolling; text at 200 percent is not cut off; the browser reports no content-security-policy violation; each language has its own address, and that address sets the page's language; the Thai text is drawn by the site's own Thai typeface; the skip link is the first stop when the keyboard starts and stays out of sight until it is focused; the header fits on at most two rows at 320 pixels and each of its links is inside the screen; each page names its own address and its alternate addresses; on the terms pages the section in view stays in view after the switch; and Tab reaches the skip link, the logo, Pricing and the link to the other language in that order, and Enter on that link opens the same page in the other language at its own address. On the reading pages, text and background meet a contrast of 4.5 to 1 (3 to 1 for large text) in both the light and the dark colour scheme, the line height is at least 1.5 times the font size, and the line length of English text is measured against 80 characters. The source checks confirm that the home page declares English as its language, and that the layout uses relative type sizes and a viewport setting that does not block zoom.",
+    "limits": "The checks above cover only what they measure. They do not test every criterion of WCAG 2.2. In particular, the keyboard checks cover the header only (the skip link, the logo, Pricing and the link to the other language) and do not read the focus order or whether focus is visible anywhere else on the page; no check reads the names and roles of controls with a screen reader; the contrast and line-height checks cover the reading pages, not the default pages, whose background gradient is not read; the line-length check does not apply to Thai text; and the pages have not been checked with script switched off. The repository records no manual audit and no test with assistive technology by people.",
+    "prereq": "The site needs a current browser. It needs no plug-in, and no account or sign-in to read a page. Whether a page reads with script switched off is not checked.",
+    "report": "If a page is hard for you to use, write to info@kolwen.com with the address of the page and what got in your way. We read every report and answer it. We do not promise a time for the answer.",
+    "date": "1 November 2026."
+  },
+  "shared": {
+    "share": {
+      "image-alt": "The Kolwen wordmark: cream letters beside three orange bars, on a dark background, with a fossil footprint, a fern fossil, an open book, a lump of coal and a magnifying glass at the edges."
+    },
+    "brand": "Kolwen",
+    "skip": "Skip to main content",
+    "header": {
+      "label": "Main",
+      "home": "Kolwen home",
+      "pricing": "Pricing",
+      "language": "Language"
+    },
+    "switch": {
+      "en": "English",
+      "th": "ไทย"
+    },
+    "footer": {
+      "label": "Footer",
+      "note": "© 2026 Kolwen · trademark application pending",
+      "home": "Home",
+      "group-product": "Product",
+      "pricing": "Pricing",
+      "changelog": "Changelog",
+      "group-legal": "Legal",
+      "terms": "Terms",
+      "privacy": "Privacy",
+      "refund": "Refunds",
+      "group-code": "Code",
+      "group-contact": "Contact",
+      "email": "Email",
+      "support": "Support",
+      "abuse": "Report abuse",
+      "appeals": "Appeals",
+      "security": "Security"
+    },
+    "names": {
+      "github": "GitHub",
+      "huggingface": "Hugging Face",
+      "npm": "npm",
+      "llms": "llms.txt"
+    },
+    "page": {
+      "note": "This page: this site stores nothing in your browser"
+    }
+  }
+}

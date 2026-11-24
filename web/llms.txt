@@ -1,0 +1,14 @@
+# Kolwen
+
+> Kolwen is a verifiable AI assistant. It is in development and not yet available: nothing can be bought, and the pages marked draft are not in force.
+
+The site is in English and Thai.
+
+## Pages
+
+- [Home](https://kolwen.com/): what Kolwen is and its status
+- [Pricing](https://kolwen.com/pricing): the planned plans and their US prices; nothing can be bought yet
+- [Changelog](https://kolwen.com/changelog): the repository's change log; no product has shipped, and two name-reservation packages are published (kolwen 0.0.1 on PyPI, kolwen 0.0.2 on npm)
+- [Terms](https://kolwen.com/terms): the draft terms; not in force, and parts wait for legal review
+- [Privacy](https://kolwen.com/privacy): the draft privacy notice; parts wait for legal review
+- [Refunds](https://kolwen.com/refund): the draft refund terms; parts wait for legal review

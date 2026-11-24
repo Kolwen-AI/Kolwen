@@ -1,0 +1,227 @@
+name: CI
+
+# Diverges from the flock template in its JOB SET, deliberately: the template ships one `gate` job
+# for a skill repo (build, verify, test). This repo has no build and no product test suite, so it ships
+# `assets` (regenerate every brand file, fail on any byte difference), `surface` (the room's
+# published-claim laws), `reply-language` (the reply-language harness proving it detects the failure, then
+# a tree scan), `clone-test` (the decap battery's label source of truth and its self-test),
+# `secret-scan` (the house scanner's own tests, then the scan) and `rendered` (the 320 px reflow and 200% text checks in a real headless browser).
+# `all-green` needs all six and is the stable required context either way.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      # Only genuinely non-participating paths. This set is deliberately TINY: nearly every
+      # tracked file here is a published surface (the page, the PyPI long-description, the
+      # brand doc, the README), and the surface job checks exactly those claims.
+      # NOTE the inversion vs the usual reflex: brand/**.png and brand/**.svg are NOT ignored —
+      # a hand-edited asset is precisely what the assets job exists to catch.
+      - '.gitignore'
+  pull_request:
+    branches: [main]
+    # NO paths-ignore here, deliberately: `all-green` and `analyze (javascript)` are REQUIRED
+    # contexts on main. A paths-ignore on pull_request means the context never reports, and a
+    # required context that never reports leaves the PR permanently unmergeable — measured on
+    # PR #4, which touched only web/robots.txt and sat at mergeable_state=blocked. The push
+    # filter below keeps owner rail 1's discipline where it actually saves work and gates
+    # nothing. Divergence from the Coal* shape, named: the seniors carry the same latent
+    # defect and have not hit it because their heads push directly rather than through PRs.
+
+# cancel-in-progress: TRUE -- ci.yml only reads, tests and compares; it publishes nothing and
+# touches no external state, so a superseded run has nothing to leave half-done.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Every checkout below sets `persist-credentials: false` (LWK-168). This workflow runs on
+# `pull_request` and executes scripts out of the checked-out tree; by default the checkout leaves
+# the job's token in .git/config for every later step to read. No job here runs a git operation
+# that needs it -- they only read, regenerate and compare -- so none keeps it.
+jobs:
+  assets:
+    name: assets (byte-identity)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # LWK-216: max 9 s over 11 runs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # Zero-dependency: no install step. Regenerate every brand asset and fail if a committed
+      # file differs — catches a hand-edited PNG and generator drift in one check.
+      # ubuntu-latest ONLY, single Node major, deliberately: byte-identity depends on
+      # zlib.deflateSync(level 9) producing identical output, and whether that holds across
+      # platform and Node major is UNMEASURED here. A matrix would risk reddening a correct
+      # repo. Widen it once the Node-major and macOS axes are measured too.
+      - run: node brand/make-brand.mjs
+      # LWK-139: web/ is in the diff too, because make-brand.mjs now WRITES three files
+      # there. A generator that owns a file and a gate that does not check it is half a rule --
+      # the copy could still be hand-edited between runs and nothing would say so.
+      - run: git diff --exit-code -- brand/ web/favicon.svg web/favicon-32.png web/apple-touch-icon.png
+
+  surface:
+    name: surface (published claims)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15 # K-193: 210 to 374 s over 20 runs (median 281.5 s, 2026-11-20 to 2026-11-22); 15 min is about 2.4 times the slowest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # The room's own laws, mechanised: trademark FILED-never-registered · no filing
+      # identifier · no kitchen leakage · Thai orthography · HTML + ld+json integrity ·
+      # bilingual structure · every stated contrast ratio recomputed from its own hex pair.
+      - run: node scripts/surface-check.mjs
+      # The sitemap's lastmod says when each page's content last changed; this keeps it true (the rule is stated at the top of the script).
+      - run: node scripts/sitemap-lastmod.mjs
+      # The one robots.txt comparison rule the post-deploy check applies (it cannot run here: it needs the live site).
+      # And the legal-state switch's tests: the Thai 7-day clause is in TERMS.md only while legal/legal-state.json says a trigger is met.
+      - run: node --test scripts/accessibility-statement.test.mjs scripts/availability-log.test.mjs scripts/lib/release-shape.test.mjs scripts/release-notes.test.mjs scripts/verify-release-shape.test.mjs scripts/page-claims.test.mjs scripts/seo-tags.test.mjs scripts/robots-edge.test.mjs scripts/legal-state.test.mjs scripts/legal-pages.test.mjs scripts/address-check.test.mjs scripts/fonts.test.mjs scripts/font-coverage.test.mjs scripts/font-versions.test.mjs scripts/page-weight.test.mjs scripts/html-tokens.test.mjs scripts/coderabbit-config.test.mjs scripts/i18n-catalogue.test.mjs scripts/type-lint.test.mjs scripts/reading-theme.test.mjs scripts/domain-seams.test.mjs scripts/workflow-permissions.test.mjs scripts/raw-text.test.mjs scripts/gate-residue.test.mjs scripts/override-watch.test.mjs scripts/sitemap-lastmod.test.mjs scripts/worker-monitor.test.mjs scripts/worker-status.test.mjs scripts/worker-headers.test.mjs scripts/worker-routes.test.mjs scripts/status-page.test.mjs scripts/browser-start.test.mjs scripts/woff2-bounds.test.mjs scripts/pattern-bounds.test.mjs scripts/subprocessor-page.test.mjs scripts/headers-file.test.mjs scripts/contained-read.test.mjs scripts/page-template-slots.test.mjs scripts/page-weight-gaps.test.mjs scripts/npm-release-guard.test.mjs tools/ciwait.test.mjs
+      # All seven pages are generated: terms, privacy and refund from TERMS.md, PRIVACY.md and the clause file; the changelog from CHANGELOG.md; home, pricing and 404 from web-src/pages and the language catalogue web-src/i18n. A page edited by hand, a source edited without a re-render, a visible string that is not a catalogue slot, or a key missing in a language, fails here.
+      - run: node scripts/legal-pages.mjs --check
+      # Step zero's tests (tools/step-zero): standard library only, on the runner's own Python 3; the tokenizer library is not needed for them.
+      - run: python3 -m unittest discover -s tools/step-zero -p "test_*.py"
+      # The transfer-size budget (web-build rule W-PERF-08): each page's cold-load bytes and requests against twice the HTTP Archive Web Almanac median home page; a FAIL above twice the median unless the page is a named divergence.
+      - run: node scripts/page-weight.mjs
+
+  rendered:
+    name: rendered (320 px reflow, 200% text, CSP, reading theme, Thai glyphs, skip link, header, keys)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15 # 174 s over 1 run (the first run on a runner, 2026-10-18: 17 s for the check, 152 s for its tests); a thin sample, resize from more runs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # The rendered checks (build-qc.md W-A11Y-07, W-FMT-11): every page, in both languages, in the headless Chrome the runner already has, driven over the DevTools protocol with Node's own
+      # WebSocket (no dependency). A 320 CSS px viewport must not scroll sideways (WCAG 2.2 SC 1.4.10); text at 200% must not be cut or lost (SC 1.4.4); the browser must report no
+      # Content-Security-Policy violation under the real headers. On the pages that declare data-job="prose" (the reading theme), in the light and in the dark scheme: a solid ground, every text
+      # element at 4.5:1 (3:1 large) against the colour it really sits on (SC 1.4.3), line heights of 1.5 (Latin) and 1.65 (Thai), and no Latin line over 80 characters. CI=true is set by
+      # Actions: with no browser the script FAILS here, it never skips.
+      # The Thai text must be drawn by the site's own Thai face, never a system fallback (glyphs). The skip link is the first Tab stop and moves focus to main (skip). At 320 px the
+      # header's items sit on at most two rows and each link's visible text is in its accessible name (header). Tab visits the skip link, the mark, Pricing and the two language buttons
+      # in that order, and a language button switches with Space and with Enter without moving the page (keys).
+      - run: node --max-old-space-size=1024 scripts/rendered-check.mjs
+      # The checks' own tests: each defect planted in a copy of web/ (a 400 px element, a clipped box, an unhashed inline style, faint text, a tight line height) must be found.
+      - run: node --max-old-space-size=1024 --test --test-timeout=300000 scripts/rendered-check.test.mjs
+  reply-language:
+    name: reply language (LWK-131)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # LWK-216: max 13 s over 11 runs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # The reply is in the language of the MESSAGE, on every path. No reply surface ships yet,
+      # so what runs today is the harness proving it DETECTS the failure (red fixture = the
+      # Synantic shape, a Thai template on an English message) and a tree scan for hard-coded
+      # single-language templates. The same harness takes the real endpoint via
+      # KOLWEN_CHAT_ENDPOINT the day /chat exists. Spec: docs/REPLY-LANGUAGE.md
+      - run: node scripts/reply-language-check.mjs --self-test
+      - run: node scripts/reply-language-check.mjs --scan
+      # The endpoint report's own test: a reply with control characters is written as one escaped field, and the finding stays on one line.
+      - run: node --test scripts/reply-language-check.test.mjs
+  clone-test:
+    name: never a clone (LWK-132)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # LWK-216: max 11 s over 11 runs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # The chip the ladder measures must equal the label the product shows. web/ic.json is the
+      # single source of truth for that label. A swap changes it and this job re-runs, but ONLY its
+      # `--label` and `--self-test` steps: the real battery run (the runner against the labelled chip,
+      # which needs KOLWEN_IC_ENDPOINT and KOLWEN_IC_KEY) is never run by any workflow, so a chip
+      # change passes this job green. That run is a hand run keyed to the label changing
+      # (docs/NEVER-A-CLONE.md section 2), and nothing in CI checks that it happened. Today no IC is
+      # labelled, so what runs is the runner proving it DETECTS a relabel (a mocked wrong chip must
+      # fail the assert). The real fixtures live outside this repo and are never
+      # published here, so THIS checkout cannot run the fixture leg. The self-test is split for
+      # that reason (LWK-168): the legs that need no fixture run unconditionally and fail the job
+      # on any failure; only the fixture leg is conditional, and it says so in the log and as a
+      # workflow warning. The step is NOT guarded in shell: a required check that can pass with
+      # nothing run is worse than a red one. Spec: docs/NEVER-A-CLONE.md
+      - name: label source of truth
+        run: node scripts/decap-battery.mjs --label
+      - name: battery self-test (fixture-free legs always; fixture leg skips loudly)
+        run: node scripts/decap-battery.mjs --self-test
+  secret-scan:
+    name: secret scan (LWK-239)
+    runs-on: ubuntu-latest
+    # Bounds, stated as arithmetic: each scanner test step is capped at 6 minutes (its file's outer bound, 360 s); two of them are
+    # 12 minutes, and the checkout, setup and gate steps are allowed the remaining 3, so 15 minutes. (The earlier 10-minute bound,
+    # sized on a 9 s basis, could not hold two 6-minute steps.)
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # The house secret scan. The scanner's own tests (an EXPLICIT file list, never the directory form, which breaks
+      # on Node 24) and the gate's spawn tests run first; then the gate itself in tree mode, the only mode a CI
+      # checkout can run (it has no pushed range, and the gate says so in its PASS line). The push-time scan of
+      # added lines, commit messages and tags runs in .githooks/pre-push on the pusher's box.
+      # Two bounds, and what each one does. `timeout-minutes` on a step bounds that whole file: it is the outer bound, and nothing else
+      # bounds a file, because Node 24's --test-timeout applies to each test inside the file and the file's own wrapper has none (measured
+      # by CodeRabbit on #207). --test-timeout (360000 ms) bounds each single test inside its file. Each file has its own step, so a
+      # missing file fails its own step: Node 24 runs the other file and passes when one of two listed paths is missing.
+      # The 360 s figure is sized from the canon's measurement: secret-gate.test.mjs runs 88 tests in about 168 s on a Windows runner,
+      # its slowest single test about 8 s (THE CANON COPY ROUND OF 2026-11-21; ci-evidence chose 360 s per file). This job runs on
+      # ubuntu, a different machine, so the margin (about 2.1 times the Windows figure) is the stated allowance, not a measurement here.
+      # The heap cap is the one the rendered job uses for the same kind of test run.
+      - name: scanner tests (secret-scan.test.mjs)
+        timeout-minutes: 6
+        run: node --max-old-space-size=1024 --test --test-timeout=360000 scripts/secret-scan.test.mjs
+      - name: gate tests (secret-gate.test.mjs)
+        timeout-minutes: 6
+        run: node --max-old-space-size=1024 --test --test-timeout=360000 scripts/secret-gate.test.mjs
+      - run: node scripts/secret-gate.mjs
+  # A single STABLE required-check context (job names drift; this does not).
+  # Rulesets require `all-green`, never the per-job names.
+  all-green:
+    name: all-green
+    needs: [assets, surface, rendered, reply-language, clone-test, secret-scan]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5 # LWK-216: max 5 s over 11 runs
+    # LWK-180. `if: always()` makes this job run whatever its needs did, so it must judge them: a
+    # needed job counts ONLY if its result is exactly `success`. `skipped` and `cancelled` are red,
+    # not a pass -- a required check that goes green because a job did not run is the row-1 defect
+    # again (a battery never run). It iterates the `needs` context itself instead of a hand-copied
+    # list of job names, so adding a job to `needs:` above gates it here with no second edit, and an
+    # empty context is a failure rather than a vacuous pass. The context arrives through the
+    # environment, never interpolated into the script.
+    # jq: the runner ships 1.7.1; every construct used (to_entries, length, all, -e) predates 1.5,
+    # so this is not a version-sensitive step. Stated, not assumed (LWK-192 T4).
+    env:
+      NEEDS: ${{ toJSON(needs) }}
+    steps:
+      - name: gate result
+        run: |
+          printf '%s' "$NEEDS" | jq -r 'to_entries[] | "\(.key)=\(.value.result)"' || {
+            echo "::error::all-green: NEEDS did not parse as JSON -- the needs context itself is malformed, which is not a pass either"
+            exit 1
+          }
+          printf '%s' "$NEEDS" | jq -e 'length > 0 and ([.[] | .result] | all(. == "success"))' > /dev/null || {
+            echo "::error::all-green: every needed job must be exactly 'success' -- a skipped, cancelled or failed job is not a pass"
+            exit 1
+          }

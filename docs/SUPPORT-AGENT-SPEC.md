@@ -1,0 +1,162 @@
+# Support-agent build spec
+
+The document the `/chat` build reads. **Nothing here runs yet** — this is the set of requirements
+that bind the moment a conversational surface exists, gathered in one place so the build collects
+them rather than rediscovers them.
+
+## Already-binding requirements from other units
+
+These are not restated here; each lives in its own spec and binds at the same surface:
+
+- **Reply language** — `docs/REPLY-LANGUAGE.md`. The reply is in the language of the MESSAGE on
+  every path. Its system-prompt rule and per-message detection are the at-surface halves.
+- **Never a clone** — `docs/NEVER-A-CLONE.md`. The IC label, the SELF-DECAP battery, grounding
+  that is never silent, and no canned refusal templates.
+
+## Zero Data Retention is an account-mode requirement, not a setting to remember
+
+Whichever AI provider Kolwen's support agent uses, the account or project it runs under must be
+configured for zero data retention where the provider offers it, and the retention tier must be a
+stated fact rather than a default nobody checked.
+
+The concrete shape, from AWS Bedrock's own documentation, read 2026-09-06 at
+`docs.aws.amazon.com/bedrock/latest/userguide/data-retention.html`: retention modes run `none`
+(ZDR) < `default` < `aws_review`. Under `none`, *"No request or response data is written to durable storage by AWS or
+shared with the model provider."* **A model can require a higher tier than `none`** — Claude models
+on Bedrock require `aws_review`, under which requests are retained inside AWS for up to 30 days for
+AWS's own review and are still never forwarded to the model provider. If the account is pinned to
+`none` and a model requires more, the request is **blocked with an error** rather than silently
+retained.
+
+**The requirement, therefore:** the build states which retention tier each provider account runs
+under, and treats a tier it did not choose as a defect. A provider that offers no such control is a
+finding for the owner before it is used.
+
+## Retention window
+
+**[N days]** for conversation content, bracketed for the same reason `TERMS.md` brackets it: N is
+set before launch, and no statute supplies it.
+
+## The start-of-chat notice and the end-of-chat consent button
+
+**Design-time requirements of `/chat`: a start-of-chat notice and an end-of-chat consent control
+for helping improve Kolwen. Their exact text is drafted and PENDING THE OWNER'S SIGNATURE — it is
+not reproduced here, and no wording in this file should be treated as final.**
+
+## Support opens an account only with recorded permission
+
+**PRELIMINARY: the wording below is counsel's draft (LWK3-041), not yet signed. Nothing in it is in force until it is signed.**
+
+> **Support opens an account only with your permission, recorded on the case.** A support seat, human or agent, answers from what you send in the case. It opens your account, usage or stored data only after you give permission for that case.
+> - **Who, where.** The account holder, in the case's own channel (the chat, or a reply from the account's address on the case thread), in plain words and by a clear act. Silence, an earlier case or a box ticked at sign-up is not permission.
+> - **Scope, time.** The request says what will be opened and why. Permission covers that case, for a seat of Kolwen's, and ends when the case closes, after [N] idle days, or when withdrawn. A new case needs new permission.
+> - **Record.** On the case: who asked, what was opened, when, your words, the case id. Kept as the retention table's row says.
+> - **Withdrawal.** Any time, in the same channel and as easily as it was given. Access stops at once. We tell you what withdrawing means for the case. The record of what was opened stays.
+> - **Without permission.** Support sees only the case's own messages and answers from them. If that is not enough it says what it needs and why. You decide.
+
+Exceptions a law forces, a lawful order or legal duty and a danger to life, body or health, are counsel's open questions (LWK3-041, section 2) and are not covered by this rule; a fraud or abuse investigation runs through the abuse process in `TERMS.md`, not the support seat.
+
+## Account enforcement, appeals and the person behind the AI
+
+**The principle: an AI agent never works alone.** A support agent that refuses a refund "due to a violation"
+before the appeal is decided, sends the customer back to the appeal form, and then lets the conversation close
+as "no longer monitored" has turned a dispute into a loop with nobody in it. These requirements are each the
+opposite of one step in that loop. They sit beside the abuse defences (the trigger side of enforcement, which
+decides when a case opens) and the support-data clause (what a support conversation may retain); this section
+covers what happens to the customer once an account action is on the table.
+
+The enforcement process itself is in `TERMS.md` ("Acceptable use and how it is enforced"): notice, suspension
+rather than termination, a window to answer, a written decision, one appeal to a human, and a register of
+cases. The requirements below are how the support surface behaves around that process; none replaces a step.
+
+1. **An AI first line, with a person always behind it.** The agent hands off to a person (the case's keeper, once staff exists) when the user asks for
+   one, on any account action, on anything about money, when the same issue is raised a second time, and when
+   its own confidence in an answer is low. **The AI never closes a thread that holds an open account action or
+   dispute.**
+2. **Every suspension states the rule and the conduct, and names the appeal route.** This is the "notice" step of
+   the process, in the customer's hands. Whether the law or a live security investigation can justify delaying
+   that notice is an open question for counsel, with its timing and content; the process in `TERMS.md` has no such
+   exception, so until counsel decides, notice comes first.
+3. **One matter, one record, one case ID per case.** A matter has one record across every door and every mail. A contact about an open matter attaches to that matter's case and never opens a second one; a new case ID is issued only for a new matter or for an appeal, which takes its `KWA-` ID on the same matter record. An appeal is a case with its type prefix on the same matter record, never a second scheme. A split found later is merged into the one record, and the merge is recorded on both IDs. The customer sees the case's state and the deadline of its current step, which Kolwen sets and
+   publishes. The steps are `TERMS.md` steps 3 to 5: **14 business days** for the customer to answer a notice,
+   **7 business days** for Kolwen's written decision, **30 business days** for the customer to file an appeal, and
+   **14 business days** for Kolwen to answer it. If one of Kolwen's own deadlines passes (the 7 business days for
+   the decision, the 14 business days for the appeal answer, or the 90-day ceiling, which is 90 calendar days of
+   Kolwen's own time), the suspension is lifted and the key comes back into use, as `TERMS.md` states under its
+   ceiling paragraph. The ID rules
+   are in "Case IDs and the case status page", below.
+4. **One case across support, safety and billing, with one keeper.** Every door sees the same case and its ID. Every case names its keeper, and every door and every mail lands with that keeper, never in a shared pool. No door sends the
+   customer back to a door already tried.
+5. **Money waits for the decision.** No refund is refused while an appeal is open, and a reversed suspension
+   restores the time, or refunds pro rata, without a second request. This is the "refund follows the outcome"
+   rule of the process.
+6. **Data export and account deletion stay open during a suspension.**
+
+**Also required:** a suspended or cancelled customer keeps their entitlement to human support for as long as
+their dispute or appeal is open. A suspension never removes the person.
+
+**Phase 1.** The AI support is the maintainer's assistant, and the maintainer is the person behind it. The AI
+triages, keeps the case and its deadline, and drafts every reply; the maintainer reads, decides and sends
+anything that touches an account, money or an appeal. The published appeal deadline is sized to one person. A
+second person joins that lane when Kolwen hires. In this phase the keeper of every case is the owner, and the per-keeper rooms come with the first hire.
+
+**Handover of a case's keeper.** When a case's keeper changes, a written handover note is written on the case: its state, the open promises, the next deadline and any consent held. The customer is told who now keeps the case. The case moves keeper to keeper and is never returned to a pool. The permission recorded on the case travels with it inside Kolwen, and a handover never renews it: an idle lapse still stops an old permission. A handover to anyone outside Kolwen, such as a processor or a lawyer, is a new disclosure and needs new permission. Nothing here runs today: there is no keeper field and no handover note.
+
+**Checks still open** (counsel's, not answered here): whether a decision about an account taken solely by
+automated processing needs a right to human intervention, to express a view and to contest it (GDPR Art. 22);
+whether the EU Digital Services Act's duty to give a statement of reasons reaches this service; and the Thai
+reading.
+
+The support tool is a provider choice, and carries the same duty as every other provider: a studied alternative
+and a way out within a day.
+
+## Case IDs and the case status page
+
+**The format.** `KW-XXXX-XXXX-C`: the prefix `KW`, a body of eight Crockford Base32 characters in two groups of four,
+and one check character. An appeal's case takes the type prefix `KWA-` in place of `KW-`; its body and check
+character follow the same rules. Only part of the postal S10 identifier's layout is borrowed: a prefix, a body and
+a check character. The format is not S10-compatible: the appeal prefix `KWA` has three characters, and S10's country
+code has no counterpart. It does not borrow the serial: the body is random, never a sequence.
+
+**The body.** Each of the eight characters is one of the 32 symbols (the symbols 0 to 9, then ABCDEFGHJKMNPQRSTVWXYZ, Crockford's table, values 0 to 31 in that order), drawn from a
+cryptographically secure random source: five random bits give one symbol, and 32 divides 256, so the draw is uniform
+with no rejection step. A body already issued under either prefix is drawn again, never reused. Crockford's page accepts lowercase input and, at decode time only, reads `I` and `L` as `1`
+and `O` as `0`. Source: https://www.crockford.com/base32.html, read 2026-11-02.
+
+**The check character.** Read the eight body characters as one base-32 number N, the first character most
+significant. The check character is the symbol at position N mod 37 (counting from 0) in the 37-symbol set (
+the 32 symbols followed by `*`, `~`, `$`, `=` and `U`). Crockford's page: "The check symbol encodes the number modulo 37, 37 being the least prime number greater than 32." Example, not an issued ID: body `0000000Z` gives N = 31, 31 mod 37 = 31, and position 31 is `Z`, so the
+format reads `KW-0000-000Z-Z`. The check character covers the eight body characters only: it catches a mistyped body, not a
+mistyped prefix, and the prefix is validated exactly, on its own. It does not authenticate an ID. The S10
+check digit whose position this borrows is a different algorithm (weighted modulus 11 over digits only): UPU S10-12,
+clause 5.4, approved 17 October 2017, read 2026-11-02.
+
+**The requirements.**
+
+1. **The ID is a reference, never the key.** The acknowledgement mail carries a status link with its own secret: a
+   random string of at least 128 bits from a cryptographically secure source (a house choice; no standard gives this
+   figure). Alternatively the reader proves control of the contact address before the page opens. Knowing a case ID
+   opens nothing.
+2. **The ID is random, never sequential.** A sequence would show how many cases there are and make the next one
+   guessable.
+3. **The case page shows the state and the deadline only, never the content.** No message, no reason text, no account
+   data.
+4. **Lookups are rate-limited.** The limit is set and published by Kolwen. The figure is not in this spec yet (see
+   the open items below).
+
+**Mail threading.** The case ID is in the subject of every mail about the case. Every mail about a case also carries a
+`Message-ID` header, and every reply carries `In-Reply-To` and `References`. This is a house requirement. RFC 5322
+section 3.6.4 says that a message SHOULD have a Message-ID field, and that reply messages SHOULD have In-Reply-To and
+References fields as appropriate (https://www.rfc-editor.org/rfc/rfc5322.txt, read 2026-11-02). The References field
+holds the parent's References, then the parent's Message-ID. The subject ID is the fallback for routing and search. An inbound mail without that thread, from a verified contact with an open case, attaches to the open case only when it is about that matter; a mail about a different matter opens its own case under item 3's new-matter rule. When the mail's matter or its case is unclear, Kolwen asks the contact which matter it is about instead of guessing.
+
+**The page.** It is called "Case status" and sits at `kolwen.com/support/case`. It is not called "tracking", and it
+does not sit at `/status`, which is the site's service-health page.
+
+**Open, for the maintainer and counsel:** the rate-limit figure; the status-link lifetime; whether a case ID is shown
+to the customer in the app as well as in mail.
+
+## What does not exist yet
+
+No endpoint, no account with any provider, no conversation storage, no deletion job, no case ID generator, no case
+status page, no mail threading, no keeper field, no attach-to-open-case rule, no handover note, and no retention row for the support-access record (its period is the owner's to set). Every paragraph above is a requirement on a thing that has not been built.

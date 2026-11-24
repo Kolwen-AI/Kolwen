@@ -1,0 +1,341 @@
+# Terms—DRAFT
+
+> **DRAFT with legal gaps. Not signed, not in force, not linked from the site.** Published in the
+> repository so the shape is reviewable; the clauses marked `[pending legal review]` are the ones
+> counsel decides. Companion to `PRIVACY.md`, which is published on the same footing.
+>
+> **Where things live.** This one file carries the Terms, the acceptable-use and enforcement process,
+> and the licence terms for a key or subscription, so the legal-gap markers below are all checked in one
+> place. The list of prohibited conduct and the end-user licence for any downloadable software are NOT
+> written here: they are open decisions, named where they would sit.
+
+## Customer Content and training
+
+**Kolwen will not train its models on Customer Content from the Services.**
+
+**Kolwen จะไม่นำเนื้อหาของลูกค้าจากบริการไปใช้ฝึกโมเดลของ Kolwen**
+
+That sentence is the absolute, enterprise-tier form, written in the shape Anthropic's Commercial
+Terms §B uses (*"Anthropic may not train models on Customer Content from Services"*, read at
+`anthropic.com/legal/commercial-terms`, 2026-09-04). It carries no opt-in exception.
+
+**A tension named rather than hidden:** for an individual user, training on their content happens only
+if they press an opt-in button (see "Outputs and training" below), never by default. Those are two
+different tiers on purpose.
+
+**GAP 1—[pending legal review]: whether the enterprise Terms carry this absolute sentence while a
+separate consumer document carries the opt-in, or whether one document must reconcile both, is
+counsel's question and the owner's decision.**
+
+## Rights in Inputs and Outputs
+
+**GAP 2—[pending legal review]**—the companion clauses in the same source Terms state that the
+customer retains rights to its Inputs, and that Customer Content is the customer's confidential
+information. Whether Kolwen adopts that allocation verbatim is counsel's call. The allocation for
+Outputs is drafted below.
+
+## Who you are contracting with
+
+Payment for a key, a subscription or credits is taken by Paddle as the merchant of record, under
+Paddle's own buyer terms. These Terms cover the licence to use Kolwen and Kolwen's own policies; the
+purchase contract itself sits with Paddle.
+
+## Age
+
+You must be at least 18, or the age at which the law of the place where you are lets you consent,
+whichever is higher. At sign-up you confirm this. Kolwen does not ask for, or keep, an image of any
+identity document. If the way an account is used shows that its holder is under that age, the account is
+disabled and the unused part is refunded.
+
+**GAP 3—[pending legal review]: counsel confirms that, for this service, Thailand's age of consent
+is 20 (Civil and Commercial Code ss.19-21; PDPA s.20). The clause holds whichever number the answer is,
+because it follows the higher of 18 and the local age.**
+
+## Outputs and training
+
+You own the Outputs you generate. Kolwen assigns to you any right, title and interest it has in them,
+if any, and claims no licence back. Outputs may not be unique: Kolwen may generate similar outputs for
+other users, and the assignment gives you no right against that.
+
+Kolwen uses your content to train its models only if you press the opt-in button, and only for what you
+opted in to. Without that press, it does not.
+
+**GAP 4—[pending legal review]: whether an AI Output carries any copyright for the person who prompted
+it under the Thai Copyright Act's human-author requirement is counsel's reading. The "if any" wording is
+there so the assignment works in a country where an Output carries none.**
+
+## Keys, subscriptions and credits
+
+A **key** is a time-boxed licence to use Kolwen, sold once through Paddle. It gives you exactly what a
+subscriber has for the same number of days: key and subscription differ in how they are paid for, not
+in what they unlock. A **subscription** renews until you cancel it. **Credits** are prepaid units of
+Kolwen's own metered service: they are used only at Kolwen, cannot be moved to anyone else, and cannot
+be cashed out.
+
+[pending legal review] **Credit does not expire.** Credit you buy with money does not expire, and Kolwen charges no dormancy fee (a fee because credit or an account is unused).
+
+> [รอที่ปรึกษากฎหมาย] **เครดิตไม่หมดอายุ** เครดิตที่คุณซื้อด้วยเงินไม่มีวันหมดอายุ และ Kolwen ไม่คิดค่าธรรมเนียมเพราะเครดิตหรือบัญชีไม่ถูกใช้งาน (dormancy fee)
+
+[pending legal review] **Minimum top-up.** The smallest amount of credit you can buy in one purchase is **[minimum top-up]**.
+
+> [รอที่ปรึกษากฎหมาย] **ยอดเติมขั้นต่ำ** จำนวนเครดิตที่น้อยที่สุดที่คุณซื้อได้ในการซื้อหนึ่งครั้งคือ **[ยอดเติมขั้นต่ำ]**
+
+A key is a licence to consume, not a thing you own. It is **non-transferable and binds to your account
+when you activate it.** Before activation a key can be given as a gift; after activation it is yours
+alone.
+
+## How usage is counted
+
+[pending legal review] **Order of use.** Kolwen uses your plan's usage allowance first. After that it uses your prepaid credits, oldest credit first. When you reach a limit of your plan, Kolwen draws on your credits only if you have turned on the setting that allows it. That setting is off until you turn it on.
+
+> [รอที่ปรึกษากฎหมาย] **ลำดับการใช้** Kolwen ใช้โควตาการใช้งานของแผนของคุณก่อน หลังจากนั้นจึงใช้เครดิตเติมเงินของคุณ โดยใช้เครดิตที่เก่าที่สุดก่อน เมื่อคุณถึงขีดจำกัดของแผน Kolwen จะหักเครดิตต่อก็ต่อเมื่อคุณเปิดการตั้งค่าที่อนุญาตไว้เท่านั้น และการตั้งค่านี้ปิดอยู่จนกว่าคุณจะเปิดเอง
+
+[pending legal review] This section applies to metered use, billed against credits at the prices per
+million tokens Kolwen publishes; a key or subscription is paid for by its own price and carries no
+per-request charge. Kolwen counts the tokens of each request it accepts at Kolwen's own gateway, as the
+request passes through it. Your usage page lists each request we counted and the charge for it, and the
+charge on that page is the charge we take. The records we count from are available to you on request.
+
+[pending legal review] Each model has two published prices per million tokens, listed separately: one
+for input and one for output. Input is the tokens of your request. Output is the tokens the model sends
+back. Each is billed at its own price. Any tokens Kolwen adds around your message to put it in the
+model's chat format are not billed.
+
+**GAP 12—[pending legal review]: counsel confirms the clause.**
+
+## Input served from a cache
+
+[pending legal review] **Launch rule.** At launch, input that Kolwen serves from a cache is billed at
+the same rate as ordinary input. A separate rate for such input applies only if Kolwen announces it by
+notice under "Changes to these Terms", and only to requests made after that notice. That rate is never
+above the ordinary input rate for the same model. That limit is a ceiling, not a price: the ceiling, not
+the separate rate, moves with the ordinary input rate, and only when that rate changes under "Price
+changes"; the separate rate may sit anywhere at or below it. The ceiling covers input served from a
+cache. It does not cover a charge for writing to a cache or for keeping one, should Kolwen ever offer
+either; any such charge is announced by notice first. Adding a separate rate for input served from a
+cache is not a price rise.
+
+**GAP 14—[pending legal review]: counsel confirms the clause.**
+
+## Limits on keys
+
+These limits exist to stop bulk buying for resale, and are set at what one household should need.
+
+- **2 keys per order.**
+- **4 keys per account per sale window, or per rolling 30 days** (all key lengths counted together).
+- **A key adds time to your account** (keys stack), up to a **36-month ceiling**.
+- **An unredeemed key expires 12 months after purchase.**
+
+**GAP 5—[pending legal review]: whether a ban on reselling a time-boxed key is enforceable under Thai
+law as it is under EU law (the CJEU's UsedSoft ruling, C-128/11, treats it as enforceable for a
+time-boxed key) is counsel's reading.**
+
+## Refunds
+
+Paddle's refund policy is the floor: you ask Paddle, and Paddle decides within its own policy. Kolwen
+adds to it:
+
+- **An unredeemed key is refunded in full within 14 days of purchase.** Nothing was used, so the key is
+  simply voided.
+- **A subscription starts at once, on your consent.** A refund inside the first billing period deducts
+  the days that have passed since your subscription started, counted from the start time recorded on
+  your Paddle receipt and in your Kolwen account, and the records we count from are available to you on
+  request.
+- [pending legal review] **Credit you bought with money.** Within 14 days of buying it, you can ask for a refund of the part you have not used, at the price you paid for it. Credit you have already used is not refunded. After 14 days, credit you bought with money is refunded only when Kolwen closes your account or shuts the service down.
+- [pending legal review] **Promotional credit.** Credit Kolwen gives you without payment is never refunded.
+- [pending legal review] **Part of your credit below one cent.** Kolwen charges your usage exactly, request by request, so the balance of credit you bought with money can hold a fraction of a cent. A refund is paid in whole cents of the currency you bought the credit in, and the amount refunded is your unused balance of credit bought with money, rounded down to the whole cent. What is left below one cent stays in your account as ordinary credit bought with money: it is shown on your usage page, it does not expire, your next request uses it first, and Kolwen never takes it. When Kolwen closes your account or shuts the service down, the refund is rounded the same way, and a balance below one cent cannot be paid out.
+- [pending legal review] **Anything else.** What these bullets do not decide is decided by Paddle's refund policy and by the law that applies to you.
+- When Kolwen ends the contract without cause, it refunds the unused part (see "Ending the contract").
+
+> - [รอที่ปรึกษากฎหมาย] **เครดิตที่คุณซื้อด้วยเงิน** ภายใน 14 วันหลังซื้อ คุณขอคืนเงินส่วนที่ยังไม่ได้ใช้ได้ ตามราคาที่คุณจ่าย เครดิตที่ใช้ไปแล้วไม่คืน เมื่อพ้น 14 วัน เครดิตที่ซื้อด้วยเงินจะคืนเฉพาะเมื่อ Kolwen ปิดบัญชีของคุณหรือปิดบริการ
+> - [รอที่ปรึกษากฎหมาย] **เครดิตโปรโมชัน** เครดิตที่ Kolwen ให้โดยไม่ต้องจ่ายเงิน ไม่คืนไม่ว่ากรณีใด
+> - [รอที่ปรึกษากฎหมาย] **เศษเครดิตที่ต่ำกว่าหนึ่งเซนต์** Kolwen คิดการใช้งานของคุณตามจริงทีละคำขอ ยอดเครดิตที่ซื้อด้วยเงินจึงอาจมีเศษของเซนต์ การคืนเงินจ่ายเป็นเซนต์เต็มหน่วยของสกุลเงินที่คุณซื้อเครดิต และยอดที่คืนคือยอดเครดิตที่ซื้อด้วยเงินและยังไม่ได้ใช้ ปัดลงเป็นเซนต์เต็มหน่วย เศษที่ต่ำกว่าหนึ่งเซนต์คงอยู่ในบัญชีของคุณในฐานะเครดิตที่ซื้อด้วยเงินตามปกติ แสดงในหน้าการใช้งาน ไม่หมดอายุ คำขอถัดไปของคุณใช้เศษนั้นก่อน และ Kolwen ไม่เอาเศษนั้นไปเด็ดขาด เมื่อ Kolwen ปิดบัญชีของคุณหรือปิดบริการ การคืนเงินปัดแบบเดียวกัน และยอดที่ต่ำกว่าหนึ่งเซนต์จ่ายออกไม่ได้
+> - [รอที่ปรึกษากฎหมาย] **เรื่องอื่น** เรื่องที่ข้อความข้างต้นไม่ได้กำหนด ให้เป็นไปตามนโยบายคืนเงินของ Paddle และกฎหมายที่ใช้กับคุณ
+
+**GAP 6—[pending legal review]: counsel signs the wording of this clause, and confirms the
+immediate-start consent works as the basis for deducting days used.**
+
+## Ending the contract
+
+**By Kolwen without cause.** Kolwen refunds the unused part: a key's remaining days, a subscription's
+remaining current period, and unused credits at the price paid.
+
+**By Kolwen for your fault** (a breach of the acceptable-use process below, or a chargeback). This runs
+as a process, not a summary punishment: see "Acceptable use and how it is enforced".
+
+**By you.** You may stop using Kolwen at any time. A refund follows the Refunds section.
+
+## Changes to these Terms
+
+Kolwen gives **30 days' notice** of a material change, by email to the address on your account **and** by
+a banner on the site and in the app. A change forced by law, security or abuse prevention takes effect
+at once. If you reject a changed term, you may end the contract and you are refunded the unused part, as
+in "Ending the contract". At your first sign-in after a change takes effect, you see a one-time screen to
+review and accept it. A public dated record of each change to these Terms is kept. If an email bounces,
+that is logged and the in-app screen carries the notice.
+
+## Price changes
+
+[pending legal review] This section governs a change to the price of a subscription, a key or credits.
+For a rejected price change it applies in place of "Ending the contract" and of the sentence about
+rejecting a changed term in "Changes to these Terms". Every other change to these Terms is handled as
+"Changes to these Terms" says.
+
+- [pending legal review] **Notice.** Before a price change that raises what you pay, Kolwen gives at
+  least **30 days' notice**, by email to the address on your account **and** in the app.
+- [pending legal review] **When it takes effect.** A price rise takes effect at the first renewal on or
+  after the later of the day the 30 days' notice ends and the day the hold in "A price you already pay"
+  ends. Never inside a period you have already paid for, never on a key you have already bought, and
+  never on prepaid credit you have already bought: those keep the price you paid. For a key or credits,
+  a new price applies only to a purchase made after the notice ends.
+- [pending legal review] **Your acceptance.** Where the law of the place where you live requires your
+  consent to a price rise, the new price applies only after you accept it. If you do not accept, your
+  subscription ends at the end of the period you have paid for.
+- [pending legal review] **If you reject a price change.** You may end the subscription, and Kolwen
+  refunds only the charges taken after the effective date of the change. Nothing paid before that date
+  is refunded because of a rejected price change, and that includes the unused part of a key.
+- [pending legal review] **A price you already pay.** An existing subscriber keeps the price they pay
+  for at least **[N months]**, and no price rise takes effect before that hold ends. When a rise takes
+  effect is set only by "When it takes effect".
+- [pending legal review] **Model versions.** The prices per million tokens published for a model version
+  stay fixed for as long as that version is offered. A new version carries its own price.
+- [pending legal review] **Retiring a model version.** Kolwen retires a model version only after
+  notice of at least **[M]**, and not before the date it published for that version when it launched.
+
+**GAP 11—[pending legal review]: counsel confirms that the opt-in rule where the customer's home
+law requires consent, and the refund of only the charges taken after the effective date, hold under
+Thailand's Unfair Contract Terms Act B.E. 2540 and the law of the place where the customer lives, and
+words the values the owner sets for **[N months]**, including the point from which that hold is
+counted, and for **[M]**.**
+
+## Limit of liability
+
+[pending legal review] To the extent permitted by law, Kolwen's total liability for a claim arising from the service is limited to **the fees you paid to Kolwen in the 12 months before the event that gave rise to the claim.** This is a ceiling on damages you prove, not an amount Kolwen pays. It does not apply to acts done wilfully or with gross negligence, and it does not apply to injury to life, body or health caused intentionally or negligently. It takes away no right that a consumer has by law, including, where the law of the place where you live gives it, a right to a refund or a price reduction in cash when the service is not provided as agreed. How far this carve-out reaches is for counsel to fix.
+
+> [รอที่ปรึกษากฎหมาย] ในขอบเขตที่กฎหมายอนุญาต ความรับผิดรวมของ Kolwen สำหรับข้อเรียกร้องที่เกิดจากบริการ จำกัดไม่เกินค่าบริการที่คุณชำระให้ Kolwen ในช่วง 12 เดือนก่อนเหตุที่ทำให้เกิดข้อเรียกร้องนั้น นี่เป็นเพดานของความเสียหายที่คุณพิสูจน์ได้ ไม่ใช่จำนวนเงินที่ Kolwen จะจ่าย ข้อจำกัดนี้ไม่ใช้กับการกระทำที่ทำโดยจงใจหรือประมาทเลินเล่ออย่างร้ายแรง และไม่ใช้กับความเสียหายต่อชีวิต ร่างกาย หรืออนามัยที่เกิดจากการกระทำโดยจงใจหรือประมาทเลินเล่อ ข้อจำกัดนี้ไม่ลิดรอนสิทธิที่กฎหมายให้ผู้บริโภค รวมถึงสิทธิขอคืนเงินหรือลดราคาเป็นเงินสดเมื่อบริการไม่เป็นไปตามที่ตกลง ในกรณีที่กฎหมายของถิ่นที่คุณอาศัยอยู่ให้สิทธินั้น ขอบเขตของข้อยกเว้นนี้ให้ที่ปรึกษากฎหมายเป็นผู้กำหนด
+
+[pending legal review] **Indemnity for intellectual-property claims.** Kolwen gives no indemnity against a third party's intellectual-property claim about an Output, unless a named enterprise customer asks for one. Where that customer asks, Kolwen gives it in writing.
+
+> [รอที่ปรึกษากฎหมาย] **การชดใช้กรณีข้อเรียกร้องด้านทรัพย์สินทางปัญญา** Kolwen ไม่ให้การชดใช้กรณีบุคคลภายนอกเรียกร้องเกี่ยวกับทรัพย์สินทางปัญญาในเรื่อง Output เว้นแต่ลูกค้าองค์กรรายที่ระบุชื่อเป็นผู้ขอ ในกรณีที่ลูกค้ารายนั้นขอ Kolwen จะให้การชดใช้เป็นลายลักษณ์อักษร
+
+**GAP 7—[pending legal review]: Thailand's Unfair Contract Terms Act B.E. 2540 may trim a cap like this
+one in a consumer contract of adhesion. Counsel confirms the wording and how far it holds.**
+
+## Governing law and courts
+
+Thai law governs these Terms, and the Thai courts have jurisdiction. Your rights as a consumer under the
+law of the place where you live are not taken away by this clause. There is no arbitration clause.
+
+**GAP 8—[pending legal review]: whether a consumer's home mandatory law overrides the choice of Thai
+law and courts (for a consumer in the EU, Rome I art. 6) is counsel's reading; the clause is written to
+preserve consumer rights either way.**
+
+## Acceptable use and how it is enforced
+
+**The list of prohibited conduct is not written yet.** Some entries are drafted and wait for counsel; until counsel reads them, the published pages do not show them. It is an open decision for the owner and counsel,
+and this section does not guess at it beyond those entries.
+
+[pending legal review] **Training on Outputs.** You may not use Outputs, or data derived from them, to train, fine-tune or distil an AI model, or to build a dataset for doing so, without Kolwen's prior written authorisation. To ask for it, write to permissions@kolwen.com and say which model you would train, for what purpose and on how many Outputs; Kolwen answers in writing within 10 business days. Kolwen's silence is not authorisation. This line does not limit what you do with an Output as your own work: you may use, publish and sell it, and use it as an input to features of your own product.
+
+> [รอที่ปรึกษากฎหมาย] **การนำ Outputs ไปใช้ฝึกโมเดล** คุณจะนำผลลัพธ์ที่ได้จากบริการ (Outputs) หรือข้อมูลที่ได้มาจาก Outputs นั้น ไปใช้เพื่อ train, fine-tune หรือ distil โมเดล AI หรือเพื่อสร้างชุดข้อมูล (dataset) สำหรับการนั้น โดยไม่ได้รับอนุญาตเป็นลายลักษณ์อักษรจาก Kolwen ล่วงหน้าไม่ได้ หากต้องการขออนุญาต ให้เขียนถึง permissions@kolwen.com และระบุว่าคุณจะ train โมเดลใด เพื่อวัตถุประสงค์ใด และด้วย Outputs จำนวนเท่าใด Kolwen จะตอบเป็นลายลักษณ์อักษรภายใน 10 วันทำการ การที่ Kolwen ไม่ตอบไม่ถือเป็นการอนุญาต ข้อนี้ไม่จำกัดสิ่งที่คุณทำกับ Output ในฐานะงานของคุณเอง คุณใช้ เผยแพร่ และขาย Output นั้นได้ และใช้เป็น input ให้ฟีเจอร์ของผลิตภัณฑ์ของคุณเองได้
+
+[pending legal review] **Resale.** You may not resell Kolwen, a key or credits, or access to any of them, without Kolwen's prior written authorisation. To ask for it, write to permissions@kolwen.com.
+
+> [รอที่ปรึกษากฎหมาย] **การขายต่อ** คุณจะขายต่อ Kolwen, key, เครดิต หรือสิทธิเข้าใช้สิ่งใดสิ่งหนึ่งเหล่านี้ โดยไม่ได้รับอนุญาตเป็นลายลักษณ์อักษรจาก Kolwen ล่วงหน้าไม่ได้ หากต้องการขออนุญาต ให้เขียนถึง permissions@kolwen.com
+
+[pending legal review] **Decisions about people.** If you use Kolwen in work whose results affect a person's health, legal matters, finances or employment, a person must review the result before any decision about that person is made. Kolwen is not the decision-maker.
+
+> [รอที่ปรึกษากฎหมาย] **การตัดสินใจเกี่ยวกับบุคคล** หากคุณใช้ Kolwen ในงานที่ผลลัพธ์กระทบต่อสุขภาพ เรื่องทางกฎหมาย การเงิน หรือการจ้างงานของบุคคล ต้องมีบุคคลตรวจผลลัพธ์ก่อนที่จะมีการตัดสินใจเกี่ยวกับบุคคลนั้น Kolwen ไม่ใช่ผู้ตัดสินใจ
+
+What is written is how Kolwen acts when it believes a customer
+has broken a rule, which is a process, in this order:
+
+1. **Notice.** Kolwen tells you which clause it believes you broke and gives a summary of the evidence.
+2. **Suspension, not termination,** while the case is open. If the product is a key, its clock of days
+   stops for the whole case.
+3. **A window to answer.** You have **14 business days** to answer the notice. If the window closes with no
+   answer, the case is still decided, as step 4 says.
+4. **A written decision,** within **7 business days** after your answer or, if you give no answer, within
+   **7 business days** after the 14 business days close, on the evidence Kolwen holds. Either the case is
+   dismissed and the account and its key are restored in full, or it is upheld. An upheld decision does not
+   end the contract at once: the account stays suspended, and the key's clock stays stopped, through the
+   appeal window of step 5 and through any appeal.
+5. **One appeal to a human** against an upheld decision. You have **30 business days** after the written
+   decision to file it, through **appeals@kolwen.com**, and Kolwen answers within **14 business days**. If
+   the appeal succeeds, the account and its key are restored in full. The contract is terminated, with no
+   refund, only when the appeal is dismissed or the 30 business days pass with no appeal filed.
+6. **A register of cases** is kept, so that the same conduct draws the same answer.
+
+**Business days.** In this section a business day is a normal working day in Thailand: Monday to Friday,
+excluding the public holidays announced by the Prime Minister's Office in the Royal Gazette. The holidays
+of banks are not used.
+
+**A ceiling and what a missed deadline does.** The case ceiling is **90 calendar days** of Kolwen's own time,
+counted from the date of the notice. The count pauses while your 14-business-day window to answer is open, from the notice until you
+answer or the 14 business days close, whichever comes first, and while your 30-business-day window to file an appeal is open, from the
+written decision until you file the appeal or the 30 business days close, whichever comes first. Only the days outside those windows count
+toward the 90. If Kolwen misses a deadline of its own (the 7 business days for the decision, the
+14 business days for the appeal answer, or the 90-day ceiling), the suspension, including one that follows
+an upheld decision, is lifted and the key comes back into use. If a deadline of yours lapses (the 14 business days to answer, or the 30 business days to
+appeal), the case proceeds to its next step.
+
+**Chargebacks run on Paddle's track.** A bank dispute is handled through Paddle as merchant of record,
+and Paddle asks Kolwen for evidence. The account is **suspended** when a chargeback is filed, because the
+money is gone. It is **restored** if the dispute resolves in Kolwen's favour or you pay again, and
+**terminated only when the dispute closes against Kolwen.** Kolwen does not argue a chargeback with you
+directly.
+
+> **[รอที่ปรึกษากฎหมาย] ขั้นตอนเมื่อ Kolwen เห็นว่าลูกค้าฝ่าฝืนกฎ**
+> รายการพฤติกรรมที่ห้ามยังไม่ได้เขียน มีบางข้อที่ร่างไว้และรอที่ปรึกษากฎหมาย จนกว่าที่ปรึกษาจะอ่าน หน้าที่เผยแพร่จะยังไม่แสดงข้อเหล่านั้น เป็นเรื่องที่เจ้าของและที่ปรึกษากฎหมายต้องตัดสิน และหัวข้อนี้ไม่เดาแทน
+> สิ่งที่เขียนไว้คือวิธีที่ Kolwen ปฏิบัติเมื่อเห็นว่าลูกค้าฝ่าฝืนกฎ ตามลำดับนี้
+> 1. แจ้งข้อกำหนดที่เห็นว่าฝ่าฝืน พร้อมสรุปพยานหลักฐาน
+> 2. ระงับบัญชี ไม่ใช่เลิกสัญญา ระหว่างที่เคสยังเปิด ถ้าสินค้าเป็นคีย์ นาฬิกานับวันของคีย์หยุดตลอดทั้งเคส
+> 3. ลูกค้ามีเวลา **14 วันทำการ** เพื่อตอบข้อแจ้ง หากครบกำหนดโดยลูกค้าไม่ตอบ เคสยังคงถูกตัดสินตามข้อ 4
+> 4. คำตัดสินเป็นลายลักษณ์อักษรภายใน **7 วันทำการ** หลังลูกค้าตอบ หรือหากลูกค้าไม่ตอบ ภายใน **7 วันทำการ**
+>    หลัง 14 วันทำการสิ้นสุดลง โดยพิจารณาจากหลักฐานที่ Kolwen มี ยกคำร้องและคืนบัญชีกับคีย์เต็มที่ หรือยืนตาม
+>    คำตัดสินที่ยืนตามไม่ทำให้สัญญาสิ้นสุดทันที บัญชียังถูกระงับและนาฬิกานับวันของคีย์ยังหยุดตลอดช่วงเวลายื่นอุทธรณ์ตามข้อ 5
+>    และตลอดการอุทธรณ์
+> 5. อุทธรณ์ต่อมนุษย์ได้หนึ่งครั้งเมื่อคำตัดสินยืนตาม ภายใน **30 วันทำการ** หลังคำตัดสิน ผ่าน **appeals@kolwen.com** และ Kolwen
+>    ตอบภายใน **14 วันทำการ** หากอุทธรณ์สำเร็จ คืนบัญชีกับคีย์เต็มที่ สัญญาจะสิ้นสุดโดยไม่คืนเงินก็ต่อเมื่ออุทธรณ์ถูกยกเท่านั้น
+>    หรือครบ 30 วันทำการโดยไม่มีการยื่นอุทธรณ์
+> 6. เก็บทะเบียนเคส เพื่อให้พฤติกรรมเดียวกันได้คำตอบเดียวกัน
+>
+> **วันทำการ** ในหัวข้อนี้คือวันทำงานปกติในประเทศไทย ตั้งแต่วันจันทร์ถึงวันศุกร์ ไม่รวมวันหยุดราชการที่สำนักนายกรัฐมนตรีประกาศในราชกิจจานุเบกษา
+> และไม่ใช้วันหยุดของธนาคาร
+>
+> **เพดานและผลของการพลาดกำหนด** เพดานของเคสคือ **90 วันตามปฏิทิน** ของเวลาฝั่ง Kolwen เอง นับจากวันที่แจ้ง การนับหยุดชั่วคราวระหว่างที่หน้าต่าง 14 วันทำการสำหรับตอบของลูกค้ายังเปิดอยู่ ตั้งแต่วันที่แจ้งจนกว่าลูกค้าจะตอบหรือครบ 14 วันทำการ แล้วแต่อย่างใดมาก่อน และระหว่างที่หน้าต่าง 30 วันทำการสำหรับยื่นอุทธรณ์ของลูกค้ายังเปิดอยู่ ตั้งแต่วันที่มีคำตัดสินเป็นลายลักษณ์อักษรจนกว่าลูกค้าจะยื่นอุทธรณ์หรือครบ 30 วันทำการ แล้วแต่อย่างใดมาก่อน นับเฉพาะวันนอกหน้าต่างเหล่านั้นเข้าเพดาน 90 วัน หาก Kolwen พลาดกำหนดของตนเอง
+> (7 วันทำการสำหรับคำตัดสิน 14 วันทำการสำหรับตอบอุทธรณ์ หรือเพดาน 90 วัน) การระงับ รวมถึงการระงับที่ต่อเนื่องจากคำตัดสินที่ยืนตาม จะหลุดและคีย์กลับมาใช้ได้ หากกำหนดของลูกค้าหมดลง
+> (14 วันทำการสำหรับตอบ หรือ 30 วันทำการสำหรับอุทธรณ์) เคสเดินต่อไปยังขั้นถัดไป
+>
+> **การเรียกเงินคืนผ่านธนาคาร (chargeback)** ดำเนินตามขั้นตอนของ Paddle ข้อพิพาทกับธนาคารจัดการผ่าน Paddle ในฐานะผู้ขายตามกฎหมาย
+> (merchant of record) และ Paddle ขอหลักฐานจาก Kolwen บัญชีจะถูกระงับเมื่อมีการยื่น chargeback เพราะเงินหลุดไปแล้ว
+> จะคืนสถานะหากข้อพิพาทจบเป็นคุณแก่ Kolwen หรือลูกค้าชำระใหม่ และจะเลิกสัญญาก็ต่อเมื่อข้อพิพาทจบเป็นผลร้ายต่อ Kolwen เท่านั้น
+> Kolwen ไม่โต้แย้ง chargeback กับลูกค้าโดยตรง
+
+**GAP 9—[pending legal review]: counsel confirms the notice duties before suspension or termination
+(consumer law favours notice first), the definition of a business day against the Civil and Commercial
+Code (ss.193/1, 193/4 and 193/8), how the 90-calendar-day ceiling, which now pauses during your answer and appeal-filing windows, sits with business-day counting and
+a key clock that stops for the whole case, and, as a question only: if Kolwen misses a deadline of its own while an appeal runs, does the case end in the customer's favour, or does only the suspension lift while the appeal continues.**
+
+<!-- legal-state:thai-7day:begin -->
+<!-- legal-state:thai-7day:end -->
+
+## Retention
+
+No conversation content is retained today, because no conversational service exists.
+When one does, conversation content is retained for **[N days]** and then deleted or anonymised. N
+is set before launch, stated here, recorded, and enforced by a deletion mechanism—§23(3), §37(3)
+and §39(4) require that a period be stated, recorded and enforced, and no statute supplies the
+number.
+
+> ปัจจุบันไม่มีการเก็บเนื้อหาการสนทนา เพราะยังไม่มีบริการสนทนา เมื่อมี เนื้อหาการสนทนาจะถูกเก็บไว้
+> **[N วัน]** แล้วลบหรือทำให้ไม่สามารถระบุตัวบุคคลได้ โดย N จะถูกกำหนดก่อนเปิดใช้ ระบุไว้ที่นี่
+> บันทึกไว้ และบังคับใช้ด้วยกลไกการลบ มาตรา 23(3) มาตรา 37(3) และมาตรา 39(4) กำหนดให้ต้องระบุ
+> บันทึก และบังคับใช้ระยะเวลาการเก็บ และไม่มีกฎหมายฉบับใดกำหนดตัวเลขไว้
+
+N is the owner's and counsel's to set; this document does not choose it. See `docs/TRUST.md`.
+
+## Status of this document
+
+Nothing here is in force. There is no service to buy, no account to open, and no contract formed
+by this file. It exists so the shape can be read and corrected before it matters.

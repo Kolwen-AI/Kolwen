@@ -1,0 +1,161 @@
+# Cache-Control for kolwen.com (LWK-134a). Parsed by Workers, NOT served as an asset.
+#
+# The images and the icon here are NOT content-hashed, so the doc's `immutable, max-age=31556952`
+# must never be copied onto them: a regenerated brand mark would stay stale in caches for a year.
+# These are finite and short enough that a redeploy is visible the same day. Only the font files
+# below are content-hashed, and only they may carry `immutable`.
+#
+# Each shipped image is NAMED, one rule per file (K-170). A wildcard such as `/*.png` would give a
+# missing image path the same one-day cache, so the platform would hold a not-yet-deployed image's 404
+# for a day. A missing path matches none of these rules. The rules of this block are the only ones
+# that carry the one-day value (headers-file.test.mjs holds that), and a file added later gets its own
+# named rule here.
+/og.jpg
+  Cache-Control: public, max-age=86400
+/favicon.svg
+  Cache-Control: public, max-age=86400
+/band-404.svg
+  Cache-Control: public, max-age=86400
+/band-home.svg
+  Cache-Control: public, max-age=86400
+/favicon-32.png
+  Cache-Control: public, max-age=86400
+/apple-touch-icon.png
+  Cache-Control: public, max-age=86400
+
+# The font files ARE content-hashed: each name carries the first ten hex digits of the sha256 of its
+# bytes (scripts/font-subset.mjs writes it, scripts/font-versions.test.mjs holds name and bytes
+# together), so changed bytes are a new url and a year in every cache is safe. The patterns name the
+# .woff2 files only. fonts.css, the one unhashed file that names them and that every page links,
+# and the OFL.txt licence texts keep the platform default (revalidated), because their urls never
+# change. Each font file is NAMED with its own rule (K-175): a splat such as `/fonts/thai/*.woff2` would
+# give a missing font path the one-year immutable cache, so a 404 for a font that is not deployed would
+# be held in every browser for a year. A missing path matches none of these rules. No other Cache-Control
+# rule matches these paths: a header set by two matching rules is joined with a comma (see the
+# security-headers note below). font-versions.test.mjs and headers-file.test.mjs hold both.
+/fonts/thai/kw-sans-thai-400.7a93a32da9.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/thai/kw-sans-thai-500.bab87050a2.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/thai/kw-sans-thai-600.4e5f5074ff.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/thai/kw-sans-thai-700.b87d41e0f9.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/mono/kw-mono-400.e8d30e29b8.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/fonts/mono/kw-mono-500.78ee778fb0.woff2
+  Cache-Control: public, max-age=31536000, immutable
+
+# The page itself must always be revalidated: it carries the claims, and a stale claim is the
+# failure this room exists to prevent.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+/404.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Security headers on EVERY response (LWK-211): the CSP floor, Referrer-Policy, Permissions-Policy.
+#
+# ONE rule, on `/*`, and the only rule that may carry these headers. Two reasons.
+#  - Coverage: the 404 the platform serves for an UNMATCHED path (`assets.not_found_handling`) is a
+#    response to a request for THAT path, so a rule keyed only on `/404.html` may not reach it; a `/*`
+#    rule is keyed on the requested path and does. Measured 2026-09-25: on the production alias a
+#    missing `/x.svg` came back with the 86400 Cache-Control rule for `/*.svg`, i.e. the path rules
+#    are applied to the 404-page fallback. A Workers Preview does NOT serve the fallback at all: an
+#    unmatched path there gets a 9-byte platform "Not found" outside the asset pipeline, and no rule
+#    of this file (path or host) touches it. Its only header, `X-Robots-Tag: noindex`, is Cloudflare's
+#    own. So the preview's 404 is checked for nothing, and production's is checked for everything
+#    (scripts/post-deploy-check.mjs).
+#  - No duplicates: a header set by two matching rules is JOINED with a comma (Cloudflare's own headers
+#    page), which would serve two policies, or one policy twice, and no longer the string written here.
+#    surface-check rule 13 fails if a second rule carries the CSP.
+# Caps (Cloudflare): 100 rules, 2,000 characters per line. surface-check rule 13 checks both.
+#
+# WHERE THE OTHER TWO ARE SET. Strict-Transport-Security and X-Content-Type-Options are set by the
+# Cloudflare ZONE, not by this file (measured 2026-09-25 on kolwen.com: `max-age=15552000;
+# includeSubDomains` and `nosniff`; the workers.dev host carries neither, it does not pass the zone).
+# They are deliberately NOT set here: the zone value is the one served on the production host, and a
+# second copy here would ride beside it as a joined value nobody can compare to a single declared
+# string. post-deploy-check asserts both are PRESENT on the production origin, so a zone setting that
+# is switched off is caught, not assumed.
+#
+# CSP. The pages fetch their typefaces from the site itself: web/fonts/fonts.css is the one manifest every page links, and its @font-face rules load
+# the WOFF2 files under /fonts/ only (surface-check rule 13 holds that). So font-src is 'self' alone and the only origin named for a fetch is
+# Cloudflare's Web Analytics beacon, below.
+#  - script-src: NO 'unsafe-inline'. The one inline script in index.html is admitted by its hash; any
+#    byte change breaks it, and surface-check rule 13 recomputes it. 'self' stays for same-origin
+#    scripts and Cloudflare's own same-origin /cdn-cgi/ paths; web/ ships no .js file (rule 7).
+#    The one named origin is Cloudflare Web Analytics' beacon (LWK-223, owner pick): the edge injects it
+#    with a VERSIONED path under https://static.cloudflareinsights.com/beacon.min.js/, which an exact-path
+#    source (no trailing slash) does not match. CSP path matching treats a source path that ends in `/` as
+#    a prefix, so `https://static.cloudflareinsights.com/beacon.min.js/` admits that path and any version
+#    under it and nothing else on the host. (The host alone would admit every script that host serves.)
+#    The unversioned `/beacon.min.js` itself is NOT admitted (W3C CSP3, path-part matching: a source path
+#    with more segments than the request path does not match), which matters only if the site ever moves to
+#    Cloudflare's manual snippet. surface-check rule 13 holds this exact source string.
+#    No `connect-src` is added: with automatic injection the beacon posts to this same origin's
+#    /cdn-cgi/rum, which `default-src 'self'` already covers (Cloudflare Web Analytics FAQ, "What do I need
+#    to add to my Content Security Policy": for automatic injection "ensure your connect-src includes 'self'").
+#    The beacon carries no Subresource Integrity, a named exception to the W3C Subresource Integrity practice for third-party scripts: the FAQ
+#    ("How can I enforce Subresource Integrity (SRI) with the JS beacon?") says Cloudflare does not support
+#    version-pinning the beacon, so no stable hash exists to pin.
+#  - style-src: every inline <style> block of the pages, and the <style> of every SVG image under web/ (the SVG is a document this policy governs; surface-check rule 13 recomputes them and reports how many it hashed) is admitted by hash too, so there
+#    is no 'unsafe-inline' anywhere. The font manifest is a same-origin file, so 'self' admits it; the Google Fonts stylesheet,
+#    which varied by user agent and could carry no fixed hash, was the one third-party exception, and self-hosting the two IBM Plex families retired it.
+#  - The pricing page (/pricing; it began as /plans, which now answers a 301 from web/_redirects) and the four pages scripts/legal-pages.mjs generates (/terms,
+#    /privacy and /refund from the repository's TERMS.md, PRIVACY.md and legal/thai-7day-clause.md, and /changelog from CHANGELOG.md) share ONE <style> block, so
+#    the five carry one hash. `node scripts/legal-pages.mjs --check` (a CI step) fails if the pricing page's block is not byte for byte the generated pages'. The page script and
+#    the rules for a reader without script are synced blocks, the same bytes on all seven pages, so each adds one hash and no page adds its own. None loads a payment script or a new origin; each takes the `/*` rule
+#    like `/`, and no rule here sets noindex on any of them. /llms.txt is plain text and takes only the `/*` rule.
+#  - The header and footer rules (HEADER_CSS and FOOTER_CSS in scripts/lib/legal-render.mjs) sit inside the shared block on the pages that generate it, and are written between fixed markers into the style blocks of
+#    index.html and 404.html, which are their own; `node scripts/legal-pages.mjs --write` updates the style-src and script-src hashes here, and `--check` fails on a stale one, or on a style-src-elem (none today) that lacks one: `--write` never edits that directive, and surface-check rule 13 judges the directive a browser applies to a block.
+#  - The ld+json block in index.html is a DATA block, not script: CSP's script-src does not govern it.
+#  - NAMED CONSEQUENCE: on kolwen.com the edge appends an inline bot-detection script to the HTML (the
+#    Web Analytics beacon above is a separate, allowed script). It has per-request contents, so no hash can
+#    admit it, and this policy blocks it (a console report, nothing on the page). Turning that zone feature off removes the report; allowing it would need
+#    'unsafe-inline', which this policy refuses.
+# CROSS-ORIGIN HEADERS AND FORM-ACTION (LWK-220 item 2, the OWASP Secure Headers Project set; Cloudflare audit TH-F6).
+#  - form-action 'self': a CSP directive with NO default-src fallback, so it is stated. The page has no form today;
+#    this keeps one added later from posting off-site. It is part of the CSP floor surface-check rule 13 enforces.
+#  - Cross-Origin-Opener-Policy same-origin: the page opens no cross-origin popups and is opened by none that it
+#    needs to talk to. Cross-Origin-Resource-Policy same-origin: no other origin embeds this site's responses.
+#    Both are checked against the served response by post-deploy-check, like the three headers above.
+#  - Cross-Origin-Embedder-Policy require-corp is NOT set, on purpose. It makes every cross-origin no-cors
+#    subresource need a CORP header. When this was decided the page loaded three: the Google Fonts stylesheet, its font files and
+#    the Web Analytics beacon; the fonts are now the site's own, and the beacon is the one cross-origin subresource left. Read 2026-10-02 (curl, HEAD, GET only): the stylesheet, a font file and the
+#    unversioned beacon URL each answered `Cross-Origin-Resource-Policy: cross-origin` and
+#    `Access-Control-Allow-Origin: *`, so they would load; but no real browser has loaded this page under COEP
+#    yet, the beacon's versioned path was not fetched, and the page has no SharedArrayBuffer or other need for
+#    cross-origin isolation. A header that could blank the fonts for a benefit nothing here uses is not shipped
+#    on header evidence alone. Revisit with a real-browser run.
+#  - upgrade-insecure-requests is NOT set. The page loads no http: subresource (every origin above is https),
+#    the zone sends HSTS and redirects http to https, so the directive would upgrade nothing; and it also
+#    upgrades same-origin requests, which on a plain-http local preview (wrangler dev) is a behaviour change
+#    nobody has measured here.
+# Permissions-Policy: every standardized feature the page does not use, names from the W3C
+# webappsec-permissions-policy feature registry (read 2026-09-25). The page uses none of them.
+# ZONES (the domain seams, web-src/seams.json, surface-check rule 20). This file is the headers file of the COMPANY zone: the one Worker that serves every page of web/, and the
+# `/*` rule below is that zone's strict hash policy. Another zone is another Worker with its own publish root and its own headers file, so its
+# policy is its own rule set; it is never a second CSP rule here, because Cloudflare joins the values of two matching rules and rule 20 fails the file that tries it.
+/*
+  Content-Security-Policy: default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; script-src 'self' https://static.cloudflareinsights.com/beacon.min.js/ 'sha256-FjQe9qbaQmXSbY4WgpxuXKBWi6a9+bgHckXCNqi55cE='; style-src 'self' 'sha256-aRp+Ej0CK5QWDGLs8aspuuc9xlYPAsi2sJ0vRRnTGiU=' 'sha256-ZyYGwBwgpDdVstXhIgqPH5+CPyW0do8C7EzMKObkWxA=' 'sha256-EVSNSi1yZ9UgYftDcAXIEHzV+z6vDEUQJMfuaD9kxEU=' 'sha256-BXuTfcXsauAt+62epA44kUuF0U/c2QErltShZyA2XMs=' 'sha256-votawf6b4bRb5xWL7WgENyLSKlRfpPYVE/uFaOAFcuE=' 'sha256-HIgGmBybFKSpp3LoxCQUWd9YoNLD6D4Z1+EIGyqK0vc=' 'sha256-tI/1F/1aIFgtzlPSvQ7fLlyOUhXobZsddNeynWwBgmk='; font-src 'self'; form-action 'self'
+  Referrer-Policy: strict-origin-when-cross-origin
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Permissions-Policy: accelerometer=(), autoplay=(), bluetooth=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), hid=(), idle-detection=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()
+
+# noindex on the PREVIEW host, never on production (AW-35 (1), BB-535; the host itself is the scope).
+# Previews are served on previews.kolwen.com, the preview hostname attached to this Worker through the Cloudflare
+# API on 2026-11-21 (the owner signed card BB-535; main pressed it). A rule keyed on PATH cannot express this: _headers matches an absolute URL by HOST, so the host is
+# the scope. A placeholder matches one dot-delimited label, so the pattern below matches <name>.previews.kolwen.com and
+# nothing else. kolwen.com does not end in .previews.kolwen.com, and the bare previews.kolwen.com has no label before it.
+# scripts/headers-file.test.mjs checks both with a local matcher over the documented placeholder semantics (the
+# preview host matches; kolwen.com and www.kolwen.com do not). Cloudflare adds noindex only on workers.dev: its Custom domains page says "Cloudflare adds this header automatically to workers.dev Preview
+# URLs, but not to custom domain Preview URLs." So on previews.kolwen.com this rule is what sends it. A Preview URL is
+# <preview-name>.previews.kolwen.com and a deployment URL <deployment>-<preview-name>.previews.kolwen.com (the Previews page, "URLs");
+# both are one label before the host, so the rule covers both.
+# The workers.dev preview rule is gone with the workers.dev previews (wrangler.jsonc preview_urls is false), so no
+# rule of this file names a workers.dev host, and production's own alias cannot be given noindex by this file.
+https://:preview.previews.kolwen.com/*
+  X-Robots-Tag: noindex

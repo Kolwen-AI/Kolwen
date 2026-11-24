@@ -1,0 +1,136 @@
+// Witnesses for the CI file reads (scripts/lib/contained-read.mjs): a path that resolves outside the root is refused, a file over the
+// read cap is refused before it is read, and a directory alias that loops back into the root ends, with each real file read once.
+// The directory links need no elevation where a junction can be made; where neither a junction nor a symlink can be made, the tests
+// that need one skip visibly.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, renameSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { measurePage } from './page-weight.mjs';
+import { readContained, MAX_READ_BYTES } from './lib/contained-read.mjs';
+import { makeResponder } from './lib/static-server.mjs';
+import { coverageGaps, fontNameProblems } from './lib/font-coverage.mjs';
+import { check } from './sitemap-lastmod.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const roots = [];
+const tree = () => { const d = mkdtempSync(join(tmpdir(), 'contained-read-')); roots.push(d); mkdirSync(join(d, 'web')); return d; };
+// A directory link: a junction first (no elevation on Windows), then a symlink. False when neither can be made here.
+function linkDir(target, link) {
+  for (const type of ['junction', 'dir']) { try { symlinkSync(target, link, type); return true; } catch { /* the next kind */ } }
+  return false;
+}
+test.after(() => { for (const d of roots) rmSync(d, { recursive: true, force: true }); });
+
+const page = (d, head) => writeFileSync(join(d, 'web', 'index.html'), '<!doctype html><html><head>' + head + '</head><body><main>A</main></body></html>');
+const sheetLink = href => '<link rel="stylesheet" href="' + href + '">';
+const CPS = new Set([65]);
+
+test('a stylesheet that resolves outside the web root is refused, not read', t => {
+  const d = tree();
+  const outside = mkdtempSync(join(tmpdir(), 'contained-outside-')); roots.push(outside);
+  writeFileSync(join(outside, 'x.css'), 'body{}');
+  if (!linkDir(outside, join(d, 'web', 'css'))) return t.skip('no directory link (junction or symlink) can be made here');
+  page(d, sheetLink('/css/x.css'));
+  assert.throws(() => measurePage(join(d, 'web'), 'index.html', CPS), /loads \/css\/x\.css, leads outside the root/);
+});
+
+test('a stylesheet over the read cap is refused before it is read', () => {
+  const d = tree();
+  writeFileSync(join(d, 'web', 'big.css'), Buffer.alloc(9 << 20, 0x20));
+  page(d, sheetLink('/big.css'));
+  assert.throws(() => measurePage(join(d, 'web'), 'index.html', CPS), /loads \/big\.css, is \d+ bytes, over the \d+ byte read cap/);
+});
+
+test('a directory alias that loops back into the web root ends, and the page is measured', t => {
+  const d = tree();
+  if (!linkDir(join(d, 'web'), join(d, 'web', 'loop'))) return t.skip('no directory link (junction or symlink) can be made here');
+  writeFileSync(join(d, 'web', 'a.css'), '@import url("./loop/a.css");\nbody{}');
+  page(d, sheetLink('/a.css'));
+  const code = 'import { reads } from ' + JSON.stringify(pathToFileURL(join(HERE, 'lib', 'contained-read.mjs')).href) + '; import { measurePage } from ' + JSON.stringify(pathToFileURL(join(HERE, 'page-weight.mjs')).href)
+    + '; const r = measurePage(' + JSON.stringify(join(d, 'web')) + ", 'index.html', new Set([65])); console.log('READS ' + reads.n);";
+  const r = spawnSync(process.execPath, ['--max-old-space-size=1024', '--input-type=module', '-e', code], { encoding: 'utf8', timeout: 30000, killSignal: 'SIGKILL', env: { ...process.env, HOME: d, USERPROFILE: d, TEMP: d, TMP: d, TMPDIR: d } });
+  assert.equal(r.signal, null, 'the measure was ended by a signal, so the alias chain did not end: ' + (r.stderr || '').slice(0, 200));
+  assert.equal(r.stdout.trim(), 'READS 2', 'the page and its one stylesheet, each read once: ' + r.stdout.trim() + ' STDERR ' + (r.stderr || '').slice(0, 500));
+});
+
+function siteRecord(d, pagePath) {
+  writeFileSync(join(d, 'web', 'sitemap.xml'), '<?xml version="1.0" encoding="UTF-8"?>\n<urlset><url><loc>https://kolwen.com/o.html</loc><lastmod>2026-01-01</lastmod></url></urlset>\n');
+  mkdirSync(join(d, 'scripts', 'lib'), { recursive: true });
+  writeFileSync(join(d, 'scripts', 'lib', 'sitemap-content.json'), JSON.stringify({ 'https://kolwen.com/o.html': { page: pagePath, sha256: 'a'.repeat(64), lastmod: '2026-01-01' } }));
+}
+
+test('a sitemap record whose page resolves outside the root is refused, not read', t => {
+  const d = tree();
+  const outside = mkdtempSync(join(tmpdir(), 'contained-outside-')); roots.push(outside);
+  writeFileSync(join(outside, 'page.html'), '<main>x</main>');
+  if (!linkDir(outside, join(d, 'web', 'o'))) return t.skip('no directory link (junction or symlink) can be made here');
+  siteRecord(d, 'web/o/page.html');
+  const { problems } = check(d, { today: '2026-02-01' });
+  assert.ok(problems.some(p => /names web\/o\/page\.html, which leads outside the root/.test(p)), problems.join('\n'));
+});
+
+test('a sitemap record whose page is over the read cap is refused before it is read', () => {
+  const d = tree();
+  writeFileSync(join(d, 'web', 'big.html'), Buffer.alloc(9 << 20, 0x20));
+  siteRecord(d, 'web/big.html');
+  const { problems } = check(d, { today: '2026-02-01' });
+  assert.ok(problems.some(p => /names web\/big\.html, which is \d+ bytes, over the \d+ byte read cap/.test(p)), problems.join('\n'));
+});
+
+test('a file swapped for another after the check and before the open is refused, not read', () => {
+  const d = tree();
+  const real = join(d, 'web', 'page.txt'), other = join(d, 'other.txt');
+  writeFileSync(real, 'original');
+  writeFileSync(other, 'swapped in');
+  // the seam runs between locate's checks and the open: it puts another file's bytes at the path, as a swap of the last component would
+  const got = readContained(join(d, 'web'), 'page.txt', MAX_READ_BYTES, { afterLocate: file => renameSync(other, file) });
+  assert.equal(got.bytes, undefined, 'the swapped file was read: ' + String(got.bytes));
+  assert.match(got.refused, /changed between the check and the read/);
+});
+
+test('a file that is not swapped between the check and the open reads as before', () => {
+  const d = tree();
+  writeFileSync(join(d, 'web', 'page.txt'), 'original');
+  const got = readContained(join(d, 'web'), 'page.txt', MAX_READ_BYTES, { afterLocate: () => {} });
+  assert.equal(String(got.bytes), 'original');
+});
+
+// Two CI reads that were not contained: a link under the web root that leads out of it is refused before anything is read from it.
+const fileLink = (target, link) => { try { symlinkSync(target, link, 'file'); return true; } catch { return false; } };
+const SECRET_FONT = '0123456789';
+
+test('the static server refuses a _headers link that leads outside the web root, and reads none of it', t => {
+  const d = tree();
+  const outside = mkdtempSync(join(tmpdir(), 'contained-outside-')); roots.push(outside);
+  writeFileSync(join(outside, 'h.txt'), '/*\n  X-Outside: 1\n');
+  if (!fileLink(join(outside, 'h.txt'), join(d, 'web', '_headers'))) return t.skip('no file link (symlink) can be made here');
+  page(d, '');
+  assert.throws(() => makeResponder(join(d, 'web')), /_headers leads outside the root/);
+});
+
+test('a font file that leads outside the web root is refused, not read', t => {
+  const d = tree();
+  const outside = mkdtempSync(join(tmpdir(), 'contained-outside-')); roots.push(outside);
+  writeFileSync(join(outside, 'a.' + SECRET_FONT + '.woff2'), 'not a font');
+  mkdirSync(join(d, 'web', 'fonts'), { recursive: true });
+  if (!linkDir(outside, join(d, 'web', 'fonts', 'x'))) return t.skip('no directory link (junction or symlink) can be made here');
+  writeFileSync(join(d, 'web', 'fonts', 'fonts.css'), "@font-face{font-family:'A';src:url('/fonts/x/a." + SECRET_FONT + ".woff2') format('woff2');unicode-range:U+0041;}\n");
+  const problems = fontNameProblems(join(d, 'web'));
+  assert.ok(problems.some(p => /leads outside the root/.test(p)), 'the problems: ' + problems.join(' | '));
+});
+
+test('the coverage check refuses a font link that leads outside the web root, and reads none of it', t => {
+  const d = tree();
+  const outside = mkdtempSync(join(tmpdir(), 'contained-outside-')); roots.push(outside);
+  writeFileSync(join(outside, 'a.' + SECRET_FONT + '.woff2'), 'not a font');
+  mkdirSync(join(d, 'web', 'fonts'), { recursive: true });
+  if (!linkDir(outside, join(d, 'web', 'fonts', 'x'))) return t.skip('no directory link (junction or symlink) can be made here');
+  writeFileSync(join(d, 'web', 'fonts', 'fonts.css'), "@font-face{font-family:'A';src:url('/fonts/x/a." + SECRET_FONT + ".woff2') format('woff2');unicode-range:U+0041;}\n");
+  page(d, '');
+  const gaps = coverageGaps(join(d, 'web'));
+  assert.ok(gaps.some(g => /leads outside the root/.test(g)), 'the gaps: ' + gaps.join(' | '));
+});

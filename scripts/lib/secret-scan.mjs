@@ -1,0 +1,1098 @@
+// secret-scan.mjs — a zero-dependency secret scanner for a git gate.
+// Past the 800-line signal on purpose: one scanner that every copy takes whole, so a split would change each copy.
+//
+// PORTABLE BY CONTRACT: node builtins only, no repository path, name or constant. A sibling
+// repo copies this file byte-for-byte; everything repo-specific (which files, how a hit is
+// reported, what the gate's summary says) belongs to the CALLER. Git is reached only through a
+// `git(args) -> stdout` function the caller injects, so this module never spawns anything itself. The one call that wants bytes (a commit's
+// patch, to decode wide text in it) passes { buffer: true } as a second argument; a git() that ignores it and returns a string still works.
+//
+// WHY IT EXISTS: a PRIVATE repository on GitHub's Free plan gets neither server-side secret
+// scanning nor push protection, so the repository's own pre-push gate is the only wall.
+//
+// WHAT IT NEVER DOES: return a matched value. A hit carries the location, the pattern NAME and a
+// truncated one-way fingerprint (see fingerprint() below), and nothing else, so no caller can
+// leak a value by accident. Locations come from files the caller may not have authored: the
+// CALLER escapes them before printing.
+//
+// WHAT IT REFUSES: a pushed ref whose object is not a commit (a blob, a tree, or a tag that peels
+// to one) is refused by name, never scanned, because a range scan would pass it unread.
+// scanPushed() throws code 'ENONCOMMIT' naming every such ref, so a caller that does not know the
+// code still fails.
+//
+// A pushed tag that points at another tag is followed down the chain and every tag message on it is
+// scanned. A chain longer than MAX_TAG_DEPTH tag objects, a tag object met twice, or a tag object
+// whose headers cannot be read throws code 'ETAGCHAIN', so a caller that does not know the code
+// still fails: a message that was not read is not a message that was clean.
+//
+// LIMITS, stated: a line scanner cannot see a key split across lines, a credential inside a URL
+// (scheme://user:pass@host), a key in a file NAME (names are escaped for printing, never scanned),
+// a provider key glued to a following word character
+// (a glued run of keys of ONE provider is found, one hit per key, for aws, github classic, google, sendgrid, stripe-live and the PEM header,
+// and as one hit for the open-ended providers (github fine-grained is the exception, see GLUED KEYS); two keys of DIFFERENT providers glued together are not,
+// e.g. aws then github or google then aws: the guards are per provider, a named limit), or a value whose body is hex-only or
+// single-case (the generic rule excludes hex; the `sk-` pattern requires mixed case). For the
+// generic rule only, two residues (THREE STEPS, below): a generic key inside a secret-named value is
+// reported only if the whole value passes the content test; and a secret name glued onto the end
+// of the preceding value, with no whitespace, quote, `,` `;` `)` or `&` between, is read as part
+// of that value, so the key after it is missed. Against the previous single-regex version, fewer
+// glued keys are missed overall, but some it found are now missed: this walk reaches the class
+// from more places. A provider-shaped key is found anywhere on the line.
+//
+// Also for the generic rule only: a BARE (unquoted) value that reads as code is not judged (the
+// five conditions are at CODE_VALUE below), so a bare secret that is itself words and brackets AND
+// joined by `_`, `.` or camelCase humps, for example `Correct_horse(battery_staple7_mountain` after a
+// secret name, escapes; the same value quoted is found (a quoted one is always judged),
+// and so is a passphrase of plain words joined by `(` or `[` (it has no `_`, `.` or
+// hump). Random keys do not read as code: of 100,000 per named generator, none did.
+// A value also stops at a closing tag, `</name>`, that is followed by the end of the line, whitespace or `<`;
+// what follows such a tag is not judged as part of the value. A tag followed by any other character
+// does not stop it.
+//
+// Also for the generic rule only (C5; 1028b, 2026-10-28): a BARE value that opens with `/` and whose regex literal, read forward from that
+// slash, is followed by a terminator or the end of the line AND holds one of `\ [ ] ( ) { } | ? * ^ $`, is a regex literal, not a secret, and
+// is not judged (the umbrella's house-backup shape: constants that hold a regex). The forward read crosses spaces and terminators both inside
+// and outside a class: a backslash escapes the next character, a `/` inside `[...]` does not end the literal, and the literal ends at the first
+// unescaped `/` outside a class anywhere later on the line, then takes flags `[dgimsuyv]*`. It gives up after LITERAL_SCAN_MAX (4,096)
+// characters, and a literal that does not close within that bound is judged as a value. The residue, stated: a bare secret that opens with
+// `/`, closes with `/` and flags before a terminator, and holds one of those characters, escapes. Two shapes are the measured cases (INSPECT,
+// 1028b): `R2`, a bare value holding a `,` with the close after it; and `R3`, a bare value, then a space, then text that holds a metacharacter
+// and a later `/`. A literal followed directly by `<` is judged, not skipped (the safe direction). A quoted value is always judged.
+//
+// Also for the generic rule only (LWK-277): a constant that NAMES the environment variable of a secret is not judged. Three
+// conditions, all required: a left name that says it holds a name (it ends in `_ENV`, `_VAR`, `_VARIABLE`, `_ENVIRONMENT`, `_NAME`,
+// `_ENVVAR`, or is camelCase `…Env`, `…Var`, `…Name`); a value of at least two all-caps segments joined by `_`, each a short token (up
+// to three characters, a letter first: `R2`, `ID`, `KEY`) or a pronounceable word of four or more capitals with a vowel, the whole at
+// most 100 characters, at least three quarters of it inside words; AND the value itself is secret-named (it holds `SECRET`, `TOKEN`,
+// `PASSWORD`, `KEY` and the rest of the name list above), since the name of a secret's variable says so. Why that is far from a real
+// secret: a machine-generated secret is random, and random capitals-and-digits seldom split into pronounceable word segments that
+// also hold a secret word (measured, 10,000 lines per carrier: 0 of 58,296 random 20-character keys over A-Z, 0-9 and `_` went
+// quiet on a left name of this kind, and none of every other random generator swept). A human passphrase is the one real secret of
+// this shape, and its residue is stated, not hidden: a passphrase of ALL-CAPS words joined by `_` that holds a short
+// letter-and-digit token (`R2`) AND a word that is itself secret-named (`PASSWORD`, `TOKEN`), assigned to a left name that ends in
+// one of those words, is not found. A mixed-case passphrase (`Correct_Horse_R2_Password`) is not an environment-variable name and is found. A passphrase without a secret word is found, short token or not. The price runs the other
+// way: an environment-variable name with no secret word in it (`AWS_S3_BUCKET_NAME_V2`) on such a left name is judged as it was
+// before, so it can false-alarm; it never escapes.
+//
+// ⚠️ NO SECRET-SHAPED LITERAL APPEARS IN THIS FILE. Every pattern is assembled from fragments at
+// load time, so a gate that scans its own tree scans this file and passes because nothing here
+// matches, never because this file is skipped.
+
+import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
+
+// ------------------------------------------------------------------ PATTERNS
+// Provider prefixes covered by GitHub's own secret-scanning detectors. Each regex requires the
+// prefix AND the body length/charset the provider issues, so a prose mention of a prefix
+// ("keys start with the AWS access-key prefix") is not a hit. `check`, where present, is a
+// second test on the matched text for a prefix too common in ordinary words.
+const b = String.raw;
+const DASH5 = '-'.repeat(5);
+const hasMix = (s) => /[0-9]/.test(s) && /[a-z]/.test(s) && /[A-Z]/.test(s);
+
+// Where a provider key may START: after a non-word character or at the start of the line, and
+// also right after a literal backslash-n/r/t (inside a JSON or C string, where the escape's
+// letter is a word character) or a %XX escape (a URL-encoded value). A key glued to an ordinary
+// word character is still not a key.
+const L = b`(?:(?<![A-Za-z0-9_])|(?<=\\[nrt])|(?<=%[0-9A-Fa-f]{2}))`;
+// GLUED KEYS: two keys of one provider written back to back, or joined by `_` or `-`. The start guard also accepts the
+// exact shape of the key just before (`prev`, with an optional `_`), and the end guard, where a key is named, also
+// accepts the next key only when that key is WHOLE, so a prefix alone is not a key. Each adjacency is one alternative
+// naming its own provider, so a word that merely holds a prefix stays refused.
+// WIRED PER PROVIDER (C5; the pair counts were measured on the lib before and after): aws, github classic, google, sendgrid
+// and stripe-live are FOUND AS A GLUED RUN, one hit per key, on all three joins. The open-ended runs swallow a glued run as ONE hit: gitlab,
+// the two square shapes, anthropic, openai-style and slack do not stop at a key boundary, so back to back and joined by `_` they read as
+// one hit; joined by `-` gitlab reads one. GITHUB FINE-GRAINED IS THE EXCEPTION, a stated limit pinned by a test: a glued PAIR back to back or
+// by `_` reads one hit, a glued RUN of three or more back to back or by `_` reads ZERO (its body cap ends inside the run, never on a word
+// boundary), and joined by `-` it reads one hit per key. No provider finds a glued pair at zero; github fine-grained finds none for a run of three or more.
+const GLUE_START = (prev) => b`(?:${L}|(?<=${prev}))`;
+const AWS_PREFIX = b`(?:AK` + b`IA|AS` + b`IA)`;
+const AWS_KEY = AWS_PREFIX + b`[0-9A-Z]{16}`;
+const GH_KEY = b`gh[pousr]_[A-Za-z0-9]{36,255}`;
+const GOOGLE_PREFIX = b`AI` + b`za`;
+const GOOGLE_KEY = GOOGLE_PREFIX + b`[0-9A-Za-z_-]{35}[_-]?`;
+// Each prefix is split in the source, as the other provider prefixes are, so the file holds no contiguous key-shaped text.
+const SENDGRID_KEY = b`S` + b`G\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}`;
+// The stripe head is split out so the lookbehind that names the previous key has a BOUNDED body (24 to 256): a lookbehind is tried at
+// every position of the line, and an unbounded one would cost the length of a long alphanumeric run at each of them.
+const STRIPE_HEAD = b`(?:sk|rk)` + b`_live_`;
+const STRIPE_KEY = STRIPE_HEAD + b`[A-Za-z0-9]{24,}`;
+
+export const PATTERNS = Object.freeze([
+  { name: 'aws-access-key-id', re: new RegExp(GLUE_START(b`${AWS_KEY}_?`) + AWS_PREFIX + b`[0-9A-Z]{16}(?:\b|(?=_?${AWS_KEY}))`) },
+  // Two shapes. The classic token: a prefix and 36-255 base62 characters. The stateless App installation token: `ghs_APPID_JWT`,
+  // about 520 characters (GitHub's changelogs of 2026-10-02 and 2026-05-15, its 2026-04-24 notice and its installation-token docs,
+  // read 2026-10-04). None of those pages says what APPID is, and the vendor's own recommended pattern, `ghs_[A-Za-z0-9\.\-_]{36,}`,
+  // constrains nothing after the prefix. So this asks only for `ghs_` and a run of the JWT's alphabet (letters, digits, `_`, `.`,
+  // `-`) with a floor of 100, far above the 40-character legacy form; it never asks for an APPID alphabet. The cost: a snake_case
+  // identifier of 100 or more characters right after `ghs_` also fires. The run is open-ended on purpose (no `\b`, no upper bound): a
+  // bound would let a longer token through, and a match starts only at the prefix, so the cost stays linear.
+  { name: 'github-token', re: new RegExp(GLUE_START(b`${GH_KEY}_?`) + b`gh` + b`(?:[pousr]_[A-Za-z0-9]{36,255}(?:\b|(?=_?${GH_KEY}))|s_[A-Za-z0-9_.-]{100,})`) },
+  { name: 'github-fine-grained-pat', re: new RegExp(L + b`github` + b`_pat_[A-Za-z0-9_]{50,255}\b`) },
+  { name: 'gitlab-pat', re: new RegExp(L + b`gl` + b`pat-[A-Za-z0-9_-]{20,}`) },
+  { name: 'sendgrid-api-key', re: new RegExp(GLUE_START(b`${SENDGRID_KEY}_?`) + SENDGRID_KEY + b`(?:\b|(?=_?${SENDGRID_KEY}))`) },
+  { name: 'square-access-token', re: new RegExp(L + b`sq0` + b`atp-[A-Za-z0-9_-]{22,}`) },
+  { name: 'square-oauth-secret', re: new RegExp(L + b`sq0` + b`csp-[A-Za-z0-9_-]{43,}`) },
+  { name: 'anthropic-api-key', re: new RegExp(L + b`sk` + b`-ant-[A-Za-z0-9_-]{32,}`) },
+  // `sk-` opens ordinary hyphenated words, so the body must look issued: long, and mixing
+  // digits with both letter cases. A 32-char random base62 body lacks one class ~5% of the time;
+  // that miss is the price of not flagging every long hyphenated identifier.
+  { name: 'openai-style-api-key', re: new RegExp(L + b`sk` + b`-(?!ant-)(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{32,}`), check: hasMix },
+  { name: 'slack-token', re: new RegExp(L + b`xo` + b`x[abprs]-[A-Za-z0-9-]{10,}`) },
+  { name: 'stripe-live-key', re: new RegExp(GLUE_START(b`${STRIPE_HEAD}[A-Za-z0-9]{24,256}_?`) + STRIPE_KEY + b`(?:\b|(?=_?${STRIPE_KEY}))`) },
+  { name: 'google-api-key', re: new RegExp(GLUE_START(GOOGLE_KEY) + GOOGLE_PREFIX + b`[0-9A-Za-z_-]{35}(?:(?![0-9A-Za-z_-])|(?=[_-]?${GOOGLE_PREFIX}[0-9A-Za-z_-]{35}))`) },
+  { name: 'private-key-pem', re: new RegExp(DASH5 + b`BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?` + DASH5) },
+]);
+
+// ------------------------------------------------------------ GENERIC ENTROPY
+// A value assigned to a key-like NAME, scored by Shannon entropy per character.
+//
+// THE THRESHOLD, and why it cannot fire on a hash: 3.5 bits/char, with four more gates:
+//   - length >= 20;
+//   - at least one digit AND one letter (a 20+ char random base62 value lacks a digit ~3% of
+//     the time; a word-like config value almost always does);
+//   - NOT hex-only (dashes allowed): a sha256 pin, a git SHA or a UUID lives in a 16-symbol
+//     alphabet, and the maximum entropy of a hex string is log2(16) = 4.0 bits/char, so the
+//     hex exclusion removes them STRUCTURALLY rather than by a threshold that happens to sit
+//     above them;
+//   - NOT a reference: a value opening with `$`, `<`, `%`, `{` or `[` names a secret, it is not one.
+// 3.5 sits below random base62/base64 of length 20-40 (typically ~4.0-5.0) and above repetitive
+// or word-like values. It was calibrated against every added line in the first host repo's
+// history (the caller's return records the count); raise it only against such a measurement.
+export const ENTROPY_THRESHOLD = 3.5;
+export const ENTROPY_MIN_LENGTH = 20;
+const NAME = String.raw`(?:secret|token|passw(?:or)?d|passwd|pwd|credential|api[_-]?key|access[_-]?key|private[_-]?key|auth[_-]?key|(?:^|[_.-])key)`;
+// A value ends at whitespace, a quote, `,` `;` `)` or `&`. The `&` matters: in a query string
+// (`token=...&api_key=...`) a value that ran on would swallow the next assignment.
+//
+// THREE STEPS, SO THE COST STAYS LINEAR WITHOUT A LENGTH BOUND, AND NO VALUE HIDES A SECRET.
+// 1. NAME_OP matches a name and its operator, never the value. The name is a WHOLE run of name
+//    characters: the lookbehind lets a run start only where the previous character is not a name
+//    character, so each run is tried once, and the greedy run can give back only characters that
+//    cannot open an operator. The operator is `:=` (Go), `=>` (PHP, Ruby), `:` or `=`.
+// 2. namesSecret() decides whether that run names a secret, anywhere inside it. A NON-secret name
+//    consumes nothing past its operator, so the walk goes on INSIDE its value: `$env:API_KEY = …`,
+//    `url: https://h/p?api_key=…` and `opts: token=…` each reach the secret assignment behind them.
+// 3. Only for a secret name is the value read. A value skipped cheaply, as a `${...}`-style
+//    reference or as too short, is walked again from its first character, so a real key behind it
+//    is still found. A value judged on its CONTENT (digits and letters, not hex-only, entropy) is
+//    consumed, hit or not, because each such judgment costs the value's length and must happen
+//    once per character for the whole line to stay linear. The residues: a key inside a
+//    secret-named value that fails on content is reported only if the whole value passes; and a
+//    secret name glued onto the end of the preceding value, with no whitespace, quote, `,` `;`
+//    `)` or `&` between, is read as part of that value, so the key after it is missed. Against
+//    the previous single-regex version, fewer glued keys are missed overall, but some it found
+//    are now missed, because this walk reaches the class from more places.
+// A single regex with NAME between two name-character runs backtracks through both runs at every
+// start position (cubic time, a hung push); bounding the runs stopped that but missed a key token
+// deep in a long snake_case name, the commonest env-var shape.
+const NAME_OP = new RegExp(String.raw`(?<![A-Za-z0-9_.-])([A-Za-z0-9_.-]+)["']?\s*(?::=|=>|[:=])\s*["'\x60]?`, 'g');
+// A closing markup tag (`</name>`) also ends a value: it is not part of the text before it. In an
+// XML or ResX element `...PublicKeyToken=<16 hex></value>`, the tag made a hex-only token read as
+// mixed content. Only a tag that closes the value ends it: it must be followed by the end of the
+// line, whitespace or the next `<`, so a `<`, a `</`, or a tag-shaped piece with more value after
+// it stays in the value (2 of 100,000 random printable-ASCII passwords held a tag-shaped piece).
+const VALUE_END = new RegExp(String.raw`[\s"'\x60,;)&]|<\/[A-Za-z][\w.:-]*>(?=$|[\s<])`, 'g');
+// A BARE (unquoted) value that READS AS CODE is not judged: `path_key = str(load_state_file_v2(`,
+// `let pad_token_id = f(0)`, `token_ids: ids[1..]`. It reads as code only if ALL five hold:
+// (1) it opens with an identifier path followed at once by `(` or `[`;
+// (2) the WHOLE value holds nothing but letters, digits, `_`, `.`, `(`, `[` and `]`, so one `*`,
+//     `#`, `!`, `-` or `=` ends the claim;
+// (3) at least CODE_WORD_SHARE of its characters, brackets not counted, sit in runs of six or more
+//     of letters, `_` and `.`, and vowels are at least CODE_VOWEL_SHARE of the letters in those
+//     runs, as in the words of an identifier and not in a random string;
+// (4) at most CODE_UPPER_SHARE of its letters are upper case: camelCase humps and acronyms, not a
+//     random mix of cases;
+// (5) it holds `_`, `.` or a camelCase hump, as code names do: plain lower-case words joined by a
+//     bracket (a passphrase such as `word1(word2(word3`) are not code.
+// The three numbers are ours, set by measurement and not taken from any vendor. Of 100,000 random
+// keys per generator and carrier (a .env line, a YAML line, quoted, followed by a call), none read
+// as code for a default web-framework key (50 characters, 49 symbols), a 24-character symbol
+// password or a 24-character printable-ASCII password. A generator whose alphabet is exactly the
+// code characters, which no tool is known to use, read as code for none of 20,000. Code written as one
+// heavy-hump or digit-laden identifier may fail (3) or (4), and an all-lower-case call chain with
+// no `_`, `.` or hump fails (5); each is then judged like any other value, which is the old behaviour.
+// A QUOTED value is a literal whatever it looks like, and is judged as before. Cost: the sticky
+// test stops at the first character outside its class, an operator character is outside it, and the next
+// name starts after an operator, so the runs of successive starts are disjoint and the line stays
+// linear.
+const CODE_VALUE = new RegExp(String.raw`[A-Za-z_][A-Za-z0-9_.]*[(\[][A-Za-z0-9_.(\[\]]*`, 'y');
+const CODE_WORD_RUN = /[A-Za-z_.]{6,}/g;
+const CODE_WORD_SHARE = 0.75;
+const CODE_VOWEL_SHARE = 0.28;
+const CODE_UPPER_SHARE = 0.3;
+function readsAsCode(line, start, end) {
+  CODE_VALUE.lastIndex = start;
+  if (!CODE_VALUE.test(line) || CODE_VALUE.lastIndex !== end) return false;
+  const v = line.slice(start, end);
+  let inRuns = 0;
+  let runLetters = 0;
+  let runVowels = 0;
+  for (const m of v.matchAll(CODE_WORD_RUN)) {
+    inRuns += m[0].length;
+    for (const c of m[0]) if (/[A-Za-z]/.test(c)) { runLetters++; if ('aeiouAEIOU'.includes(c)) runVowels++; }
+  }
+  const bodyLength = v.length - (v.match(/[([\]]/g) || []).length; // the brackets are syntax, not part of the words
+  if (inRuns < CODE_WORD_SHARE * bodyLength || runVowels < CODE_VOWEL_SHARE * runLetters) return false;
+  const letters = v.replace(/[^A-Za-z]/g, '');
+  if ((letters.match(/[A-Z]/g) || []).length > CODE_UPPER_SHARE * letters.length) return false;
+  return /[_.]|[a-z][A-Z]/.test(v); // code names are joined by `_`, `.` or a camelCase hump; plain words are not
+}
+// A BARE value that is a regex literal (C5, LIMITS above; 1028b, 2026-10-28): the literal is read FROM ITS OPENING SLASH, not from the
+// value's end. The value walker ends a bare value at its first terminator, and a terminator can sit inside a regex (`)` in `(pem|key)`,
+// `,` in `{40,}`), so the slice the walker judges can hold a regex's head with no closing `/`. regexLiteralEnd scans the literal through its
+// own grammar: a backslash escapes the next character. The scan crosses spaces and terminators both inside and outside a class, and a `/`
+// inside `[...]` does not end it: the literal ends at the first unescaped `/` outside a class anywhere later on the line, within
+// LITERAL_SCAN_MAX characters, then takes flags `[dgimsuyv]*`. The literal is skipped only when a terminator or the end of the line
+// follows AND it holds a character a base64 secret never holds (REGEX_ONLY_CHARS). The umbrella's house-backup constants are this shape.
+const REGEX_ONLY_CHARS = /[\\[\](){}|?*^$]/;
+const LITERAL_FLAGS = 'dgimsuyv';
+const TERMINATOR_AFTER = /[\s"'\x60,;)&]/;
+// X-1 (1028b, 2026-10-28): the forward read is bounded. A literal that does not close within this many characters of its opening slash is
+// judged as a value, the safe direction, so M never-closing candidates on one line cost M x a constant, not M x the line length.
+const LITERAL_SCAN_MAX = 4096;
+// Test hook (1029b): counted units of work, read by the tests only through the two functions exported below; no caller reads them.
+const work = { literal: 0, cover: 0 };
+function regexLiteralEnd(line, start) {
+  if (line[start] !== '/') return -1;
+  let inClass = false;
+  for (let i = start + 1; i < line.length; i++) {
+    work.literal++;
+    if (i - start > LITERAL_SCAN_MAX) return -1;
+    const c = line[i];
+    if (c === '\\') { i++; continue; }
+    if (inClass) { if (c === ']') inClass = false; continue; }
+    if (c === '[') { inClass = true; continue; }
+    if (c === '/') {
+      let j = i + 1;
+      // 1103e: a literal has at most eight distinct flags, so a longer run is not a literal, and the run is read at most eight characters.
+      while (j < line.length && j - i - 1 < LITERAL_FLAGS.length && LITERAL_FLAGS.includes(line[j])) { work.literal++; j++; }
+      return j;
+    }
+  }
+  return -1;
+}
+const isRegexLiteralAt = (line, start) => {
+  const end = regexLiteralEnd(line, start);
+  return end > 0 && (end === line.length || TERMINATOR_AFTER.test(line[end])) && REGEX_ONLY_CHARS.test(line.slice(start, end));
+};
+// NAME's bare `key` alternative matches only at the start of a run that opens the line, as it
+// always has: `key = ...` at the top of a file is a key, `map(key => value)` is not.
+const NAME_RE = new RegExp(NAME, 'i');
+const namesSecret = (name, runStart) => NAME_RE.test(runStart === 0 ? name : ` ${name}`);
+
+export function shannon(s) {
+  const n = s.length;
+  if (!n) return 0;
+  const counts = new Map();
+  for (const c of s) counts.set(c, (counts.get(c) || 0) + 1);
+  let h = 0;
+  for (const k of counts.values()) { const p = k / n; h -= p * Math.log2(p); }
+  return h;
+}
+
+// LWK-277: a constant that NAMES an environment variable holds a name, not a secret. The left name must end in a word that says so
+// (`SECRET_ENV`, `token_env_name`, camelCase `secretEnvVar`, `apiKeyName`), and the value must be an environment-variable name:
+// two or more `_`-joined all-caps segments, each a short token (up to three characters, a letter first: R2, ID, KEY) or a word of
+// four or more capitals that pronounce (a quarter of them vowels, Y counted, and no run of four consonants), with at least three
+// quarters of the characters inside words, the whole at most ENV_NAME_MAX characters. A longer value is never read this way, so
+// the check costs nothing on a long line. The hook adds a third condition: the value itself names a secret (NAME_RE).
+const ENV_NAME_MAX = 100;
+const POINTER_SNAKE = /[_.-](?:env|envvar|var|variable|environment|name)$/i;
+const POINTER_CAMEL = /[a-z](?:Env|EnvVar|Var|Variable|Environment|Name)$/;
+const ENV_SHORT = /^[A-Z][A-Z0-9]{0,2}$/;
+const ENV_WORD = /^[A-Z]{4,}$/;
+const ENV_WORD_SHARE = 0.75;
+const ENV_VOWEL_SHARE = 0.25;
+const isWord = (s) => ENV_WORD.test(s) && (s.match(/[AEIOUY]/g) || []).length >= ENV_VOWEL_SHARE * s.length && !/[^AEIOUY]{4}/.test(s);
+const isEnvName = (v) => {
+  if (v.length > ENV_NAME_MAX) return false;
+  const segments = v.split('_');
+  if (segments.length < 2) return false;
+  let inWords = 0;
+  for (const s of segments) {
+    if (isWord(s)) inWords += s.length;
+    else if (!ENV_SHORT.test(s)) return false;
+  }
+  // at least three quarters of the characters must sit in real words: a short token is allowed, a run of them is not
+  return inWords >= ENV_WORD_SHARE * (v.length - (segments.length - 1));
+};
+const isPointerName = (name) => POINTER_SNAKE.test(name) || POINTER_CAMEL.test(name);
+
+// Every qualifying value on the line, with its [start, end) span.
+// See THREE STEPS above for what is consumed and what is walked again.
+function genericValues(line) {
+  const out = [];
+  const nameOp = new RegExp(NAME_OP); // own lastIndex per call
+  const valueEnd = new RegExp(VALUE_END);
+  // The end of the value run that holds `start`. Value starts only move forward, and a run holds
+  // no end character, so one cached end serves every start inside it: each character is read once.
+  let runEnd = -1;
+  const endOf = (start) => {
+    if (start >= runEnd) {
+      valueEnd.lastIndex = start;
+      const d = valueEnd.exec(line);
+      runEnd = d ? d.index : line.length;
+    }
+    return runEnd;
+  };
+  for (let m = nameOp.exec(line); m; m = nameOp.exec(line)) {
+    if (!namesSecret(m[1], m.index)) continue; // walk on inside its value
+    const start = nameOp.lastIndex;
+    const end = endOf(start);
+    if (end - start < ENTROPY_MIN_LENGTH || /^[$<%{[]/.test(line[start])) continue; // cheap skip: walk on inside it
+    const quoted = /["'\x60]/.test(line[start - 1]);
+    if (!quoted && (readsAsCode(line, start, end) || isRegexLiteralAt(line, start))) continue; // a bare code or regex value: walk on inside it
+    nameOp.lastIndex = end; // judged on content from here: consumed, hit or not
+    const v = line.slice(start, end);
+    if (!/[0-9]/.test(v) || !/[A-Za-z]/.test(v)) continue;
+    if (/^[0-9a-f-]+$/i.test(v)) continue;
+    if (isEnvName(v) && isPointerName(m[1]) && NAME_RE.test(v)) continue; // a constant that names a secret's environment variable holds a name (LWK-277)
+    if (shannon(v) < ENTROPY_THRESHOLD) continue;
+    out.push({ value: v, start, end });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- SCANNING
+// Global copies of the patterns, so a line is searched for EVERY match, not only the first.
+const GLOBAL = PATTERNS.map((p) => ({ ...p, re: new RegExp(p.re.source, `${p.re.flags}g`) }));
+
+// PRIVATE: the only place a matched value exists. It never leaves this module; callers get a
+// pattern name and a fingerprint.
+//
+// ONE MATCH NEVER HIDES ANOTHER. Every match of every pattern is its own hit, with its own
+// fingerprint, and a `check` is applied to each match separately — so a decoy that fails the
+// check cannot hide a real value after it, and acknowledging one value cannot silence a
+// different value on the same line. THE GENERIC RULE skips a value only when ONE pattern match
+// covers the whole value (the match starts at or before it and ends at or after it): that is the
+// same text reported once. It does NOT skip a value that merely OVERLAPS a match, or that HOLDS a
+// match inside it. The earlier rule dropped a value that overlapped ANY match, so an acknowledged
+// provider key inside a larger password silenced the password, which then never got a fingerprint
+// of its own. The price of the rule as it now stands is the safe direction: a secret-named value that is a
+// provider key plus extra characters reports twice, with two fingerprints.
+function matchLine(line) {
+  const found = [];
+  const spans = [];
+  for (const p of GLOBAL) {
+    for (const m of line.matchAll(p.re)) {
+      if (p.check && !p.check(m[0])) continue;
+      found.push({ pattern: p.name, value: m[0] });
+      spans.push([m.index, m.index + m[0].length]);
+    }
+  }
+  // Sorted by start, with the running maximum of the ends, one binary search answers each value: O((N + M) log N) for N matches
+  // and M values, where a compare against every span was O(N * M).
+  spans.sort((a, b) => a[0] - b[0]);
+  const reach = [];
+  let top = -1;
+  for (const [, e] of spans) { top = Math.max(top, e); reach.push(top); }
+  for (const g of genericValues(line)) {
+    if (coveredBy(spans, reach, g)) continue;
+    found.push({ pattern: 'generic-high-entropy-assignment', value: g.value });
+  }
+  return found;
+}
+// The last span that starts at or before g.start has the greatest end of every span that starts at or before it (`reach`), so the
+// value is covered by one span exactly when that greatest end reaches g.end.
+function coveredBy(spans, reach, g) {
+  let lo = 0;
+  let hi = spans.length - 1;
+  let idx = -1;
+  while (lo <= hi) {
+    work.cover++;
+    const mid = (lo + hi) >> 1;
+    if (spans[mid][0] <= g.start) { idx = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return idx >= 0 && reach[idx] >= g.end;
+}
+// Test hook (1029b): kind is "literal" (regex-literal read steps) or "cover" (containment probes). Never called by the scanner.
+export function _workCountForTests(kind) { return work[kind]; }
+export function _resetWorkCountForTests() { work.literal = 0; work.cover = 0; }
+
+// A fingerprint names ONE value in ONE file, so a caller can acknowledge a known, non-secret
+// match (a third party's public client key in a captured page) without a path-wide exemption.
+// 64 bits of sha256 over file, pattern and value. Every pattern above requires a long
+// high-entropy body, so the fingerprint cannot be walked back to the value.
+export function fingerprint(file, pattern, value) {
+  return createHash('sha256').update(`${file}\0${pattern}\0${value}`).digest('hex').slice(0, 16);
+}
+
+// One line, read as it stands and, when it holds a NUL and nulDrop is on, read again with every NUL removed. This second reading is an EXTRA pass,
+// never the one that finds wide text: removing NULs can glue a wide character's ASCII-valued byte onto a key (ใ is 43 0E in UTF-16LE, so "C"
+// joins the token and the pattern misses it), so wide text is DECODED first (WIDE TEXT, below). A hit here only ever refuses, acknowledgeable by
+// its fingerprint like any other. A caller that holds the bytes turns the pass off for bytes the wide-text rule does not read as wide text.
+function readLine(line, nulDrop = true) {
+  const found = matchLine(line);
+  if (!nulDrop || !line.includes(NUL)) return found;
+  // a Set, not a scan of `found` per hit: a line of many distinct tokens (each NUL-separated) would otherwise cost the square of their count
+  const seen = new Set(found.map((f) => `${f.pattern}${NUL}${f.value}`));
+  for (const h of matchLine(line.split(NUL).join(''))) {
+    const k = `${h.pattern}${NUL}${h.value}`;
+    if (!seen.has(k)) { seen.add(k); found.push(h); }
+  }
+  return found;
+}
+
+// The pattern NAMES that hit one line. Never the matched text.
+export function scanLine(line) {
+  return readLine(line).map((h) => h.pattern);
+}
+
+// Scan a whole text. hits: [{ line, pattern, fp }]. opts.nulDrop: false skips the NUL-removed second reading of each line (default on).
+export function scanText(text, file = '', opts = {}) {
+  const nulDrop = opts.nulDrop !== false;
+  const hits = [];
+  const lines = String(text).split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    for (const h of readLine(lines[i], nulDrop)) hits.push({ line: i + 1, pattern: h.pattern, fp: fingerprint(file, h.pattern, h.value) });
+  }
+  return hits;
+}
+
+// ------------------------------------------------------------ WIDE TEXT (UTF-16, UTF-32)
+// A key written in UTF-16 or UTF-32 has a NUL beside every ASCII byte, so no reading of it as UTF-8 sees the key whole. Wide text is DECODED and
+// the decoded text scanned. THE RULE for "these bytes are wide text": they open with a byte-order mark (FF FE or FE FF for UTF-16, FF FE 00 00 or
+// 00 00 FE FF for UTF-32), or their NULs fall on a code unit's high-byte positions at least WIDE_SKEW times as often as on the other positions
+// (ASCII in UTF-16 puts its NUL on one byte parity; in UTF-32 on three of four positions), and number at least WIDE_MIN_NULS on each high-byte
+// position. Bytes that are not text scatter their NULs over every position, so neither the decoded readings nor the NUL-removed reading is run on
+// them and neither can add a hit to them; only the provider keys in their wide spellings are searched in such bytes (WIDE-SPELLED KEYS, below). A known gap: UTF-16 with no mark, dense with characters whose low byte is itself NUL now and then
+// (random CJK, about 1 in 256), puts enough NULs on the other parity to defeat the skew; a byte-order mark decides such a file.
+// Every run of bytes is decoded at every alignment in both byte orders: a blob can start with a stray byte, and a hunk of added lines starts
+// wherever git's line break fell (even inside a character whose low byte is 0x0A). A reading at a wrong alignment or order can only add a hit,
+// never hide one, and the order flip is not a shift: a shifted UTF-16LE character glues its low byte onto the unit before it.
+const WIDE_SKEW = 4;
+// Fewer than the shortest token any pattern matches (15 characters, a Slack token): a key in wide text brings at least that many NULs of its own,
+// so a few stray NULs (a short binary header) never make bytes read as wide text.
+const WIDE_MIN_NULS = 12;
+// The wide kind a byte-order mark at the start of b declares, none without one.
+function bomKinds(b) {
+  if (b.length >= 4 && b[0] === 0xff && b[1] === 0xfe && b[2] === 0 && b[3] === 0) return ['utf32'];
+  if (b.length >= 4 && b[0] === 0 && b[1] === 0 && b[2] === 0xfe && b[3] === 0xff) return ['utf32'];
+  if (b.length >= 2 && ((b[0] === 0xff && b[1] === 0xfe) || (b[0] === 0xfe && b[1] === 0xff))) return ['utf16'];
+  return [];
+}
+// ------------------------------------------------------------ WIDE-SPELLED KEYS (20f)
+// A file with no mark whose NULs the skew test does not read as wide text (big-endian and little-endian text in one file, balancing each other; or text
+// of one order beside other NUL-bearing bytes) is NOT guessed to be wide text: a guess from the shape of the NULs reads fonts and PE files as text
+// (the 7edf02c review's H1). Its raw bytes are searched instead for the PATTERNS' keys in their four wide spellings: each character followed by one
+// NUL (UTF-16LE) or preceded by one (UTF-16BE), followed by three (UTF-32LE) or preceded by three (UTF-32BE), at every byte offset. Only the
+// provider patterns run on what is found, never the generic high-entropy rule: a binary's bytes match a provider key's prefix and body only when it
+// holds the key. A run of such characters (printable ASCII or a tab) holds no line break, so it is one line; a match is reported at the raw line where
+// its first character sits. A word in the same spelling is part of the run, so a key glued to it is refused here as anywhere; in a big-endian reading the
+// character before the run stays in front of it, for little-endian text read one byte on (spelledIn).
+const SPELL_CH = '[\t\x20-\x7e]';
+// A run of at least WIDE_MIN_NULS units; the first unit is written out ahead of the repeat, which V8 scans about four times faster than a repeated group alone.
+const spelling = (unit, w, lead) => ({ re: new RegExp(`${unit}(?:${unit}){${WIDE_MIN_NULS - 1},}`, 'g'), w, lead });
+const SPELLINGS = [
+  spelling(`${SPELL_CH}\0`, 2, 0), // UTF-16LE: [c, 0]
+  spelling(`\0${SPELL_CH}`, 2, 1), // UTF-16BE: [0, c]
+  spelling(`${SPELL_CH}\0\0\0`, 4, 0), // UTF-32LE: [c, 0, 0, 0]
+  spelling(`\0\0\0${SPELL_CH}`, 4, 3), // UTF-32BE: [0, 0, 0, c]
+];
+// The literal every match of each pattern holds, by pattern name (split like the patterns, so this file holds no key-shaped text). A run without any of
+// them is skipped before the patterns run: most wide runs in a binary are its own strings. A pattern with no entry here turns the skip off for every
+// run, so a rule added to PATTERNS is never passed over here.
+const SPELL_LITERAL = {
+  'aws-access-key-id': AWS_PREFIX, 'github-token': b`gh[pousr]_`, 'github-fine-grained-pat': b`github` + b`_pat_`, 'gitlab-pat': b`gl` + b`pat-`,
+  'sendgrid-api-key': b`S` + b`G\.`, 'square-access-token': b`sq0` + b`atp-`, 'square-oauth-secret': b`sq0` + b`csp-`, 'anthropic-api-key': b`sk` + b`-ant-`,
+  'openai-style-api-key': b`sk` + b`-`, 'slack-token': b`xo` + b`x`, 'stripe-live-key': STRIPE_HEAD, 'google-api-key': GOOGLE_PREFIX, 'private-key-pem': DASH5 + b`BEGIN `,
+};
+const SPELL_GATE = PATTERNS.every((p) => SPELL_LITERAL[p.name]) ? new RegExp(PATTERNS.map((p) => `(?:${SPELL_LITERAL[p.name]})`).join('|')) : null;
+// The keys in wide spellings in a latin1 view of bytes: onMatch(pattern, value, offset of the key's first character in the view). Native regex passes, no loop a byte.
+function spelledIn(text, onMatch) {
+  for (const { re, w, lead } of SPELLINGS) {
+    re.lastIndex = 0;
+    for (const run of text.matchAll(re)) {
+      const first = run.index + lead; // the run's first character
+      let chars = '';
+      for (let i = lead; i < run[0].length; i += w) chars += run[0][i];
+      // The character before the run is put in front of it only in a big-endian reading (21i, 21g thread A): there the byte w before the run's first character
+      // is the character of little-endian text read one byte on ('x', NUL, 'g', NUL ... read as NUL, 'g' ...), the reading that would let a glued key through.
+      // In a little-endian reading a spelled character before the run is part of the run, so the unit before is a character a spelling cannot hold and does
+      // not glue: judged by its first byte, U+0441 (bytes 41 04) read as the letter A and the key after it was dropped. Stated limit, pinned by a test: in a
+      // big-endian reading a key after U+0441 (04 41) is still refused, because those bytes are also little-endian text with an A glued to the key.
+      const before = text.charCodeAt(first - w);
+      const ctx = lead > 0 && first - w >= 0 && ((before >= 0x20 && before <= 0x7e) || before === 9) ? 1 : 0;
+      const line = ctx ? text[first - w] + chars : chars;
+      if (SPELL_GATE && !SPELL_GATE.test(line)) continue;
+      for (const p of GLOBAL) {
+        for (const m of line.matchAll(p.re)) {
+          if (m.index < ctx || (p.check && !p.check(m[0]))) continue;
+          onMatch(p.name, m[0], first + (m.index - ctx) * w, w);
+        }
+      }
+    }
+  }
+}
+// The search over bytes in windows of SPELL_WINDOW + SPELL_CARRY bytes, each starting SPELL_WINDOW after the one before, so neighbours overlap by SPELL_CARRY
+// and a window holds a bounded number of bytes whatever the file's size. 21a (a carrier's pull request: CodeRabbit Verify's false rejection, and the fingerprint of a
+// key cut by a window): a match is reported by ONE window, the one that OWNS its first byte. A window owns from SPELL_EDGE bytes past its start (the first
+// owns from 0) up to SPELL_EDGE bytes past the next window's start (the last owns to the end), so the owners tile the file. The window's text runs on past
+// what it owns by SPELL_CARRY - SPELL_EDGE bytes, longer than any provider key the patterns accept whole: a match it owns ends inside its text, so a word cut
+// by the window's end (the end of the text satisfying a pattern's closing boundary) is never reported, and a key that crosses an edge is fingerprinted whole.
+// SPELL_EDGE bytes before what a window owns keep the character before a key in view, so a glued key is refused as anywhere. A window with no NUL, or no
+// character a spelling can hold, is skipped (a run of zeros costs one scan for each). The gap 21a named (a match longer than SPELL_CARRY - SPELL_EDGE bytes cut at
+// its owner's text end) is closed in spelledHits at 21i: a window whose owned match reaches its text end is read again further, so the match keeps its whole value.
+// The gate's probe needs no such read: a cut match of an open-ended pattern still matches, and the probe keeps no value, only whether a key was seen.
+// FINGERPRINTS THAT MOVED at 21i, for a room that committed an acknowledgment of one: a wide-spelled match longer than SPELL_CARRY - SPELL_EDGE bytes that
+// runs past its window's text end (it starts in the window's owned range, wherever, and start + length passes the window's start + 1 MiB + 16 KiB; a file not
+// read as wide text and larger than 1 MiB) was fingerprinted on the cut value and is now fingerprinted on the whole value (measured by the 21i INSPECT: a
+// 48,000-byte match starting 30,000 bytes before the owned end moved too). No other fingerprint moved.
+// FINGERPRINTS THAT MOVED at 21a (7f15919), for a room that committed an acknowledgment of one: in a file that is not read as wide text and is larger than 1 MiB, a
+// wide-spelled match that crosses an offset k x 1 MiB (k >= 1) and whose cut prefix already matched a pattern (an open-ended or long body: openai-style, glpat, slack,
+// square) was fingerprinted on the cut value and is now fingerprinted on the whole value; and a match longer than SPELL_CARRY - SPELL_EDGE bytes that starts within
+// SPELL_EDGE bytes after such an offset was whole and was then cut (the gap 21a named, whole again since 21i). Every other fingerprint is unchanged; a 40-character github key across an
+// edge never moved, because its cut prefix never matched.
+// 21i (21g thread B, a carrier's pull request): SPELL_EDGE bytes of view before what a window owns held the one character a word boundary reads, but not the WHOLE
+// previous key a glued key's start guard asks for, so the second of two glued keys starting just past a window's first owned byte was dropped. Every window
+// after the first now also holds SPELL_LEAD bytes before its start, read only as context: ownership is unchanged, so no fingerprint moves; a glued key that was
+// dropped there is now found. SPELL_LEAD is more than four bytes for each of the 265 characters the longest start guard reads (a stripe key: its 8-character head,
+// 256-character body and a joining `_`).
+const SPELL_CARRY = 16384;
+const SPELL_WINDOW = 1 << 20;
+const SPELL_EDGE = 8; // a UTF-32 unit and the character before it
+const SPELL_LEAD = 2048;
+const SPELL_ANY = new RegExp(SPELL_CH);
+// One window: text is its latin1 view, of which the first `lead` bytes are context before the window's start; base is the window's start in the stream;
+// first and last say whether it opens or closes the stream.
+function spelledWindow(text, base, lead, first, last, onMatch) {
+  if (text.indexOf(NUL) < 0 || !SPELL_ANY.test(text)) return;
+  const from = lead + (first ? 0 : SPELL_EDGE);
+  const to = last ? text.length : lead + SPELL_WINDOW + SPELL_EDGE;
+  spelledIn(text, (pattern, value, pos, w) => { if (pos >= from && pos < to) onMatch(pattern, value, base + pos - lead, w); });
+}
+// The wide-spelled keys of one run of bytes that is not read as wide text: [{ line, pattern, fp }], each key once, in file order.
+export function spelledHits(bytes, file = '') {
+  if (bytes.indexOf(0) < 0) return [];
+  const seen = new Map(); // one hit a pattern and an offset: the 16-bit spellings overlap (big-endian text read one byte on is little-endian)
+  for (let at = 0; ; at += SPELL_WINDOW) {
+    const last = at + SPELL_WINDOW + SPELL_CARRY >= bytes.length;
+    const lead = at === 0 ? 0 : SPELL_LEAD;
+    // 21i (the 21a named gap): a match the window owns that reaches the end of its text may be cut there, so the window is read again over twice as many bytes
+    // past its start, until every match it owns ends inside its text or the text reaches the file's end; only then are its matches kept, whole.
+    let end = last ? bytes.length : at + SPELL_WINDOW + SPELL_CARRY;
+    for (;;) {
+      const mine = [];
+      let cut = false;
+      spelledWindow(bytes.toString('latin1', at - lead, end), at, lead, at === 0, last, (pattern, value, pos, w) => {
+        mine.push({ pattern, value, pos });
+        if (pos + value.length * w >= end) cut = true;
+      });
+      if (!cut || end >= bytes.length) { for (const h of mine) { const k = h.pattern + NUL + h.pos; if (!seen.has(k)) seen.set(k, h); } break; }
+      end = Math.min(bytes.length, at + 2 * (end - at));
+    }
+    if (last) break;
+  }
+  const found = [...seen.values()];
+  if (!found.length) return [];
+  const breaks = [];
+  for (let i = bytes.indexOf(0x0a); i >= 0; i = bytes.indexOf(0x0a, i + 1)) breaks.push(i);
+  const lineAt = (pos) => { let lo = 0, hi = breaks.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (breaks[mid] < pos) lo = mid + 1; else hi = mid; } return lo + 1; };
+  return found.sort((a, b) => a.pos - b.pos).map((h) => ({ line: lineAt(h.pos), pattern: h.pattern, fp: fingerprint(file, h.pattern, h.value) }));
+}
+// The same search over a stream, for the gate: feed(piece) in order from the blob's first byte, end() when the blob ends, then found() says whether any key
+// was seen. The windows are spelledHits' own, so the verdict equals spelledHits' on the whole blob; at most SPELL_LEAD + SPELL_WINDOW + SPELL_CARRY bytes and
+// one piece are held. No value leaves.
+export function spelledProbe() {
+  let found = false;
+  let pend = ''; // from the current window's start less its lead
+  let base = 0;
+  let lead = 0;
+  const hit = () => { found = true; };
+  return {
+    feed(piece) {
+      if (found) return;
+      pend += piece.toString('latin1');
+      // a window is run only once a byte past it has arrived, so it is known not to be the last
+      while (pend.length > lead + SPELL_WINDOW + SPELL_CARRY && !found) {
+        spelledWindow(pend.slice(0, lead + SPELL_WINDOW + SPELL_CARRY), base, lead, base === 0, false, hit);
+        pend = pend.slice(lead + SPELL_WINDOW - SPELL_LEAD); // the next window starts SPELL_WINDOW on and keeps SPELL_LEAD bytes before it
+        base += SPELL_WINDOW;
+        lead = SPELL_LEAD;
+      }
+    },
+    end() { if (!found && (pend.length > lead || base === 0)) spelledWindow(pend, base, lead, base === 0, true, hit); pend = ''; },
+    found: () => found,
+  };
+}
+// extra: kinds the caller knows from the file's own committed mark (see scanPatch's bomOf); they count even where the bytes alone do not show them.
+export function wideKinds(bytes, extra = []) {
+  const b = bytes;
+  const kinds = new Set([...extra, ...bomKinds(b)]);
+  const z = [0, 0, 0, 0];
+  for (let i = 0; i < b.length; i++) if (b[i] === 0) z[i & 3]++;
+  const even = z[0] + z[2];
+  const odd = z[1] + z[3];
+  if (Math.max(even, odd) >= WIDE_MIN_NULS && Math.max(even, odd) >= WIDE_SKEW * Math.min(even, odd)) kinds.add('utf16');
+  for (let k = 0; k < 4; k++) {
+    const high = Math.min(z[(k + 1) & 3], z[(k + 2) & 3], z[(k + 3) & 3]);
+    if (high >= WIDE_MIN_NULS && high >= WIDE_SKEW * z[k]) { kinds.add('utf32'); break; }
+  }
+  return [...kinds];
+}
+// UTF-16 decodes natively (an unpaired surrogate becomes U+FFFD); UTF-32 in chunks of code points, so neither holds one string per character.
+const UTF16LE = new TextDecoder('utf-16le');
+const CODE_POINT_CHUNK = 8192;
+function decodeUnits(bytes, width, offset, littleEndian) {
+  const part = bytes.subarray(offset, offset + Math.floor((bytes.length - offset) / width) * width);
+  if (width === 2) return UTF16LE.decode(littleEndian ? part : Buffer.from(part).swap16());
+  const out = [];
+  let cps = [];
+  for (let i = 0; i < part.length; i += 4) {
+    const cp = littleEndian ? part.readUInt32LE(i) : part.readUInt32BE(i);
+    // a code point past U+10FFFF (a reading at a wrong alignment or order) cannot be a character: U+FFFD
+    cps.push(cp > 0x10ffff ? 0xfffd : cp);
+    if (cps.length === CODE_POINT_CHUNK) { out.push(String.fromCodePoint(...cps)); cps = []; }
+  }
+  out.push(String.fromCodePoint(...cps));
+  return out.join('');
+}
+// The decoded readings of a run of bytes: none when the rule does not read it as wide text; otherwise one per unit size it matches, alignment
+// and byte order.
+export function wideTexts(bytes, extra = []) {
+  const texts = [];
+  for (const kind of wideKinds(bytes, extra)) {
+    const width = kind === 'utf16' ? 2 : 4;
+    for (let offset = 0; offset < width; offset++) for (const le of [true, false]) texts.push(decodeUnits(bytes, width, offset, le));
+  }
+  return texts;
+}
+// THE BOUND on what one blob (or one hunk of added lines) may cost: wide text larger than this is not decoded. Decoding holds every reading at
+// once (four for UTF-16, eight for UTF-32, each about the size of the bytes) and the cost grows with the size, so a large file of 16-bit samples,
+// which the rule reads as UTF-16, could exhaust memory on every commit. 8 MiB: no tracked file in any room is larger (the reviewer's census,
+// 2026-11-15), and decoding 8 MiB of 16-bit samples took 3.3 s and a 242 MiB peak on one Windows machine (32 MiB took 13 s and 1.4 GB
+// before the bound). Past the bound the scan does not pass: the bytes get a hit of their
+// own, WIDE_TOO_LARGE, whose fingerprint is that of the file and its exact bytes, so an acknowledgement covers those bytes only and a change asks again.
+export const WIDE_DECODE_MAX_BYTES = 8 << 20;
+export const WIDE_TOO_LARGE = 'wide-text-too-large-to-decode';
+const tooLarge = (bytes, file) => fingerprint(file, WIDE_TOO_LARGE, createHash('sha256').update(bytes).digest('hex'));
+// The layout of each of wideTexts' readings, in the same order: { width, offset, le }.
+function wideLayouts(bytes, extra = []) {
+  const out = [];
+  for (const kind of wideKinds(bytes, extra)) {
+    const width = kind === 'utf16' ? 2 : 4;
+    for (let offset = 0; offset < width; offset++) for (const le of [true, false]) out.push({ width, offset, le });
+  }
+  return out;
+}
+// For one decoded reading, the decoded line on which a raw line's bytes sit (20b, the da5b7e9 review's M1). The raw UTF-8 reading breaks a line at EVERY 0x0A byte, a 0x0A inside a
+// wide character included; a decoded newline is a code unit whose value is 0x0A, and its 0x0A byte (the unit's first byte in little-endian order, its last in big-endian) is one of
+// those raw breaks. So every raw line lies inside one decoded line, and raw line r sits on decoded line 1 + the number of decoded newlines among the r - 1 raw breaks before it.
+function decodedLineMap(bytes, breaks, { width, offset, le }) {
+  const end = offset + Math.floor((bytes.length - offset) / width) * width; // decodeUnits drops a partial last unit
+  const before = new Int32Array(breaks.length + 1); // before[i] = decoded newlines among the first i raw breaks
+  for (let i = 0; i < breaks.length; i++) {
+    const u = le ? breaks[i] : breaks[i] - (width - 1); // the unit this 0x0A byte would be the low byte of
+    let nl = u >= offset && u + width <= end && (u - offset) % width === 0;
+    for (let k = 1; nl && k < width; k++) if (bytes[le ? u + k : u + width - 1 - k] !== 0) nl = false;
+    before[i + 1] = before[i] + (nl ? 1 : 0);
+  }
+  const map = (line) => 1 + before[Math.min(Math.max(line - 1, 0), breaks.length)];
+  map.newlines = before[breaks.length]; // how many decoded newlines this reading has
+  return map;
+}
+// The merge of one raw reading's hits with the wide readings' hits (readings in order, best first). Every raw hit keeps its pattern, fingerprint and place in the list, and is reported
+// at the line in the DECODED text where its bytes sit (20b): its raw line mapped through the reading that first holds its key, or through the best reading when none does, and
+// through the byte-order mark's reading when the file has a mark that fits it (lineOf, built by scanBytes, states the rule once; 20d, 20e). No
+// pairing by count or by ordinal: 20a's equal-count rule and the ordinal before it each named a wrong line in some shape (t352; the da5b7e9 review's two cases), because the raw
+// and the decoded readings can find different occurrences of one key. A key only a wide reading found is added once, at that reading's line, as before. The count and the
+// fingerprint of every raw hit are unchanged.
+function mergeWide(raw, readings, keyOf, lineOf) {
+  const won = new Map();
+  readings.forEach((found, ri) => {
+    const byKey = new Map();
+    for (const h of found) { const k = keyOf(h); if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(h); }
+    for (const [k, list] of byKey) if (!won.has(k)) won.set(k, { list, ri });
+  });
+  // It does not report a decoded occurrence of a key the raw reading also found elsewhere: one line per raw hit, so a second occurrence is named once the first is removed
+  // (UMB4-048, a design change for its own unit: reporting it would change the hit count).
+  const inRaw = new Set();
+  const out = raw.map((h) => {
+    const k = keyOf(h);
+    inRaw.add(k);
+    const w = won.get(k);
+    return { ...h, line: lineOf(w ? w.ri : -1, h.line) };
+  });
+  // Named gap (UMB4-048, the 6ea2246 review's L2): a key only a decoded reading holds keeps that reading's own line, so in a file that mixes byte orders it can name line 1.
+  for (const [k, w] of won) if (!inRaw.has(k)) out.push(w.list[0]);
+  return out;
+}
+// Scan a whole blob from its bytes: the UTF-8 reading, as scanText reads it, with the NUL-removed second reading only when the rule reads the blob
+// as wide text; then each decoded reading of wide text, merged in by mergeWide (every hit at the decoded line where its bytes sit). Bytes the rule
+// does not read as wide text give exactly the UTF-8 reading; wide text past WIDE_DECODE_MAX_BYTES gives the UTF-8 reading and a
+// WIDE_TOO_LARGE hit at line 1. hits: [{ line, pattern, fp }]
+export function scanBytes(bytes, file = '') {
+  const wide = wideKinds(bytes).length > 0;
+  if (wide && bytes.length > WIDE_DECODE_MAX_BYTES) {
+    return [...scanText(bytes.toString('utf8'), file, { nulDrop: false }), { line: 1, pattern: WIDE_TOO_LARGE, fp: tooLarge(bytes, file) }];
+  }
+  const hits = scanText(bytes.toString('utf8'), file, { nulDrop: wide });
+  if (!wide) return [...hits, ...spelledHits(bytes, file)]; // 20f: not wide text, so its keys are searched in their wide spellings, never decoded
+  const layouts = wideLayouts(bytes);
+  const breaks = [];
+  for (let i = 0; i < bytes.length; i++) if (bytes[i] === 0x0a) breaks.push(i);
+  const maps = new Map(); // one line map per reading, built when a hit first needs it
+  const mapOf = (ri) => { if (!maps.has(ri)) maps.set(ri, decodedLineMap(bytes, breaks, layouts[ri])); return maps.get(ri); };
+  // Which reading a raw hit's line is mapped through (lineOf, below, is the rule; this says why). A file with a byte-order mark: the mark's reading (20d, CodeRabbit on
+  // Kolwen PR 197: the first reading that holds a key can be one the file is not written in, little-endian bytes appended to a big-endian file, and a little-endian reading
+  // counts none of its newlines), EXCEPT where the reading that holds the key decodes MORE newlines than the mark's (20e: a mark that lies about the body, or a stray byte
+  // after a true mark); then the key's reading names the line. A file with no mark: the reading that first holds the key (a UTF-32 file shifted off its grid by a stray byte is decoded only at its own offset), and for a
+  // key no reading holds (20c, the re-check's N1), of the readings at offset 0 (a file starts on a character), the one that decodes the most newlines (the first of a tie); a
+  // reading at another offset can count a 0x0A inside a character as a newline. Named gap: a file with NO mark that mixes byte orders still takes its key's first reading.
+  let marked;
+  const markReading = () => {
+    if (marked !== undefined) return marked;
+    const b = bytes;
+    const mark = b[0] === 0xff && b[1] === 0xfe && b[2] === 0 && b[3] === 0 ? { width: 4, le: true } : b[0] === 0 && b[1] === 0 && b[2] === 0xfe && b[3] === 0xff ? { width: 4, le: false }
+      : b[0] === 0xff && b[1] === 0xfe ? { width: 2, le: true } : b[0] === 0xfe && b[1] === 0xff ? { width: 2, le: false } : null;
+    marked = mark ? layouts.findIndex((l) => l.width === mark.width && l.offset === 0 && l.le === mark.le) : -1;
+    return marked;
+  };
+  let best = null;
+  const bestAtZero = () => {
+    if (best !== null) return best;
+    best = 0;
+    for (let ri = 1; ri < layouts.length; ri++) if (layouts[ri].offset === 0 && mapOf(ri).newlines > mapOf(best).newlines) best = ri;
+    return best;
+  };
+  // 20e (the 6ea2246 review's L1): the mark's reading is used only where it fits the file at least as well as the reading that holds the key, measured by the newlines each
+  // decodes. A mark that lies about the body (a big-endian mark over little-endian text), or a stray byte after a true mark (the body at an odd offset), decodes fewer
+  // newlines than the reading that holds the key, and that reading's line stands.
+  const lineOf = (ri, line) => {
+    const m = markReading();
+    if (ri < 0) return mapOf(m >= 0 ? m : bestAtZero())(line);
+    return mapOf(m >= 0 && m !== ri && mapOf(m).newlines >= mapOf(ri).newlines ? m : ri)(line);
+  };
+  return mergeWide(hits, wideTexts(bytes).map((text) => scanText(text, file)), (h) => `${h.pattern} ${h.fp}`, lineOf);
+}
+// The patch is a --unified=0 stream (scanPatch's contract; the push scan's own `git show --unified=0`): a hunk holds no context line, so its added lines are
+// contiguous from the hunk's + line and an added line's number is that line plus its index among them, here and in scanPatchText (21a, reading 4: a patch with context
+// lines is outside the contract and would be numbered from its first context line).
+// The wide reading of a patch held as BYTES: the added lines of each hunk are joined back into the byte run they were cut from (git cuts at every
+// 0x0A byte, even inside a wide character, and marks a last line with no line break with a "\ No newline" line), and each run the rule reads as
+// wide text is decoded and scanned, and its UTF-8 reading scanned again with its NULs removed; a run past WIDE_DECODE_MAX_BYTES gets the
+// WIDE_TOO_LARGE hit instead (a new file's run is its whole content, so the fingerprint matches the tree's). A line in a decoded run is numbered
+// from the hunk's first line. The committed file's mark (opts.bomOf, a git read) is read once per file, and only for a run past line 1 that holds a
+// NUL byte; a plain run takes no read. A file whose mark says it is past WIDE_DECODE_MAX_BYTES gets one WIDE_TOO_LARGE hit, keyed by the SHA-256 of its bytes.
+// hits: [{ commit, file, line, pattern, fp }]
+function scanPatchWide(bytes, opts) {
+  const skip = typeof opts.skipFile === 'function' ? opts.skipFile : null;
+  const bomOf = typeof opts.bomOf === 'function' ? opts.bomOf : null;
+  const hits = [];
+  let commit = '', file = null, start = 0, inHeader = false, run = [], lastAdded = false, fileHunks = 0;
+  // Each file's committed mark is read once, and only when a run needs it (see flush).
+  const marks = new Map();
+  const markOf = () => {
+    const key = commit + '\0' + file;
+    if (!marks.has(key)) marks.set(key, bomOf ? bomOf(commit, file) : { kinds: [] });
+    return marks.get(key);
+  };
+  const flush = () => {
+    if (file !== null && run.length) {
+      const runBytes = Buffer.from(run.join(''), 'latin1');
+      // The mark sits on line 1: a run holding line 1 carries it in its own bytes. A wide key always carries NUL bytes (ASCII in UTF-16 or UTF-32 does),
+      // so a run with none takes no mark and no git call.
+      const mark = (fileHunks === 1 && start === 1) || !runBytes.includes(0) ? { kinds: [] } : markOf();
+      if (mark.tooLarge !== undefined) hits.push({ commit, file, line: start, pattern: WIDE_TOO_LARGE, fp: fingerprint(file, WIDE_TOO_LARGE, mark.tooLarge) });
+      else if (wideKinds(runBytes, mark.kinds).length && runBytes.length > WIDE_DECODE_MAX_BYTES) hits.push({ commit, file, line: start, pattern: WIDE_TOO_LARGE, fp: tooLarge(runBytes, file) });
+      else {
+        const decoded = wideTexts(runBytes, mark.kinds);
+        const texts = decoded.length ? [...decoded, runBytes.toString('utf8')] : [];
+        if (!decoded.length) for (const h of spelledHits(runBytes, file)) hits.push({ commit, file, line: start + h.line - 1, pattern: h.pattern, fp: h.fp }); // 20f, as scanBytes
+        // 21i (21h D13): with the committed file's line map, a decoded reading's line counts from the decoded line where the hunk starts, and the UTF-8 reading's
+        // raw line is mapped as a whole; with none (a run that holds line 1, or a file with no mark) the lines are git's, as before
+        const at = (raw) => (mark.lineOf ? mark.lineOf(raw) : raw);
+        texts.forEach((text, i) => {
+          const utf8 = i === texts.length - 1;
+          for (const h of scanText(text, file)) hits.push({ commit, file, line: utf8 ? at(start + h.line - 1) : at(start) + h.line - 1, pattern: h.pattern, fp: h.fp });
+        });
+      }
+    }
+    run = [];
+  };
+  for (const raw of bytes.toString('latin1').split('\n')) {
+    const l = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    if (l.startsWith('\0COMMIT ')) { flush(); commit = l.slice(8).trim(); file = null; inHeader = false; fileHunks = 0; continue; }
+    if (l.startsWith('diff --git ') || l.startsWith('diff --cc ')) { flush(); file = null; inHeader = true; fileHunks = 0; continue; }
+    if (inHeader && l.startsWith('+++ ')) {
+      const p = utf8Path(Buffer.from(dropOneTab(l.slice(4)), 'latin1'));
+      file = p === '/dev/null' ? null : unquotePath(p).replace(/^b\//, '');
+      if (file !== null && skip && skip(file)) file = null;
+      continue;
+    }
+    if (l.startsWith('@@') && (inHeader || file !== null)) {
+      const m = /^@@@? -\d+(?:,\d+)? (?:-\d+(?:,\d+)? )?\+(\d+)(?:,\d+)? @@/.exec(l);
+      if (m) { flush(); start = Number(m[1]); fileHunks++; inHeader = false; lastAdded = false; continue; }
+    }
+    if (inHeader) continue;
+    // "\ No newline at end of file" after an added line: that line had no break, so the run drops the one it was given
+    if (raw.startsWith('\\') && lastAdded && run.length) { run[run.length - 1] = run[run.length - 1].slice(0, -1); continue; }
+    lastAdded = raw.startsWith('+') && file !== null;
+    if (lastAdded) run.push(raw.slice(1) + '\n');
+  }
+  flush();
+  return hits;
+}
+
+// Unquote a C-style quoted path from a diff header. git quotes a name holding special bytes and
+// escapes them as backslash-a/b/t/n/v/f/r, backslash-quote, backslash-backslash, or three octal
+// digits per BYTE (so one non-ASCII character can be several octal escapes). The result is
+// rebuilt as bytes and decoded once as UTF-8, so it equals the name a tree scan sees. Anything that
+// is not git's quoting comes back raw: the fingerprint then matches no ack, which is the safe side.
+const BACKSLASH = String.fromCharCode(92);
+const C_ESCAPES = new Map([['a', 7], ['b', 8], ['t', 9], ['n', 10], ['v', 11], ['f', 12], ['r', 13], ['"', 34], [BACKSLASH, 92]]);
+// git ends a `+++` path with ONE TAB when the name holds a space: this drops that one trailing TAB and nothing else (a string compare, not a regular-expression replace).
+const dropOneTab = (s) => (s.endsWith('\t') ? s.slice(0, -1) : s);
+function unquotePath(p) {
+  if (!(p.length >= 2 && p.startsWith('"') && p.endsWith('"'))) return p;
+  const s = p.slice(1, -1);
+  const bytes = [];
+  for (let i = 0; i < s.length;) {
+    if (s[i] === BACKSLASH) {
+      const oct = /^[0-7]{3}/.exec(s.slice(i + 1, i + 4));
+      if (oct) {
+        const v = parseInt(oct[0], 8);
+        if (v > 255) return p;
+        bytes.push(v); i += 4; continue;
+      }
+      const e = C_ESCAPES.get(s[i + 1]);
+      if (e === undefined) return p;
+      bytes.push(e); i += 2; continue;
+    }
+    const ch = String.fromCodePoint(s.codePointAt(i));
+    for (const x of Buffer.from(ch, 'utf8')) bytes.push(x);
+    i += ch.length;
+  }
+  return utf8Path(Buffer.from(bytes));
+}
+// A path's bytes as text, or an EPATHBYTES error naming them when they are not UTF-8 (21a, a carrier's pull request): decoded, two such paths would become one name, and their
+// hits one fingerprint that one acknowledgment clears for both. The caller (the gate's push scan) turns the error into a failure that names the path.
+function utf8Path(bytes) {
+  const s = bytes.toString('utf8');
+  if (Buffer.from(s, 'utf8').equals(bytes)) return s;
+  const name = bytes[0] === 0x62 && bytes[1] === 0x2f ? bytes.subarray(2) : bytes; // without the b/ of a diff header
+  throw Object.assign(new Error('a path is not valid UTF-8'), { code: 'EPATHBYTES', path: Buffer.from(name) });
+}
+
+// The probe for "binary" by content, git's own text-or-binary rule (xdiff buffer_is_binary): a NUL byte among the first 8,000 bytes.
+// A caller that skips a file decides "binary" from these bytes, never from the name: see looksBinary and the skipFile note below.
+const BINARY_PROBE_BYTES = 8000;
+export function looksBinary(bytes) {
+  const n = Math.min(bytes.length, BINARY_PROBE_BYTES);
+  for (let i = 0; i < n; i++) if (bytes[i] === 0) return true;
+  return false;
+}
+
+// Scan the ADDED lines of a `git log -p --unified=0` patch stream whose commits are introduced by
+// a line `\0COMMIT <sha>` (the caller's --format). hits: [{ commit, file, line, pattern, fp }]
+// opts.skipFile(path) -> true skips that file's added lines: the ONLY way a path escapes the scan,
+// and the caller's explicit choice (e.g. a path it knows is a genuine binary). A skip decided by a NAME alone is a hole: a text file
+// named like a binary carries its secrets past the scan. Decide "binary" from the content, with looksBinary above.
+// A patch held as BYTES (the caller's git(args, { buffer: true }) returned a Buffer) is also read as wide text, hunk by hunk; a patch held as a
+// string is read as it always was. opts.bomOf(commit, file) gives a file's committed mark ({ kinds } or { tooLarge }; scanPushed supplies it). The wide reading adds only a key (by commit, file, pattern and fingerprint) the UTF-8 reading did not find.
+export function scanPatch(patch, opts = {}) {
+  if (!Buffer.isBuffer(patch)) return scanPatchText(patch, opts, true);
+  const hits = scanPatchText(patch.toString('utf8'), opts, false);
+  const key = (h) => `${h.commit} ${h.file} ${h.pattern} ${h.fp}`;
+  const seen = new Set(hits.map(key));
+  for (const h of scanPatchWide(patch, opts)) if (!seen.has(key(h))) { seen.add(key(h)); hits.push(h); }
+  return hits;
+}
+// nulDrop: the NUL-removed second reading of each added line; on for a patch held as a string (its bytes are gone, so the wide-text rule cannot
+// run), off for the UTF-8 reading of a patch held as bytes (scanPatchWide runs it on the hunks the rule reads as wide text).
+function scanPatchText(patch, opts, nulDrop) {
+  const skip = typeof opts.skipFile === 'function' ? opts.skipFile : null;
+  const hits = [];
+  // inHeader: a `+++ ` line is a file header only between `diff --git` and the first `@@`. Inside
+  // a hunk, an ADDED line whose content starts with "++ " reads as `+++ ` too, and must be scanned.
+  let commit = '', file = null, lineNo = 0, inHeader = false;
+  for (const raw of String(patch).split('\n')) {
+    const l = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    if (l.startsWith('\0COMMIT ')) { commit = l.slice(8).trim(); file = null; inHeader = false; continue; }
+    if (l.startsWith('diff --git ') || l.startsWith('diff --cc ')) { file = null; inHeader = true; continue; }
+    if (inHeader && l.startsWith('+++ ')) {
+      // git ends a `+++` path with ONE TAB when the name holds a space, quoted or not (27D-2, git 2.56.0). An unquoted name never holds a
+      // raw TAB (git writes it as \t), so that one trailing TAB is the separator and never part of the name.
+      const p = dropOneTab(l.slice(4));
+      file = p === '/dev/null' ? null : unquotePath(p).replace(/^b\//, '');
+      if (file !== null && skip && skip(file)) file = null;
+      continue;
+    }
+    if (l.startsWith('@@') && (inHeader || file !== null)) {
+      const m = /^@@@? -\d+(?:,\d+)? (?:-\d+(?:,\d+)? )?\+(\d+)(?:,\d+)? @@/.exec(l);
+      if (m) { lineNo = Number(m[1]); inHeader = false; continue; }
+    }
+    if (inHeader) continue;
+    if (l.startsWith('+') && file !== null) {
+      for (const h of readLine(l.slice(1), nulDrop)) hits.push({ commit, file, line: lineNo, pattern: h.pattern, fp: fingerprint(file, h.pattern, h.value) });
+      lineNo++;
+    }
+  }
+  return hits;
+}
+
+// ------------------------------------------------------------ PUSHED RANGE
+const ZERO = /^0+$/;
+const SHA = /^[0-9a-f]{40,64}$/i;
+
+// Parse pre-push stdin: "<local ref> <local sha> <remote ref> <remote sha>" per line.
+// Throws on a malformed line: a range that cannot be read must fail the gate, never pass it.
+export function parsePushRefs(stdinText) {
+  const refs = [];
+  for (const l of String(stdinText).split(/\r?\n/)) {
+    if (!l.trim()) continue;
+    const f = l.trim().split(/\s+/);
+    if (f.length !== 4 || !SHA.test(f[1]) || !SHA.test(f[3])) throw new Error('malformed pre-push ref line');
+    refs.push({ localRef: f[0], localSha: f[1], remoteRef: f[2], remoteSha: f[3] });
+  }
+  return refs;
+}
+
+// The rev-list arguments for one pushed ref, or null for a deletion (nothing is pushed).
+// A brand-new remote branch (remote sha all zeros), or a remote sha this clone does not hold,
+// scans every commit not already on a remote-tracking ref: the PUSH remote's own tracking refs
+// when the caller names it, every remote's when it cannot (a push to a bare URL has no name).
+// A commit held only by some OTHER remote is not on the push remote, so naming it matters.
+export function rangeArgs(ref, hasCommit, remote = null) {
+  if (ZERO.test(ref.localSha)) return null;
+  if (ZERO.test(ref.remoteSha) || !hasCommit(ref.remoteSha)) return [ref.localSha, '--not', remote ? `--remotes=${remote}` : '--remotes'];
+  return [`${ref.remoteSha}..${ref.localSha}`];
+}
+
+// A remote name reaches rev-list as a glob pattern, so it must hold no glob or whitespace
+// character, and cannot open with `-`. git's own refname rules already forbid all of these.
+function checkRemote(r) {
+  if (typeof r !== 'string' || !/^[^\s*?[\-][^\s*?[]*$/.test(r) || r.includes(BACKSLASH)) throw new TypeError('invalid remote name');
+  return r;
+}
+
+// Messages carry keys too (`git commit -m "... <token>"`). Their hits have no file; the label
+// below stands in for one in the fingerprint and holds a NUL, which no path can, so a message
+// acknowledgment can never match a file of the same name.
+const NUL = String.fromCharCode(0);
+const MESSAGE_LABEL = { message: `${NUL}commit-message`, tag: `${NUL}tag-message` };
+
+// An annotated tag may point at ANOTHER tag, and the chain still peels to a commit, so the
+// non-commit guard passes it. Every tag object on the chain is read, outer first, so no tag message
+// goes unscanned. The walk is bounded: at most MAX_TAG_DEPTH tag objects. Real chains are one or
+// two deep, so 16 is far past any use and still a handful of git calls. A longer chain, a tag
+// object met twice (git's content hashing cannot make one, so this is a guard, not an expected
+// path) and a tag object whose headers cannot be read all throw code 'ETAGCHAIN': a message that
+// was not read is not a message that was clean, and the caller must turn the error into a failure.
+export const MAX_TAG_DEPTH = 16;
+function tagChain(sha, git) {
+  const chain = [];
+  const seen = new Set();
+  for (let cur = sha; ; ) {
+    if (seen.has(cur) || chain.length >= MAX_TAG_DEPTH) {
+      const e = new Error('a pushed tag chain is too deep or repeats, so it was not fully read');
+      e.code = 'ETAGCHAIN';
+      throw e;
+    }
+    seen.add(cur);
+    const text = git(['cat-file', 'tag', cur]);
+    chain.push({ sha: cur, text });
+    const head = text.split(/\r?\n\r?\n/, 1)[0];
+    const obj = /^object ([0-9a-f]{40,64})$/m.exec(head);
+    const type = /^type (\S+)$/m.exec(head);
+    if (!obj || !type) {
+      const e = new Error('a pushed tag object has no readable object and type headers');
+      e.code = 'ETAGCHAIN';
+      throw e;
+    }
+    if (type[1] !== 'tag') return chain;
+    cur = obj[1];
+  }
+}
+
+// Scan everything being pushed. git(args) -> stdout is injected by the caller and must THROW when
+// git fails. opts: { remote, skipFile } (see rangeArgs and scanPatch).
+//
+// Per commit: the ADDED lines of its diff, with --text so a file git would call binary (a NUL
+// byte, a -diff attribute) is still read; and its full message (%B), fetched separately so a
+// message can never confuse the patch parser. Per pushed annotated tag: every tag message on its
+// chain, outer first (a tag may point at another tag; see tagChain).
+//
+// Returns { refs, commits, tags, hits }. `tags` counts the tag objects read, per pushed ref, so a
+// tag object shared by two pushed chains is counted once for each. EVERY hit names the pushed ref
+// it was found under (refSha = that ref's local sha), and a commit reached by two refs yields its
+// hits once per ref: the caller decides acknowledgments PER REF, from what that ref itself carries.
+// kind is 'diff', 'message' or 'tag'; file is null for the last two. Every error propagates: the
+// caller turns it into a FAIL, because a scan that could not run has not passed. A pushed ref that
+// is not a commit throws code 'ENONCOMMIT' with refs: [{ ref, sha, type }], so a caller that knows
+// the code can name each ref, and one that does not still fails.
+export function scanPushed(stdinText, git, opts = {}) {
+  const refs = parsePushRefs(stdinText);
+  const remote = opts.remote === undefined || opts.remote === null || opts.remote === '' ? null : checkRemote(opts.remote);
+  const hasCommit = (sha) => { try { git(['cat-file', '-e', `${sha}^{commit}`]); return true; } catch { return false; } };
+  // The committed file's mark (its byte-order mark): a patch's zero-context hunk does not carry a mark on an unchanged line 1. Read once per file, and
+  // only for a run past line 1 that holds a NUL byte (see scanPatchWide): one git call, cat-file blob, which returns the whole blob (git has no head
+  // read), so a blob past the caller's git buffer throws and the scan fails. A marked blob past WIDE_DECODE_MAX_BYTES is not decoded: it gets the
+  // fail-closed WIDE_TOO_LARGE hit, keyed by the SHA-256 of its bytes, the tree scan's key for the same file (21i, 21h D14; until then its git blob id, a second fingerprint
+  // for one file). An unmarked blob past the bound passes on its bytes, as the tree scan passes it.
+  const bomOf = (commit, file) => {
+    const spec = `${commit}:${file}`;
+    const head = git(['cat-file', 'blob', spec], { buffer: true });
+    if (!Buffer.isBuffer(head)) { const e = new Error('the committed file could not be read as bytes'); e.code = 'EBOMREAD'; throw e; }
+    const kinds = bomKinds(head);
+    if (kinds.length && head.length > WIDE_DECODE_MAX_BYTES) return { tooLarge: createHash('sha256').update(head).digest('hex') }; // 21i: the tree scan's key for the same bytes
+    if (!kinds.length) return { kinds };
+    // 21i (21h D13): a hunk's start is git's line number, which counts every 0x0A byte, one inside a wide character too, so it can sit past the decoded line a reader
+    // sees. The mark gives the file's layout; its line map turns a raw line of the committed file into the decoded line where its bytes sit (as scanBytes maps a raw hit).
+    const breaks = [];
+    for (let i = head.indexOf(0x0a); i >= 0; i = head.indexOf(0x0a, i + 1)) breaks.push(i);
+    return { kinds, lineOf: decodedLineMap(head, breaks, { width: kinds[0] === 'utf32' ? 4 : 2, offset: 0, le: head[0] === 0xff }) };
+  };
+  // FAIL CLOSED on a pushed object that is not a commit. `rev-list` returns NOTHING, with no error,
+  // for a blob, a tree, or a tag of either, so a range scan would pass it unread
+  // (`git tag x $(git hash-object -w secrets.env)` then a push). Every such ref is named in one
+  // error; the caller must turn it into a failure. A branch, and a tag of a commit, peel to a
+  // commit and pass through unchanged.
+  const notCommits = [];
+  for (const ref of refs) {
+    if (ZERO.test(ref.localSha)) continue;
+    const type = git(['cat-file', '-t', `${ref.localSha}^{}`]).trim();
+    if (type !== 'commit') notCommits.push({ ref: ref.localRef, sha: ref.localSha, type });
+  }
+  if (notCommits.length) {
+    const e = new Error('a pushed ref is not a commit');
+    e.code = 'ENONCOMMIT';
+    e.refs = notCommits;
+    throw e;
+  }
+  const ranges = [];
+  const shas = new Set();
+  for (const ref of refs) {
+    const args = rangeArgs(ref, hasCommit, remote);
+    if (!args) continue;
+    const list = git(['rev-list', ...args]).split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    for (const s of list) shas.add(s);
+    ranges.push({ ref, list });
+  }
+  const bySha = new Map();
+  for (const sha of shas) {
+    // asked for as bytes, so wide text in it can be decoded; a caller whose git() returns a string still gets the UTF-8 reading
+    const patch = git(['-c', 'core.quotepath=off', 'show', '--format=%x00COMMIT %H', '--unified=0', '--text',
+      '--no-color', '--no-ext-diff', '--no-textconv', '--diff-merges=first-parent', sha], { buffer: true });
+    const found = scanPatch(patch, { ...opts, bomOf }).map((h) => ({ ...h, kind: 'diff' }));
+    for (const h of scanText(git(['show', '-s', '--format=%B', sha]), MESSAGE_LABEL.message)) {
+      found.push({ commit: sha, file: null, line: h.line, pattern: h.pattern, fp: h.fp, kind: 'message' });
+    }
+    bySha.set(sha, found);
+  }
+  const hits = [];
+  let tags = 0;
+  for (const { ref, list } of ranges) {
+    for (const sha of list) for (const h of bySha.get(sha)) hits.push({ refSha: ref.localSha, ...h });
+    if (ref.remoteSha !== ref.localSha && git(['cat-file', '-t', ref.localSha]).trim() === 'tag') {
+      for (const t of tagChain(ref.localSha, git)) {
+        tags++;
+        for (const h of scanText(t.text, MESSAGE_LABEL.tag)) {
+          hits.push({ refSha: ref.localSha, commit: t.sha, file: null, line: h.line, pattern: h.pattern, fp: h.fp, kind: 'tag' });
+        }
+      }
+    }
+  }
+  return { refs: refs.length, commits: shas.size, tags, hits };
+}
