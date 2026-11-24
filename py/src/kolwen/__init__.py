@@ -3,7 +3,7 @@
 This package reserves the name on PyPI so the published one is the real one.
 
     https://kolwen.com
-    https://github.com/TheColliery/Kolwen
+    https://github.com/Kolwen-AI/Kolwen
 
 Terms for the model weights and for the code are published per release.
 """

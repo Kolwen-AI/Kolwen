@@ -9,7 +9,7 @@ This package reserves the name on PyPI so that the `kolwen` you install is
 the one we publish.
 
 - Home: <https://kolwen.com>
-- Source and releases: <https://github.com/TheColliery/Kolwen>
+- Source and releases: <https://github.com/Kolwen-AI/Kolwen>
 
 ## License
 
