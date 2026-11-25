@@ -16,6 +16,7 @@ function Invoke-WebRequest {
 }
 # The read and press paths read a token by name; stub values keep the test runnable on a box without one (the network is stubbed).
 if (-not $env:GITHUB_READ_TOKEN) { $env:GITHUB_READ_TOKEN = 'stub-read-token' }
+if (-not $env:GITHUB_READ_TOKEN_KOLWEN_AI) { $env:GITHUB_READ_TOKEN_KOLWEN_AI = "stub-read-token" }
 if (-not $env:GITHUB_TOKEN) { $env:GITHUB_TOKEN = 'stub-write-token' }
 $tool = Join-Path $PSScriptRoot 'cr-verify.ps1'
 $readOut = (& $tool -Pr 213 2>&1 | Out-String)

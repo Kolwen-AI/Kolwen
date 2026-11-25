@@ -1,7 +1,7 @@
 // node ciwait.mjs <fullsha> [maxSeconds]: polls the check runs of a commit every 30 s until all are completed or time runs out; prints each run's name, status,
 // conclusion and id, then a verdict. It JUDGES: exit 0 only when the check named all-green concluded success and no completed check concluded a failure;
 // exit 1 on RED (each failing check named); exit 3 while runs are still open at the time limit. A successful, skipped or neutral run is not a failure.
-// Read token (GITHUB_READ_TOKEN). The judgment is pure (judge, reportRuns) so a test can feed it a recorded list; the CLI sits behind the entry guard.
+// Token (GITHUB_TOKEN): check runs are readable only with it, GET only (main's rule, 2026-11-25). The judgment is pure (judge, reportRuns) so a test can feed it a recorded list; the CLI sits behind the entry guard.
 import { githubToken } from './github-token.mjs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,12 +31,12 @@ export function reportRuns(runs) {
 }
 
 async function main() {
-  const tok = githubToken('GITHUB_READ_TOKEN');
+  const tok = githubToken('GITHUB_TOKEN');
   const H = { Authorization: `Bearer ${tok}`, Accept: 'application/vnd.github+json' };
   const [sha, maxS = '500'] = process.argv.slice(2);
   const end = Date.now() + Number(maxS) * 1000;
   for (;;) {
-    const j = await (await fetch(`https://api.github.com/repos/TheColliery/Kolwen/commits/${sha}/check-runs?per_page=100`, { headers: H })).json();
+    const j = await (await fetch(`https://api.github.com/repos/Kolwen-AI/Kolwen/commits/${sha}/check-runs?per_page=100`, { headers: H })).json();
     const runs = j.check_runs || [];
     const v = judge(runs);
     if (v.state !== 'open' || Date.now() > end) {
