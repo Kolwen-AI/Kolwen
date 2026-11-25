@@ -91,23 +91,16 @@ the pointer to it.
   "Nothing is retained today" is scoped to conversation content in the four documents that carried
   it, because the contact mailbox holds what a visitor sends it.
 - **Two Thai summaries said less than their English, in Kolwen's favour.** The cookie interim
-  position dropped the promise not to rely on the strictly-necessary characterisation to skip a
-  banner, and the retention sentence kept "no statute supplies the number" while dropping that a
-  period must be stated, recorded and enforced. Both Thai summaries, and the one for the retrieval
-  basis, now carry every obligation their English carries. The Thai has still not been read by a
-  native legal reviewer.
-- **A correction to the correction above: the fix made the English the looser half.** Fixing the
-  cookie interim position's Thai to say no cookie "of that kind" left its English saying Kolwen
-  "sets none", which read back to a clause about the chat cookie and could be taken as "sets no
-  cookie at all". The English now says Kolwen sets no non-essential cookie. The Thai is unchanged.
+  position's Thai dropped one of its English promises, and the retention sentence kept "no statute
+  supplies the number" while dropping that a period must be stated, recorded and enforced. Both Thai
+  summaries, and the one for the retrieval basis, now carry every obligation their English carries.
+  The Thai has still not been read by a native legal reviewer.
+- **A correction to the correction above: the fix made the English the looser half.** Fixing the cookie interim position's Thai left its English reading wider than the Thai, and it could be read back to a different clause. The English now matches the Thai's scope; the clause stays held pending counsel. The Thai is unchanged.
 - **`PRIVACY.md` cited the owner's rulings by their register id** in its draft header, in both
   languages, and in its gapped note. That published the numbering of a decision log that is not
   public. It now cites the ruling by its date. The governance documents keep their ids, and their
   index now says in one line what such an id is.
-- **One interim clause in `PRIVACY.md` was phrased as a legal conclusion** ("it is a controller for
-  that processing") while the gap it sits under reserves that characterisation to counsel. It is
-  now phrased as Kolwen's own undertaking, in English and Thai alike ("Kolwen will treat it as a
-  controller for that processing"). The gap and its marker are unchanged.
+- **One interim clause in `PRIVACY.md` was phrased as a legal conclusion** while the gap it sits under reserves that characterisation to counsel. It is now phrased as Kolwen's own undertaking, in English and Thai alike. The gap and its marker are unchanged.
 - **A correction to the correction to `governance/policies.md`: its list of what the surface check
   fails the build on was closed ("a named list of failures only") and the check outgrew it.** The
   list named eight classes; the check has ten rules. It left out the legal-gap marker rule, which
@@ -119,12 +112,13 @@ the pointer to it.
 ### Changed
 
 - **The repository moved to the Kolwen-AI organisation.** Its links, badges and package metadata now name `Kolwen-AI/Kolwen`; the published packages keep the old links until the next publish.
+- **The changelog and the served pages name held drafts by topic only, never by their rules or values** (K-211).
 
 - **The liability, refund and price-change parts of the terms are redrafted and held pending counsel, and the credit wording follows the owner's signed refund decision, preliminary until counsel** (BB-558, BB-559, BB-568). The redrafted terms are not shown on the public pages.
 
 - **The terms draft gains one prohibited-conduct entry, pending counsel** (LWK3-081). `TERMS.md` carries "Training on Outputs" as the first entry of the list of prohibited conduct. It is marked pending legal review and held on the public pages. Its authorisation address and its response time are open (owner card BB-551).
 
-- **The Thai text of the "Training on Outputs" entry is drafted, pending counsel** (K-205). `TERMS.md` carries the Thai clause beside the English one, as a block quote marked pending legal review, so it is held on both public pages with the English. The English clause's "Silence is not authorisation" now reads "Kolwen's silence is not authorisation", to match the Thai subject; nothing else in the English moves. Its two placeholders stay open (owner card BB-551).
+- **The Thai text of the "Training on Outputs" entry is drafted, pending counsel** (K-205). `TERMS.md` carries the Thai clause beside the English one, as a block quote marked pending legal review, so it is held on both public pages with the English.
 
 - **The "Training on Outputs" entry's two values are filled in the draft** (BB-551). The entry is still pending counsel and held on both public pages, so its values are not published here.
 
@@ -150,10 +144,9 @@ the pointer to it.
 - Known limits, not yet fixed: `<noscript>` is read as markup, the scripting-off model its `<style>` is hashed for, although a browser with scripting on reads it as text. Character references and CDATA sections are not decoded in any body. The script-data escape states (a `<!--` inside a script) are not modelled, so a later `</script` can end the body early. An inline SVG's `<style>` and `<title>` are read as the HTML parser reads them, which differs inside `<svg>`. A raw-text body with no end is a finding at its line.
 - `PRIVACY.md` (a draft, not linked from the site) now marks seven statements about cookies, trackers
   and analytics `[pending legal review]` (the Thai twin with the file's Thai marker `[รอที่ปรึกษากฎหมาย]`):
-  "This site sets no cookies at all", "no advertising cookie and no tracker", the quoted Thai and English
-  summary of the same, "no third-party analytics on this page", the measurement that one third-party
-  origin is fetched, and the paragraph saying whether a Cloudflare analytics product is enabled cannot be
-  measured from the repository. The home page footer no longer claims them, and counsel has not cleared the
+  the statements about cookies and trackers, their Thai and English summary, the statement about third-party
+  analytics, the measurement of third-party origins, and the paragraph on whether a Cloudflare analytics product
+  is enabled. The home page footer no longer claims them, and counsel has not cleared the
   draft's wording. The sentences are unchanged. The draft's header, in both languages, now says four
   legal gaps plus these seven marked statements, and no longer lists the cookies as asserted facts.
 - The Worker's `workers.dev` production alias is switched off (`workers_dev: false` in `wrangler.jsonc`);
@@ -263,7 +256,7 @@ the pointer to it.
 - The shared blocks (a header slot, empty today; the footer of each language; the footer CSS) are written once in `scripts/lib/legal-render.mjs`, and `node scripts/legal-pages.mjs --write` puts them into all seven pages between fixed markers and updates the matching `style-src` hashes in `web/_headers`, so one edit reaches every page in one run and a footer CSS change needs no hand-typed hash. `--write` refuses a page whose marker pairs overlap, nest or stand out of order, and never edits a `style-src-elem` directive. `--check` stays the CI gate: it fails on a differing block, a marker that is missing, doubled or out of order, pairs that overlap or nest, a stale hash, or a `style-src-elem` that lacks one. The script's header is the list of record.
 - `README.md`: a CodeRabbit pull-request reviews badge under the tagline, in the organisation's standard form for this repository.
 - `PRIVACY.md`: a conditional "Worker logs" paragraph. Today the Worker runs no code of ours and logs nothing; when it does and Workers Logs is switched on (Cloudflare's default for a new Worker), Cloudflare Workers Logs will record each request, kept 3 days on the Workers plan without a monthly charge and 7 days on the paid plan until 30 November 2026; from 1 December 2026 the page names Observability pricing and no retention per plan (Cloudflare documentation, read 2026-10-17). Whether a log line holds the IP address or headers is a pending line to measure when the Worker ships.
-- `TERMS.md`: a "Price changes" section (draft, every part under the pending-legal-review marker): at least 30 days' notice by email and in the app, a change only at the first renewal on or after the later of the notice's end and the price hold's end, and never inside a paid period, a key or prepaid credit, the customer's acceptance where their home law requires it, a refund on rejection of only the charges taken after the effective date, and a price kept for an open number of months. Model versions keep their per-million-token prices for their life, and retire only on notice. The values are left open.
+- `TERMS.md`: a "Price changes" section (draft, held pending counsel under the pending-legal-review marker). Its terms are not shown on the public pages.
 - `/changelog`: a page rendered from this file by `scripts/legal-pages.mjs`, every passage shown as written (nothing here waits for counsel, so no
   passage is held), in the site's own shell with the English and Thai chrome. `node scripts/legal-pages.mjs --check` fails in CI when the page is not
   the render of this file, so a change to the changelog without a re-render cannot merge. The page is in `web/sitemap.xml` and `web/llms.txt`, and
@@ -307,8 +300,7 @@ the pointer to it.
 - The enforcement process in `TERMS.md` now has its numbers, in English and in a new Thai version: 14 business days to answer
   a notice, a written decision 7 business days after the answer, 30 business days to file the one appeal through the
   appeals role address, an answer within 14 business days, the key's clock stopped for the whole case, a ceiling of 90
-  calendar days from the notice, and a missed deadline on Kolwen's side lifting the suspension. A business day is a normal
-  working day in Thailand, Monday to Friday, without the public holidays announced in the Royal Gazette. The Thai
+  calendar days from the notice, and a missed deadline on Kolwen's side lifting the suspension. The term "business day" is defined in the draft, held pending counsel. The Thai
   7-day clause (kept in `legal/`, see below) names the support role address as its cancellation channel. All of it stays under the pending-legal-review
   marker and unlinked.
 - The open-weights plan is now written in the future tense in `README.md`, `LICENSE`, `py/LICENSE` and `SECURITY.md`:
@@ -329,8 +321,8 @@ the pointer to it.
 - `TERMS.md` (still a draft, not linked from the site) now carries the signed commercial terms, each marked
   `[pending legal review]` where counsel decides: the age rule (18, or the local consent age if higher, a neutral
   confirmation, no identity image kept); outputs owned by the user, with "if any" and "similar outputs" wording and
-  training only on opt-in; Thai law and courts with consumer rights preserved; refunds (an unredeemed key in full within 14 days,
-  days used deducted inside a subscription's first period); a refund of the unused
+  training only on opt-in; Thai law and courts with consumer rights preserved; refunds (an unredeemed key in full within 14 days);
+  a refund of the unused
   part when Kolwen ends the contract without cause; 30 days' notice of a change by email and banner; and the key
   limits (2 per order, 4 per account per sale window or rolling 30 days, stacking to a 36-month ceiling, an unredeemed
   key expiring at 12 months, non-transferable and bound to the account on activation). The acceptable-use list and the
