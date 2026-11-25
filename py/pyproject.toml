@@ -25,7 +25,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://kolwen.com"
-Source = "https://github.com/TheColliery/Kolwen"
+Source = "https://github.com/Kolwen-AI/Kolwen"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kolwen"]

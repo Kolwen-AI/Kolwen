@@ -13,7 +13,7 @@
 // rule behind it would drop) · DROPS (the first enabled rule drops) · DISABLED (its rules exist and are all off) · NO RULE. Only ROUTES passes: the zone's catch-all NEVER counts, whatever it does, because the property checked is that each published address has a
 // rule of its own (a misspelled or never-created address must not pass because a catch-all happens to forward). The catch-all is printed as one information line.
 // Exit codes: 0 every address passes · 1 an address fails, or the zone could not be read · 2 a bad flag.
-// Report problems at https://github.com/TheColliery/Kolwen/issues
+// Report problems at https://github.com/Kolwen-AI/Kolwen/issues
 import { readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { resolve, dirname } from 'node:path';

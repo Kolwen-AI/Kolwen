@@ -8,7 +8,7 @@
 ## Reporting a Vulnerability
 
 Report a security issue in this repository through GitHub's private vulnerability reporting —
-**[Security → Report a vulnerability](https://github.com/TheColliery/Kolwen/security/advisories/new)**
+**[Security → Report a vulnerability](https://github.com/Kolwen-AI/Kolwen/security/advisories/new)**
 — **never a public issue**. Private reporting is enabled on this repository; the link above
 opens the form directly. Every report stays private until disclosure, whatever its severity: there is no public track for a low-severity report, because severity is often unclear when a report arrives, and a one-person project cannot take back a public mistake.
 
@@ -25,7 +25,7 @@ readers at `/.well-known/security.txt`, per RFC 9116.
 is unavailable there is no backup route—that is a real limitation, not an oversight, and it is
 stated so nobody plans around a responsiveness this project cannot guarantee.
 
-Published security advisories for this repository are listed on its [Security Advisories tab](https://github.com/TheColliery/Kolwen/security/advisories).
+Published security advisories for this repository are listed on its [Security Advisories tab](https://github.com/Kolwen-AI/Kolwen/security/advisories).
 
 ## Scope
 

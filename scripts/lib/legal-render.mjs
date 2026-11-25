@@ -253,7 +253,7 @@ const FOOTER_GROUPS = [
   [null, [['/', 'home']]],
   ['group-product', [['/pricing', 'pricing'], ['/changelog', 'changelog']]],
   ['group-legal', [['/terms', 'terms'], ['/privacy', 'privacy'], ['/refund', 'refund']]],
-  ['group-code', [['https://github.com/TheColliery/Kolwen', 'github'], ['https://huggingface.co/kolwen', 'huggingface'], ['https://www.npmjs.com/package/kolwen', 'npm'], ['/llms.txt', 'llms']]],
+  ['group-code', [['https://github.com/Kolwen-AI/Kolwen', 'github'], ['https://huggingface.co/kolwen', 'huggingface'], ['https://www.npmjs.com/package/kolwen', 'npm'], ['/llms.txt', 'llms']]],
   ['group-contact', [['mailto:info@kolwen.com', 'email'], ['mailto:support@kolwen.com', 'support'], ['mailto:abuse@kolwen.com', 'abuse'], ['mailto:appeals@kolwen.com', 'appeals'], ['https://kolwen.com/.well-known/security.txt', 'security']]],
 ];
 const NAMES = new Set(['github', 'huggingface', 'npm', 'llms']); // product names, in the shared.names group; every other link label is in shared.footer

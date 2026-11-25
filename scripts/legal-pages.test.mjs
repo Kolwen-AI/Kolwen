@@ -352,7 +352,7 @@ test('the CLI refuses an unknown flag with exit 2 and prints usage on --help', (
 });
 
 // ── the shared footer and the changelog page ────────────────────────────────────────────────────
-const LINKS = ['/', '/pricing', '/changelog', '/terms', '/privacy', '/refund', 'https://github.com/TheColliery/Kolwen', 'https://huggingface.co/kolwen', 'https://www.npmjs.com/package/kolwen', '/llms.txt', 'mailto:info@kolwen.com', 'mailto:support@kolwen.com', 'mailto:abuse@kolwen.com', 'mailto:appeals@kolwen.com', 'https://kolwen.com/.well-known/security.txt'];
+const LINKS = ['/', '/pricing', '/changelog', '/terms', '/privacy', '/refund', 'https://github.com/Kolwen-AI/Kolwen', 'https://huggingface.co/kolwen', 'https://www.npmjs.com/package/kolwen', '/llms.txt', 'mailto:info@kolwen.com', 'mailto:support@kolwen.com', 'mailto:abuse@kolwen.com', 'mailto:appeals@kolwen.com', 'https://kolwen.com/.well-known/security.txt'];
 const hrefs = block => [...block.matchAll(/<a href="([^"]*)"/g)].map(m => m[1]);
 
 // The Thai footer links to the Thai address of each page of the site (one language per file: /th/ for the home page, /th/<page> for the rest). The plain-link switch is a <a class="lang-link">, which hrefs() does not read.
@@ -935,7 +935,7 @@ const groupOf = (block, heading) => { const m = new RegExp('<div class="fgroup">
 test('llms.txt is linked under Code, in both languages, and the file exists', () => {
   for (const [lang, heading] of [['en', 'Code'], ['th', 'โค้ด']]) {
     const code = groupOf(siteFooterHtml({ lang, path: '/' }), heading);
-    assert.deepEqual([...code.matchAll(/href="([^"]*)"/g)].map(m => m[1]), ['https://github.com/TheColliery/Kolwen', 'https://huggingface.co/kolwen', 'https://www.npmjs.com/package/kolwen', '/llms.txt'], lang);
+    assert.deepEqual([...code.matchAll(/href="([^"]*)"/g)].map(m => m[1]), ['https://github.com/Kolwen-AI/Kolwen', 'https://huggingface.co/kolwen', 'https://www.npmjs.com/package/kolwen', '/llms.txt'], lang);
     assert.match(code, /<a href="\/llms\.txt">llms\.txt<\/a>/, lang + ': the link text is the file name');
   }
   assert.ok(existsSync(join(ROOT, 'web/llms.txt')), 'the file the footer links is in web/');

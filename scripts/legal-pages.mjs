@@ -21,7 +21,7 @@
 // Markdown shapes it reads, the stated limits). The pages are a pure function of their sources (TERMS.md, PRIVACY.md, the clause file, CHANGELOG.md), the legal-state record
 // (legal/legal-state.json), the hold list (scripts/lib/legal-holds.json) and the text in scripts/lib/legal-page-text.mjs, so nobody
 // edits a page by hand: a hand edit is a difference this check names.
-// Report problems at https://github.com/TheColliery/Kolwen/issues
+// Report problems at https://github.com/Kolwen-AI/Kolwen/issues
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

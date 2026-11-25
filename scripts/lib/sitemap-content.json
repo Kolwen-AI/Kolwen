@@ -51,13 +51,13 @@
   },
   "https://kolwen.com/changelog": {
     "page": "web/changelog.html",
-    "sha256": "87e4e6638be0045e69c708abad0c841c2d6dc5b0918742e5e864ac714ff503bb",
-    "lastmod": "2026-11-24"
+    "sha256": "f63792dd8e0008342274222462d74f652d75680397a6595e5ddd4bce394a4d89",
+    "lastmod": "2026-11-25"
   },
   "https://kolwen.com/th/changelog": {
     "page": "web/th/changelog.html",
-    "sha256": "6cfb469599171a5ab61b16c63341334236e797be759f806ea945382b938438af",
-    "lastmod": "2026-11-24"
+    "sha256": "20fa5c0927241c7597500e9628c4857da4433a6d67ff776de9792e5a8c5673fa",
+    "lastmod": "2026-11-25"
   },
   "https://kolwen.com/accessibility": {
     "page": "web/accessibility.html",

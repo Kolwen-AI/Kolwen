@@ -4,17 +4,20 @@ param([Parameter(Mandatory)][int]$Pr, [Parameter(Mandatory)][string]$HeadPrefix,
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'kw-check-runs.ps1')
 . (Join-Path $PSScriptRoot 'github-token.ps1')
+$rt = Get-GitHubToken -Name GITHUB_READ_TOKEN_KOLWEN_AI
+$hr = @{ Authorization = "Bearer $rt"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+# the ship token: check runs are readable only with GITHUB_TOKEN (GET only, main's rule, 2026-11-25), and the merge is a write
 $tok = Get-GitHubToken -Name GITHUB_TOKEN
 $h = @{ Authorization = "Bearer $tok"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
-$a = @((Invoke-WebRequest -TimeoutSec 60 -UseBasicParsing -Uri "https://api.github.com/repos/TheColliery/Kolwen/code-scanning/alerts?ref=refs/pull/$Pr/merge&state=open&per_page=50" -Headers $h).Content | ConvertFrom-Json | ForEach-Object { $_ })
+$a = @((Invoke-WebRequest -TimeoutSec 60 -UseBasicParsing -Uri "https://api.github.com/repos/Kolwen-AI/Kolwen/code-scanning/alerts?ref=refs/pull/$Pr/merge&state=open&per_page=50" -Headers $hr).Content | ConvertFrom-Json | ForEach-Object { $_ })
 "codeql open on PR ref: $($a.Count)"
 if ($a.Count -ne 0) { throw 'CodeQL alerts open' }
 $msg = [string](Get-Content -Raw -Encoding UTF8 $MsgFile)
-$p = Invoke-RestMethod -TimeoutSec 60 -Uri "https://api.github.com/repos/TheColliery/Kolwen/pulls/$Pr" -Headers $h
+$p = Invoke-RestMethod -TimeoutSec 60 -Uri "https://api.github.com/repos/Kolwen-AI/Kolwen/pulls/$Pr" -Headers $hr
 if (-not $p.head.sha.StartsWith($HeadPrefix)) { throw "head moved: $($p.head.sha)" }
-$runs = @((Invoke-RestMethod -TimeoutSec 60 -Uri "https://api.github.com/repos/TheColliery/Kolwen/commits/$($p.head.sha)/check-runs?per_page=100" -Headers $h).check_runs)
+$runs = @((Invoke-RestMethod -TimeoutSec 60 -Uri "https://api.github.com/repos/Kolwen-AI/Kolwen/commits/$($p.head.sha)/check-runs?per_page=100" -Headers $h).check_runs)
 Assert-GreenRuns -Runs $runs
 "check runs green on $($p.head.sha.Substring(0,7)): $($runs.Count)"
 $payload = @{ merge_method = 'squash'; sha = $p.head.sha; commit_title = [string]$Title; commit_message = $msg } | ConvertTo-Json -Compress
-$r = Invoke-RestMethod -TimeoutSec 60 -Method Put -Uri "https://api.github.com/repos/TheColliery/Kolwen/pulls/$Pr/merge" -Headers $h -Body ([System.Text.Encoding]::UTF8.GetBytes($payload)) -ContentType 'application/json; charset=utf-8'
+$r = Invoke-RestMethod -TimeoutSec 60 -Method Put -Uri "https://api.github.com/repos/Kolwen-AI/Kolwen/pulls/$Pr/merge" -Headers $h -Body ([System.Text.Encoding]::UTF8.GetBytes($payload)) -ContentType 'application/json; charset=utf-8'
 "merged=$($r.merged) sha=$($r.sha)"
