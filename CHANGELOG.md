@@ -113,6 +113,7 @@ the pointer to it.
 
 - **The repository moved to the Kolwen-AI organisation.** Its links, badges and package metadata now name `Kolwen-AI/Kolwen`; the published packages keep the old links until the next publish.
 - **The changelog and the served pages name held drafts by topic only, never by their rules or values** (K-211).
+- **The refund entries of the terms gain named cases, a set-off and a change-of-terms clause, held pending counsel** (BB-572, BB-573).
 
 - **The liability, refund and price-change parts of the terms are redrafted and held pending counsel, and the credit wording follows the owner's signed refund decision, preliminary until counsel** (BB-558, BB-559, BB-568). The redrafted terms are not shown on the public pages.
 

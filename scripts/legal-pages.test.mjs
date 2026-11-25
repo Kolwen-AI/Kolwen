@@ -157,7 +157,7 @@ test('no passage is dropped: for each source, passages = shown as written + held
 test('the counts of the three sources today', () => {
   const i = inputs();
   const s = file => classify(file, i[{ 'TERMS.md': 'terms', 'PRIVACY.md': 'privacy', 'legal/thai-7day-clause.md': 'clause' }[file]], { holds: holds.holds }).stats;
-  assert.deepEqual(s('TERMS.md'), { passages: 98, text: 28, held: 70 });
+  assert.deepEqual(s('TERMS.md'), { passages: 105, text: 26, held: 79 });
   assert.deepEqual(s('PRIVACY.md'), { passages: 57, text: 14, held: 43 });
   assert.deepEqual(s('legal/thai-7day-clause.md'), { passages: 4, text: 0, held: 4 });
 });
@@ -206,9 +206,9 @@ test('refund rows R1 and R2 are the TERMS.md passages: a changed passage is repo
   assert.deepEqual(held.problems, []);
   const doc = docEn(held.pages['web/refund.html']);
   assert.ok(!doc.includes('refunded in full within 14 days'), 'a held passage is not promised on the refund page');
-  assert.equal(count(doc, 'class="t"'), 2);
-  assert.equal(count(doc, 'class="pending"'), 8);
-  assert.match(held.report.join('\n'), /refund rows 9 passages = 2 shown as written \+ 7 pending lines/);
+  assert.equal(count(doc, 'class="t"'), 1);
+  assert.equal(count(doc, 'class="pending"'), 9);
+  assert.match(held.report.join('\n'), /refund rows 9 passages = 1 shown as written \+ 8 pending lines/);
 });
 
 test('the pages carry no raw {{token}}, no marker-less pending line, and nothing a production page must not have', () => {
@@ -231,11 +231,11 @@ test('the pages carry no raw {{token}}, no marker-less pending line, and nothing
   }
 });
 
-test('the refund page shows R1 to R9: three statements and six pending lines, and the 7-day clause as one pending line while it is not in force', () => {
+test('the refund page shows R1 to R9: two statements and eight pending lines, and the 7-day clause as one pending line while it is not in force', () => {
   const { pages, report } = renderPages(inputs());
   const doc = docEn(pages['web/refund.html']);
-  assert.equal(count(doc, 'class="t"'), 3);
-  assert.equal(count(doc, 'class="pending"'), 7);
+  assert.equal(count(doc, 'class="t"'), 2);
+  assert.equal(count(doc, 'class="pending"'), 8);
   assert.match(doc, /Thai 7-day cancellation right is drafted/);
   assert.match(report.join('\n'), /legal\/thai-7day-clause\.md 4 passages = 0 shown as written \+ 4 held \(not in force/);
   assert.ok(!/deducts? the days you used/i.test(doc.replace('deducts the days you used is waiting for review', '')), 'the page promises neither a deduction nor no deduction');

@@ -102,7 +102,7 @@ export const REFUND_ROWS = [
     th: 'คีย์ที่ยังไม่ได้ใช้ได้รับเงินคืนเต็มจำนวนภายใน 14 วันนับจากวันซื้อ เพราะยังไม่ได้ใช้อะไร คีย์จึงถูกยกเลิก',
   },
   {
-    id: 'R2', kind: 'text', from: '**By Kolwen without cause.** Kolwen refunds the unused',
+    id: 'R2', kind: 'text', from: '[pending legal review] **By Kolwen without cause.** Kolwen',
     en: "By Kolwen without cause. Kolwen refunds the unused part: a key's remaining days, a subscription's remaining current period, and unused credits at the price paid.",
     th: 'เมื่อ Kolwen เลิกสัญญาโดยไม่มีเหตุ Kolwen คืนเงินส่วนที่ยังไม่ได้ใช้ ได้แก่วันที่เหลือของคีย์ รอบปัจจุบันที่เหลือของการสมัครสมาชิก และเครดิตที่ยังไม่ได้ใช้ตามราคาที่จ่าย',
   },
