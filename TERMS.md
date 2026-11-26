@@ -163,6 +163,9 @@ immediate-start consent works as the basis for deducting days used.**
 
 ## Ending the contract
 
+**By Kolwen without cause.** Kolwen refunds the unused part: a key's remaining days, a subscription's
+remaining current period, and unused credits at the price paid.
+
 [pending legal review] **By Kolwen without cause.** Kolwen refunds the unused part: a key's remaining days, a subscription's
 remaining current period, and unused credits bought with money at the price paid, as the bullet "a refund Kolwen owes" in "Refunds" says.
 
@@ -270,8 +273,10 @@ has broken a rule, which is a process, in this order:
    appeal window of step 5 and through any appeal.
 5. **One appeal to a human** against an upheld decision. You have **30 business days** after the written
    decision to file it, through **appeals@kolwen.com**, and Kolwen answers within **14 business days**. If
-   the appeal succeeds, the account and its key are restored in full. [pending legal review] The contract is terminated, with no refund except the refund of credit bought with money that "Refunds" sets out, only when the appeal is dismissed or the 30 business days pass with no appeal filed.
+   the appeal succeeds, the account and its key are restored in full.
 6. **A register of cases** is kept, so that the same conduct draws the same answer.
+
+[pending legal review] The contract is terminated, with no refund except the refund of credit bought with money that "Refunds" sets out, only when the appeal is dismissed or the 30 business days pass with no appeal filed.
 
 **Business days.** In this section a business day is a normal working day in Thailand: Monday to Friday,
 excluding the public holidays announced by the Prime Minister's Office in the Royal Gazette. The holidays
