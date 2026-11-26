@@ -113,6 +113,7 @@ the pointer to it.
 
 - **The repository moved to the Kolwen-AI organisation.** Its links, badges and package metadata now name `Kolwen-AI/Kolwen`; the published packages keep the old links until the next publish.
 - **The changelog and the served pages name held drafts by topic only, never by their rules or values** (K-211).
+- **The refund entries of the terms gain named cases, a set-off and a change-of-terms clause, held pending counsel** (BB-572, BB-573).
 
 - **The liability, refund and price-change parts of the terms are redrafted and held pending counsel, and the credit wording follows the owner's signed refund decision, preliminary until counsel** (BB-558, BB-559, BB-568). The redrafted terms are not shown on the public pages.
 
@@ -284,8 +285,8 @@ the pointer to it.
 - The enforcement process in `TERMS.md` now covers a customer who does not answer: when the 14 business days close with
   no answer, Kolwen still decides in writing within 7 business days, on the evidence it holds, and the appeal right is
   unchanged. An upheld decision also keeps the account suspended, and the key's clock stopped, through the 30-business-day
-  appeal window and any appeal; the contract is terminated, with no refund, only when the appeal is dismissed or the window
-  passes with none filed, and a successful appeal restores the account and the key in full. The Thai version says the same,
+  appeal window and any appeal; when the contract ends after that, and what is refunded then, is held pending counsel, and
+  a successful appeal restores the account and the key in full. The Thai version says the same,
   and the missed-deadline paragraph reads consistently with both. Still under the pending-legal-review marker.
 - `legal/`: the switch for the Thai 7-day cancellation clause. `legal/legal-state.json` records the seller type and the
   dates on which a legal trigger was met (incorporation, direct-marketing registration, or annual revenue above
