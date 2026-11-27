@@ -14,7 +14,7 @@ downloadable yet, as the Status section says.
 | model | intended seat |
 |---|---|
 | **Kolwen Fern** | planned: a free model with open weights to run yourself; not released, no date set, nothing on sale |
-| **Kolwen Peat** | smallest of the fired line |
+| **Kolwen Peat** | smallest of the service models |
 | **Kolwen Lignite** | the workhorse |
 | **Kolwen Anthracite** | the top—highest-grade coal, hottest and cleanest burn |
 
