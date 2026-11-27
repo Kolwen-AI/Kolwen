@@ -1,6 +1,6 @@
 # Kolwen
 
-**The language model family fired by [TheColliery](https://github.com/TheColliery).**
+**Kolwen is a verifiable AI assistant. In development, not yet available.**
 
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Kolwen-AI/Kolwen?utm_source=oss&utm_medium=github&utm_campaign=Kolwen-AI%2FKolwen&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
