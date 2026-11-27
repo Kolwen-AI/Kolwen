@@ -1,6 +1,6 @@
 # kolwen
 
-**Verifiable AI assistant, fired by [TheColliery](https://github.com/TheColliery).**
+**Kolwen is a verifiable AI assistant. In development, not yet available.**
 
 ## Status
 
